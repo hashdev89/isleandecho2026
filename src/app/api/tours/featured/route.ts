@@ -48,9 +48,9 @@ export async function GET() {
   const startTime = Date.now()
   
   try {
-    // Check cache first
+    // Use cache only when we have data (don't cache empty – allows retry without waiting)
     const now = Date.now()
-    if (featuredToursCache && (now - cacheTimestamp) < CACHE_DURATION) {
+    if (featuredToursCache && featuredToursCache.length > 0 && (now - cacheTimestamp) < CACHE_DURATION) {
       const responseTime = Date.now() - startTime
       return NextResponse.json({ 
         success: true, 
@@ -75,11 +75,12 @@ export async function GET() {
     if (!isSupabaseConfigured) {
       const fallbackTours = loadFallbackTours()
       const featured = fallbackTours.filter(t => t.featured === true)
-      
-      // Update cache
-      featuredToursCache = featured
-      cacheTimestamp = now
-      
+      if (featured.length > 0) {
+        featuredToursCache = featured
+        cacheTimestamp = now
+      } else {
+        featuredToursCache = null
+      }
       const responseTime = Date.now() - startTime
       return NextResponse.json({ 
         success: true, 
@@ -87,9 +88,9 @@ export async function GET() {
         message: 'Featured tours retrieved from fallback storage',
         responseTime: `${responseTime}ms`
       }, {
-        headers: {
-          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
-        }
+        headers: featured.length > 0
+          ? { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' }
+          : { 'Cache-Control': 'no-store, must-revalidate' },
       })
     }
     
@@ -123,7 +124,8 @@ export async function GET() {
     }
     
     if (!data || data.length === 0) {
-      // Still empty: try file fallback
+      // Still empty: try file fallback (don't cache empty)
+      featuredToursCache = null
       const fallbackTours = loadFallbackTours()
       const fromFile = fallbackTours.filter(t => t.featured === true)
       if (fromFile.length > 0) {
@@ -139,6 +141,15 @@ export async function GET() {
           headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' }
         })
       }
+      const responseTime = Date.now() - startTime
+      return NextResponse.json({
+        success: true,
+        data: [],
+        message: 'No featured tours available',
+        responseTime: `${responseTime}ms`
+      }, {
+        headers: { 'Cache-Control': 'no-store, must-revalidate' }
+      })
     }
     
     // Transform database field names to frontend format
@@ -151,11 +162,12 @@ export async function GET() {
       groupSize: (tour as any).group_size ?? (tour as any).groupsize ?? (tour as any).groupSize ?? ((tour as any).important_info as Record<string, unknown>)?.groupSize ?? '',
       bestTime: (tour as any).best_time ?? (tour as any).besttime ?? (tour as any).bestTime ?? ((tour as any).important_info as Record<string, unknown>)?.bestTime ?? ''
     }))
-    
-    // Update cache
-    featuredToursCache = featured
-    cacheTimestamp = now
-    
+    if (featured.length > 0) {
+      featuredToursCache = featured
+      cacheTimestamp = now
+    } else {
+      featuredToursCache = null
+    }
     const responseTime = Date.now() - startTime
     return NextResponse.json({ 
       success: true, 
@@ -163,25 +175,25 @@ export async function GET() {
       message: 'Featured tours retrieved successfully',
       responseTime: `${responseTime}ms`
     }, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
-      }
+      headers: featured.length > 0
+        ? { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' }
+        : { 'Cache-Control': 'no-store, must-revalidate' },
     })
   } catch (error) {
     console.error('Error fetching featured tours:', error)
+    featuredToursCache = null
     const fallbackTours = loadFallbackTours()
     const featured = fallbackTours.filter(t => t.featured === true)
-    
     const responseTime = Date.now() - startTime
     return NextResponse.json({ 
       success: true, 
       data: featured,
-      message: 'Featured tours retrieved from fallback storage due to error',
+      message: featured.length > 0 ? 'Featured tours from fallback due to error' : 'No featured tours available',
       responseTime: `${responseTime}ms`
     }, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
-      }
+      headers: featured.length > 0
+        ? { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' }
+        : { 'Cache-Control': 'no-store, must-revalidate' },
     })
   }
 }

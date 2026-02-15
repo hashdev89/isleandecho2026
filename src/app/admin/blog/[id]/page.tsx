@@ -14,7 +14,21 @@ export default function BlogPostEditor({ params }: { params: Promise<{ id: strin
   const [isLoading, setIsLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [post, setPost] = useState({
+  const [post, setPost] = useState<{
+    id: number | string
+    title: string
+    description: string
+    excerpt: string
+    author: string
+    date: string
+    readTime: string
+    image: string
+    video: string
+    category: string
+    status: string
+    tags: string[]
+    content: string
+  }>({
     id: 0,
     title: "",
     description: "",
@@ -59,27 +73,36 @@ export default function BlogPostEditor({ params }: { params: Promise<{ id: strin
         } else {
           // Load existing post data from API
           const response = await fetch('/api/blog')
-          const posts = await response.json()
+          const data = await response.json()
+          const posts = Array.isArray(data) ? data : []
+          if (!response.ok) {
+            setError((data && typeof data.error === 'string') ? data.error : 'Failed to load blog posts')
+            setLoading(false)
+            return
+          }
           const foundPost = posts.find((p: unknown) => {
             const post = p as Record<string, unknown>
             return String(post.id) === String(resolvedParams.id)
           })
           
           if (foundPost) {
+            const rec = foundPost as Record<string, unknown>
+            const rawId = rec.id
+            const id = rawId != null && rawId !== '' ? (typeof rawId === 'number' ? rawId : String(rawId)) : 0
             setPost({
-              id: foundPost.id,
-              title: foundPost.title || "",
-              description: foundPost.description || "",
-              excerpt: foundPost.excerpt || "",
-              author: foundPost.author || "Isle & Echo Team",
-              date: foundPost.date || new Date().toISOString().split('T')[0],
-              readTime: foundPost.readTime || "",
-              image: foundPost.image || "",
-              video: foundPost.video || "",
-              category: foundPost.category || "Cultural Heritage",
-              status: foundPost.status || "Draft",
-              tags: foundPost.tags || [],
-              content: foundPost.content || ""
+              id,
+              title: (rec.title as string) || "",
+              description: (rec.description as string) || "",
+              excerpt: (rec.excerpt as string) || "",
+              author: (rec.author as string) || "Isle & Echo Team",
+              date: (rec.date as string) || new Date().toISOString().split('T')[0],
+              readTime: (rec.readTime as string) || "",
+              image: (rec.image as string) || "",
+              video: (rec.video as string) || "",
+              category: (rec.category as string) || "Cultural Heritage",
+              status: (rec.status as string) || "Draft",
+              tags: (Array.isArray(rec.tags) ? rec.tags : []) as string[],
+              content: (rec.content as string) || ""
             })
           } else {
             setError('Blog post not found')

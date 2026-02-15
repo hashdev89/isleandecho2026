@@ -1,14 +1,26 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
-import { use, useState, useEffect } from 'react'
+import { use, useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Header from '../../../components/Header'
-import { Calendar, Clock, User, ArrowLeft, Play, Share2, Bookmark } from 'lucide-react'
+import { Calendar, Clock, User, ArrowLeft, Share2, Bookmark, Check, Copy } from 'lucide-react'
+
+const SAVED_POSTS_KEY = 'isleandecho_saved_blog_posts'
 
 interface BlogPostPageProps {
   params: Promise<{ id: string }>
+}
+
+function getSavedPosts(): { id: string; title: string; url: string }[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(SAVED_POSTS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
 }
 
 export default function BlogPostPage({ params }: BlogPostPageProps) {
@@ -18,6 +30,9 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
   const [allPosts, setAllPosts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [copyDone, setCopyDone] = useState(false)
 
   useEffect(() => {
     const fetchBlogPost = async () => {
@@ -49,6 +64,60 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
 
     fetchBlogPost()
   }, [resolvedParams.id])
+
+  const postUrl = typeof window !== 'undefined' ? `${window.location.origin}/blog/${resolvedParams.id}` : ''
+  const shareTitle = post?.title ?? ''
+  const shareText = post?.description ?? post?.excerpt ?? ''
+
+  useEffect(() => {
+    if (!post) return
+    const list = getSavedPosts()
+    setSaved(list.some((p) => String(p.id) === String(post.id)))
+  }, [post])
+
+  const handleShare = useCallback(async () => {
+    const url = typeof window !== 'undefined' ? `${window.location.origin}/blog/${resolvedParams.id}` : postUrl
+    const title = post?.title ?? ''
+    const text = post?.description ?? post?.excerpt ?? ''
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title, text, url })
+        setShareOpen(false)
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') setShareOpen(true)
+      }
+    } else {
+      setShareOpen(true)
+    }
+  }, [post, resolvedParams.id, postUrl])
+
+  const copyLink = useCallback(async () => {
+    const url = typeof window !== 'undefined' ? `${window.location.origin}/blog/${resolvedParams.id}` : postUrl
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopyDone(true)
+      setShareOpen(false)
+      setTimeout(() => setCopyDone(false), 2000)
+    } catch {
+      setShareOpen(false)
+    }
+  }, [resolvedParams.id, postUrl])
+
+  const handleSave = useCallback(() => {
+    if (!post) return
+    const list = getSavedPosts()
+    const idStr = String(post.id)
+    const url = typeof window !== 'undefined' ? `${window.location.origin}/blog/${resolvedParams.id}` : ''
+    const entry = { id: idStr, title: post.title ?? '', url }
+    const exists = list.some((p) => String(p.id) === idStr)
+    const next = exists ? list.filter((p) => String(p.id) !== idStr) : [...list, entry]
+    try {
+      localStorage.setItem(SAVED_POSTS_KEY, JSON.stringify(next))
+      setSaved(!exists)
+    } catch {
+      // ignore
+    }
+  }, [post, resolvedParams.id])
 
   if (loading) {
     return (
@@ -89,9 +158,19 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
     <div className="min-h-screen bg-gray-50">
       <Header />
       
-      {/* Hero Section */}
-      <section className="relative bg-gray-900 text-white">
-        <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+      {/* Hero Section - image background with 90% black overlay */}
+      <section className="relative min-h-[28rem] flex flex-col justify-end text-white">
+        {post.image ? (
+          <>
+            <div
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+              style={{ backgroundImage: `url(${post.image})` }}
+            />
+            <div className="absolute inset-0 bg-black/90" aria-hidden />
+          </>
+        ) : (
+          <div className="absolute inset-0 bg-gray-900" />
+        )}
         <div className="relative container mx-auto px-4 py-16">
           <button
             onClick={() => router.push('/blog')}
@@ -134,15 +213,72 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
               ))}
             </div>
             
-            {/* Action Buttons */}
-            <div className="flex items-center gap-4">
-              <button className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                <Share2 className="w-4 h-4 mr-2" />
-                Share
-              </button>
-              <button className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                <Bookmark className="w-4 h-4 mr-2" />
-                Save
+            {/* Action Buttons - Share (social + copy) & Save in browser */}
+            <div className="flex items-center gap-4 relative">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => (shareOpen ? setShareOpen(false) : handleShare())}
+                  className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share
+                </button>
+                {shareOpen && (
+                  <>
+                    <div className="absolute left-0 top-full mt-1 py-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-20">
+                      <button
+                        type="button"
+                        onClick={copyLink}
+                        className="flex items-center w-full px-4 py-2 text-left text-gray-800 hover:bg-gray-100"
+                      >
+                        {copyDone ? <Check className="w-4 h-4 mr-2 text-green-600" /> : <Copy className="w-4 h-4 mr-2" />}
+                        {copyDone ? 'Copied!' : 'Copy link'}
+                      </button>
+                      <a
+                        href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareTitle)}&url=${encodeURIComponent(postUrl)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center w-full px-4 py-2 text-left text-gray-800 hover:bg-gray-100"
+                      >
+                        X (Twitter)
+                      </a>
+                      <a
+                        href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center w-full px-4 py-2 text-left text-gray-800 hover:bg-gray-100"
+                      >
+                        Facebook
+                      </a>
+                      <a
+                        href={`https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(postUrl)}&title=${encodeURIComponent(shareTitle)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center w-full px-4 py-2 text-left text-gray-800 hover:bg-gray-100"
+                      >
+                        LinkedIn
+                      </a>
+                      <a
+                        href={`https://wa.me/?text=${encodeURIComponent(shareTitle + ' ' + postUrl)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center w-full px-4 py-2 text-left text-gray-800 hover:bg-gray-100"
+                      >
+                        WhatsApp
+                      </a>
+                    </div>
+                    <div className="fixed inset-0 z-10" aria-hidden onClick={() => setShareOpen(false)} />
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleSave}
+                className={`flex items-center px-4 py-2 rounded-lg transition-colors ${saved ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+              >
+                {saved ? <Check className="w-4 h-4 mr-2" /> : <Bookmark className="w-4 h-4 mr-2" />}
+                {saved ? 'Saved' : 'Save'}
               </button>
             </div>
           </div>
@@ -154,48 +290,35 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
         <div className="container mx-auto px-4">
           <div className="mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Main Content */}
+              {/* Main Content - no image in body */}
               <div className="lg:col-span-2">
-                {/* Featured Image/Video */}
-                <div className="relative h-96 bg-gray-200 rounded-lg overflow-hidden mb-8">
-                  {post.video ? (
-                    <div className="relative w-full h-full">
-                      <iframe
-                        src={post.video}
-                        title={post.title}
-                        className="w-full h-full"
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                      <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-                        <Play className="w-12 h-12 text-white" />
-                      </div>
-                    </div>
-                  ) : (
-                    <Image
-                      src={post.image || '/placeholder-image.svg'}
-                      alt={post.title}
-                      width={800}
-                      height={400}
-                      className="w-full h-full object-cover"
-                      priority
-                    />
-                  )}
-                </div>
-
-                {/* Article Content */}
-                <article className="prose prose-lg max-w-none">
-                  <div className="text-gray-700 leading-relaxed">
+                {/* Article Content with clear paragraph separation */}
+                <article className="prose prose-lg max-w-none prose-p:mb-5 prose-p:leading-relaxed prose-headings:mb-4 prose-headings:mt-6 first:prose-p:mt-0">
+                  <div className="text-gray-700">
                     {post.content ? (
-                      <div dangerouslySetInnerHTML={{ __html: post.content }} />
+                      (() => {
+                        const html = post.content.trim()
+                        const hasTags = /<[a-z][\s\S]*>/i.test(html)
+                        if (hasTags) {
+                          return <div className="blog-content" dangerouslySetInnerHTML={{ __html: post.content }} />
+                        }
+                        return (
+                          <div className="blog-content space-y-5">
+                            {html.split(/\n\n+/).filter(Boolean).map((para: string, i: number) => (
+                              <p key={i} className="leading-relaxed">
+                                {para.split(/\n/).join(' ')}
+                              </p>
+                            ))}
+                          </div>
+                        )
+                      })()
                     ) : (
-                      <div>
-                        <p className="mb-6 text-lg leading-relaxed">
+                      <div className="space-y-5">
+                        <p className="text-lg leading-relaxed">
                           {post.description || post.excerpt || 'Content coming soon...'}
                         </p>
-                        <p className="mb-6 text-lg leading-relaxed">
-                          This blog post is currently being updated with more detailed content. 
+                        <p className="text-lg leading-relaxed">
+                          This blog post is currently being updated with more detailed content.
                           Please check back soon for the complete article.
                         </p>
                       </div>

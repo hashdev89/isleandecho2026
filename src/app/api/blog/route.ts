@@ -14,7 +14,7 @@ const ensureDataDir = () => {
 }
 
 interface BlogPost {
-  id: number
+  id: number | string
   title: string
   description: string
   excerpt: string
@@ -30,7 +30,7 @@ interface BlogPost {
 }
 
 type BlogRow = {
-  id: number
+  id: number | string
   title: string
   description: string | null
   excerpt: string | null
@@ -60,9 +60,19 @@ function slugFromTitle(title: string): string {
   return s || `post-${Date.now()}`
 }
 
-function rowToPost(row: BlogRow): BlogPost {
+function rowToPost(row: BlogRow & Record<string, unknown>): BlogPost {
+  const raw = row.id ?? row.Id ?? row.ID
+  let id: number | string =
+    raw == null || raw === ''
+      ? 0
+      : typeof raw === 'number' && Number.isInteger(raw)
+        ? raw
+        : typeof raw === 'string'
+          ? (Number(raw).toString() === raw ? Number(raw) : raw)
+          : Number(raw)
+  if (typeof id === 'number' && Number.isNaN(id)) id = 0
   return {
-    id: row.id,
+    id,
     title: row.title,
     description: row.description ?? '',
     excerpt: row.excerpt ?? '',
@@ -204,7 +214,8 @@ export async function POST(request: NextRequest) {
     }
 
     const fallbackPosts = loadFallbackBlogPosts()
-    const newId = fallbackPosts.length > 0 ? Math.max(...fallbackPosts.map((p) => p.id)) + 1 : 1
+    const numericIds = fallbackPosts.map((p) => (typeof p.id === 'number' ? p.id : Number(p.id))).filter((n) => Number.isFinite(n)) as number[]
+    const newId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1
     const newPost: BlogPost = {
       id: newId,
       ...body,
@@ -228,8 +239,9 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
     const { id, ...rest } = body
-    if (id == null) {
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    const idForDb = id != null && String(id).trim() !== '' ? (typeof id === 'string' ? id.trim() : String(id)) : null
+    if (idForDb == null) {
+      return NextResponse.json({ error: 'Missing or invalid id' }, { status: 400 })
     }
 
     if (isVercel && !isSupabaseConfigured()) {
@@ -240,11 +252,12 @@ export async function PUT(request: NextRequest) {
     }
 
     if (isSupabaseConfigured()) {
-      const updatePayload = postToRow(rest)
+      const row = postToRow(rest)
+      const { slug: _slug, ...updatePayload } = row
       const { data, error } = await supabaseAdmin
         .from('blog_posts')
         .update({ ...updatePayload, updated_at: new Date().toISOString() })
-        .eq('id', Number(id))
+        .eq('id', idForDb)
         .select('*')
         .single()
 
@@ -252,7 +265,7 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json(rowToPost(data as BlogRow))
       }
       if (error?.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Blog post not found' }, { status: 404 })
+        return NextResponse.json({ error: 'Blog post not found', details: `No post with id ${idForDb}.` }, { status: 404 })
       }
       console.error('Supabase blog_posts update error:', error)
       if (isVercel) {
@@ -265,7 +278,8 @@ export async function PUT(request: NextRequest) {
     }
 
     const fallbackPosts = loadFallbackBlogPosts()
-    const idx = fallbackPosts.findIndex((p) => String(p.id) === String(id))
+    const numericId = Number(idForDb)
+    const idx = fallbackPosts.findIndex((p) => String(p.id) === idForDb || (Number.isFinite(numericId) && Number(p.id) === numericId))
     if (idx === -1) {
       return NextResponse.json({ error: 'Blog post not found' }, { status: 404 })
     }
@@ -285,9 +299,16 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-    if (!id) {
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    const idParam = searchParams.get('id')
+    if (idParam == null || idParam.trim() === '') {
+      return NextResponse.json({ error: 'Missing or invalid id' }, { status: 400 })
+    }
+    const idForDb = idParam.trim()
+    if (idForDb === '0' && isSupabaseConfigured()) {
+      return NextResponse.json({
+        error: 'Invalid post id.',
+        details: 'This usually means the list is out of date. Refresh the blog list and try again.',
+      }, { status: 400 })
     }
 
     if (isVercel && !isSupabaseConfigured()) {
@@ -298,28 +319,28 @@ export async function DELETE(request: NextRequest) {
     }
 
     if (isSupabaseConfigured()) {
-      const { error } = await supabaseAdmin
+      const { data, error } = await supabaseAdmin
         .from('blog_posts')
         .delete()
-        .eq('id', Number(id))
+        .eq('id', idForDb)
+        .select('id')
 
-      if (!error) {
-        return NextResponse.json({ deleted: true })
-      }
-      if (error?.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Blog post not found' }, { status: 404 })
-      }
-      console.error('Supabase blog_posts delete error:', error)
-      if (isVercel) {
+      if (error) {
+        console.error('Supabase blog_posts delete error:', error)
         return NextResponse.json(
           { error: 'Failed to delete blog post.', details: (error as { message?: string })?.message },
           { status: 500 }
         )
       }
+      if (!data || data.length === 0) {
+        return NextResponse.json({ error: 'Blog post not found', details: `No post with id ${idForDb}.` }, { status: 404 })
+      }
+      return NextResponse.json({ deleted: true })
     }
 
     const fallbackPosts = loadFallbackBlogPosts()
-    const idx = fallbackPosts.findIndex((p) => p.id === Number(id))
+    const numericId = Number(idForDb)
+    const idx = fallbackPosts.findIndex((p) => String(p.id) === idForDb || (Number.isFinite(numericId) && Number(p.id) === numericId))
     if (idx === -1) {
       return NextResponse.json({ error: 'Blog post not found' }, { status: 404 })
     }

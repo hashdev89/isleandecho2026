@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useAuth } from '../../../contexts/AuthContext'
 
 interface BlogPost {
-  id: number
+  id: number | string
   title: string
   description: string
   excerpt: string
@@ -47,10 +47,13 @@ export default function AdminBlogPage() {
       const response = await fetch('/api/blog')
       const result = await response.json()
       
-      if (response.ok) {
-        setPosts(result)
+      if (response.ok && Array.isArray(result)) {
+        setPosts(result.map((p: BlogPost) => ({
+          ...p,
+          id: p.id ?? 0,
+        })))
       } else {
-        console.error('Failed to fetch blog posts:', result.error)
+        console.error('Failed to fetch blog posts', result?.error)
       }
     } catch (error) {
       console.error('Error fetching blog posts:', error)
@@ -69,19 +72,23 @@ export default function AdminBlogPage() {
     return matchesSearch && matchesCategory && matchesStatus
   })
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: number | string) => {
+    const idStr = id != null ? String(id).trim() : ''
+    if (!idStr || idStr === '0') {
+      alert('Cannot delete: invalid post id. Refresh the blog list and try again.')
+      return
+    }
     if (confirm('Are you sure you want to delete this blog post?')) {
       try {
-        const response = await fetch(`/api/blog?id=${id}`, {
+        const response = await fetch(`/api/blog?id=${encodeURIComponent(idStr)}`, {
           method: 'DELETE'
         })
         
         if (response.ok) {
-          // Remove from local state
-          setPosts(posts.filter(post => post.id !== id))
+          setPosts(posts.filter(post => String(post.id) !== idStr))
         } else {
           const result = await response.json()
-          alert(`Failed to delete post: ${result.error}`)
+          alert(`Failed to delete post: ${result?.error || 'Unknown error'}${result?.details ? ` (${result.details})` : ''}`)
         }
       } catch (error) {
         console.error('Error deleting blog post:', error)
@@ -221,8 +228,8 @@ export default function AdminBlogPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredPosts.map(post => (
-                <tr key={post.id} className="hover:bg-gray-50">
+              {filteredPosts.map((post, index) => (
+                <tr key={post.id != null && post.id !== '' ? `post-${String(post.id)}` : `post-row-${index}`} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-12 w-12">
@@ -280,7 +287,9 @@ export default function AdminBlogPage() {
                       </Link>
                       <button
                         onClick={() => handleDelete(post.id)}
-                        className="text-red-600 hover:text-red-900"
+                        disabled={post.id === 0 || post.id === '0' || String(post.id).trim() === ''}
+                        title={post.id === 0 || post.id === '0' ? 'Refresh the list to fix this post\'s id' : 'Delete post'}
+                        className="text-red-600 hover:text-red-900 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

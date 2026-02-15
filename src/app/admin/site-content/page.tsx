@@ -30,6 +30,9 @@ export default function AdminSiteContentPage() {
   const [heroImageSelectorOpen, setHeroImageSelectorOpen] = useState(false)
   const [heroImageSelectIndex, setHeroImageSelectIndex] = useState<number | null>(null)
   const [sriLankaImageSelectorOpen, setSriLankaImageSelectorOpen] = useState(false)
+  const [aboutImageSelectorOpen, setAboutImageSelectorOpen] = useState(false)
+  const [solutionsImageSelectorOpen, setSolutionsImageSelectorOpen] = useState(false)
+  const [solutionsImageSelectIndex, setSolutionsImageSelectIndex] = useState<number | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -198,7 +201,7 @@ export default function AdminSiteContentPage() {
               <div className="space-y-4">
                 {(Array.isArray(hero.heroImages) ? (hero.heroImages as string[]) : []).map((url, index) => (
                   <div key={index} className="relative inline-block align-top">
-                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-gray-50 dark:bg-gray-700/50 inline-block">
+                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-gray-50 dark:bg-gray-700/50 inline-block min-w-[280px]">
                       {typeof url === 'string' && url ? (
                         <img
                           src={url}
@@ -211,30 +214,44 @@ export default function AdminSiteContentPage() {
                           No image
                         </div>
                       )}
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setHeroImageSelectIndex(index)
-                            setHeroImageSelectorOpen(true)
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                        >
-                          <Plus className="h-4 w-4" />
-                          {url ? 'Change Image' : 'Upload or Select Image'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const list = Array.isArray(hero.heroImages) ? (hero.heroImages as string[]).filter((_, i) => i !== index) : []
+                      <div className="mt-2 space-y-2">
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Image URL</label>
+                        <input
+                          type="url"
+                          value={typeof url === 'string' ? url : ''}
+                          onChange={(e) => {
+                            const list = Array.isArray(hero.heroImages) ? [...(hero.heroImages as string[])] : []
+                            list[index] = e.target.value
                             update('hero', { heroImages: list })
                           }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
-                          title="Remove slide"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Remove
-                        </button>
+                          placeholder="Paste image URL or use Upload below"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                        />
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHeroImageSelectIndex(index)
+                              setHeroImageSelectorOpen(true)
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                          >
+                            <Plus className="h-4 w-4" />
+                            {url ? 'Change Image' : 'Upload or Select Image'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const list = Array.isArray(hero.heroImages) ? (hero.heroImages as string[]).filter((_, i) => i !== index) : []
+                              update('hero', { heroImages: list })
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
+                            title="Remove slide"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -290,15 +307,24 @@ export default function AdminSiteContentPage() {
             <Input label="Subtitle" value={String(sriLanka.subtitle ?? '')} onChange={(v) => update('sriLankaBanner', { subtitle: v })} />
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Background image</label>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Upload or select an image like in the Tours section.</p>
-              <button
-                type="button"
-                onClick={() => setSriLankaImageSelectorOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                {sriLanka.backgroundImage ? 'Change Image' : 'Upload or Select Image'}
-              </button>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Paste an image URL or upload/select from library.</p>
+              <div className="space-y-2 mb-3">
+                <input
+                  type="url"
+                  value={typeof sriLanka.backgroundImage === 'string' ? sriLanka.backgroundImage : ''}
+                  onChange={(e) => update('sriLankaBanner', { backgroundImage: e.target.value })}
+                  placeholder="https://... or leave empty and use Upload"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSriLankaImageSelectorOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  {sriLanka.backgroundImage ? 'Change Image' : 'Upload or Select Image'}
+                </button>
+              </div>
               {typeof sriLanka.backgroundImage === 'string' && sriLanka.backgroundImage ? (
                 <div className="mt-4 relative inline-block">
                   <img
@@ -349,11 +375,81 @@ export default function AdminSiteContentPage() {
         )}
 
         {activeTab === 'solutions' && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Discover Sri Lanka (Solutions) Section</h2>
             <Input label="Section title" value={String(solutions.sectionTitle ?? '')} onChange={(v) => update('solutions', { sectionTitle: v })} />
             <Input label="Section subtitle" value={String(solutions.sectionSubtitle ?? '')} onChange={(v) => update('solutions', { sectionSubtitle: v })} multiline />
-            <p className="text-sm text-gray-500 dark:text-gray-400">Items are edited as JSON or via structured form in a later iteration. For now, section title/subtitle above control the heading.</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Solution items (each with image)</label>
+              {(Array.isArray(solutions.items) ? (solutions.items as Array<{ title?: string; description?: string; image?: string; highlights?: string[] }>) : []).map((item, idx) => (
+                <div key={idx} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-4 bg-gray-50 dark:bg-gray-700/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Item {idx + 1}</span>
+                  </div>
+                  <Input label="Title" value={String(item?.title ?? '')} onChange={(v) => {
+                    const items = [...(Array.isArray(solutions.items) ? (solutions.items as Array<Record<string, unknown>>) : [])]
+                    if (!items[idx]) items[idx] = {}
+                    items[idx] = { ...items[idx], title: v }
+                    setContent((prev) => ({ ...prev, solutions: { ...solutions, items } }))
+                  }} />
+                  <Input label="Description" value={String(item?.description ?? '')} onChange={(v) => {
+                    const items = [...(Array.isArray(solutions.items) ? (solutions.items as Array<Record<string, unknown>>) : [])]
+                    if (!items[idx]) items[idx] = {}
+                    items[idx] = { ...items[idx], description: v }
+                    setContent((prev) => ({ ...prev, solutions: { ...solutions, items } }))
+                  }} multiline />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Image (URL or upload)</label>
+                    <input
+                      type="url"
+                      value={String(item?.image ?? '')}
+                      onChange={(e) => {
+                        const items = [...(Array.isArray(solutions.items) ? (solutions.items as Array<Record<string, unknown>>) : [])]
+                        if (!items[idx]) items[idx] = {}
+                        items[idx] = { ...items[idx], image: e.target.value }
+                        setContent((prev) => ({ ...prev, solutions: { ...solutions, items } }))
+                      }}
+                      placeholder="Paste image URL or use Upload below"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white mb-2"
+                    />
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSolutionsImageSelectIndex(idx)
+                          setSolutionsImageSelectorOpen(true)
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                      >
+                        <Plus className="h-4 w-4" />
+                        {item?.image ? 'Change Image' : 'Upload or Select Image'}
+                      </button>
+                      {typeof item?.image === 'string' && item.image ? (
+                        <div className="inline-block relative">
+                          <img src={item.image} alt="" className="h-16 w-24 object-cover rounded border border-gray-200 dark:border-gray-600" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Highlights (comma-separated)</label>
+                    <input
+                      type="text"
+                      value={Array.isArray(item?.highlights) ? (item.highlights as string[]).join(', ') : ''}
+                      onChange={(e) => {
+                        const highlights = e.target.value.split(',').map((s) => s.trim()).filter(Boolean)
+                        const items = [...(Array.isArray(solutions.items) ? (solutions.items as Array<Record<string, unknown>>) : [])]
+                        if (!items[idx]) items[idx] = {}
+                        items[idx] = { ...items[idx], highlights }
+                        setContent((prev) => ({ ...prev, solutions: { ...solutions, items } }))
+                      }}
+                      placeholder="e.g. Sigiriya, Temple of the Tooth"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -382,7 +478,43 @@ export default function AdminSiteContentPage() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">About</h2>
             <Input label="Title" value={String(about.title ?? '')} onChange={(v) => update('about', { title: v })} />
             <Input label="Description" value={String(about.description ?? '')} onChange={(v) => update('about', { description: v })} multiline />
-            <Input label="Image URL (optional)" value={String(about.image ?? '')} onChange={(v) => update('about', { image: v })} />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Image (URL or upload)</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Paste an image URL or upload/select from library.</p>
+              <input
+                type="url"
+                value={String(about.image ?? '')}
+                onChange={(e) => update('about', { image: e.target.value })}
+                placeholder="https://... or use Upload below"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white mb-2"
+              />
+              <button
+                type="button"
+                onClick={() => setAboutImageSelectorOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                {about.image ? 'Change Image' : 'Upload or Select Image'}
+              </button>
+              {typeof about.image === 'string' && about.image ? (
+                <div className="mt-4 relative inline-block">
+                  <img
+                    src={String(about.image)}
+                    alt="About"
+                    className="max-w-full h-40 object-cover rounded-lg border border-gray-200 dark:border-gray-600"
+                    onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-image.svg' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => update('about', { image: '' })}
+                    className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                    title="Remove image"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         )}
 
@@ -495,6 +627,40 @@ export default function AdminSiteContentPage() {
           setSriLankaImageSelectorOpen(false)
         }}
         currentImageUrl={sriLanka.backgroundImage ? String(sriLanka.backgroundImage) : undefined}
+      />
+
+      {/* About image selector */}
+      <ImageSelector
+        isOpen={aboutImageSelectorOpen}
+        onClose={() => setAboutImageSelectorOpen(false)}
+        onSelect={(imageUrl) => {
+          update('about', { image: imageUrl })
+          setAboutImageSelectorOpen(false)
+        }}
+        currentImageUrl={about.image ? String(about.image) : undefined}
+      />
+
+      {/* Solutions item image selector */}
+      <ImageSelector
+        isOpen={solutionsImageSelectorOpen}
+        onClose={() => {
+          setSolutionsImageSelectorOpen(false)
+          setSolutionsImageSelectIndex(null)
+        }}
+        onSelect={(imageUrl) => {
+          if (solutionsImageSelectIndex === null) return
+          const items = [...(Array.isArray(solutions.items) ? (solutions.items as Array<Record<string, unknown>>) : [])]
+          if (!items[solutionsImageSelectIndex]) items[solutionsImageSelectIndex] = {}
+          items[solutionsImageSelectIndex] = { ...items[solutionsImageSelectIndex], image: imageUrl }
+          setContent((prev) => ({ ...prev, solutions: { ...solutions, items } }))
+          setSolutionsImageSelectorOpen(false)
+          setSolutionsImageSelectIndex(null)
+        }}
+        currentImageUrl={
+          solutionsImageSelectIndex !== null && Array.isArray(solutions.items) && (solutions.items as Array<{ image?: string }>)[solutionsImageSelectIndex]?.image
+            ? (solutions.items as Array<{ image?: string }>)[solutionsImageSelectIndex].image
+            : undefined
+        }
       />
     </div>
   )

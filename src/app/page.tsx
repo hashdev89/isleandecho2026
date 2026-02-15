@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
@@ -209,7 +209,8 @@ export default function HomePage() {
             const timeoutId = setTimeout(() => controller.abort(), timeout)
             const response = await fetch(url, {
               signal: controller.signal,
-              next: { revalidate: 300 }
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-cache' }
             })
             clearTimeout(timeoutId)
             return response
@@ -448,13 +449,50 @@ export default function HomePage() {
     }
   }, [])
 
-  // Statistics data inspired by Swimlane's approach
+  // Statistics data – numericValue/suffix used for counter animation
   const stats = [
-    { number: '500+', label: 'Happy Travelers', icon: Users },
-    { number: '50+', label: 'Tour Packages', icon: Globe },
-    { number: '4.9', label: 'Average Rating', icon: Star },
-    { number: '24/7', label: 'Customer Support', icon: Headphones }
+    { number: '500+', label: 'Happy Travelers', icon: Users, numericValue: 500, suffix: '+' },
+    { number: '50+', label: 'Tour Packages', icon: Globe, numericValue: 50, suffix: '+' },
+    { number: '4.9', label: 'Average Rating', icon: Star, numericValue: 4.9, suffix: '' },
+    { number: '24/7', label: 'Customer Support', icon: Headphones, numericValue: 24, suffix: '/7' }
   ]
+
+  const statsSectionRef = useRef<HTMLElement>(null)
+  const [statsInView, setStatsInView] = useState(false)
+  const [animatedValues, setAnimatedValues] = useState<number[]>(stats.map(() => 0))
+
+  useEffect(() => {
+    const el = statsSectionRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) setStatsInView(true)
+      },
+      { threshold: 0.2, rootMargin: '0px' }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!statsInView) return
+    const duration = 1800
+    const start = performance.now()
+    const endValues = stats.map((s) => (s as { numericValue: number }).numericValue)
+
+    const tick = (now: number) => {
+      const elapsed = now - start
+      const t = Math.min(elapsed / duration, 1)
+      const easeOut = 1 - Math.pow(1 - t, 3)
+      const next = endValues.map((end, i) => {
+        const value = 0 + (end - 0) * easeOut
+        return i === 2 ? Math.round(value * 10) / 10 : Math.round(value)
+      })
+      setAnimatedValues(t >= 1 ? endValues : next)
+      if (t < 1) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }, [statsInView])
 
   // Features inspired by Swimlane's feature cards
   const features = [
@@ -765,9 +803,9 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Carousel Navigation - only when we have slides */}
+        {/* Carousel Navigation - z-index below navbar (navbar is z-[100]) so arrows don't overlap header */}
         {hasHeroSlides && (
-        <div className="absolute inset-0 z-[9999] hidden sm:flex items-center justify-between px-4 sm:px-6 lg:px-8 pointer-events-none">
+        <div className="absolute inset-0 z-10 hidden sm:flex items-center justify-between px-4 sm:px-6 lg:px-8 pointer-events-none">
           <button
             onClick={(e) => {
               e.preventDefault()
@@ -775,7 +813,6 @@ export default function HomePage() {
               prevSlide()
             }}
             className="bg-white/10 hover:bg-blue-600 active:bg-blue-800 backdrop-blur-sm border border-white/30 hover:border-blue-600 text-white rounded-full p-3 sm:p-4 transition-all duration-300 pointer-events-auto flex items-center justify-center shadow-lg hover:shadow-xl"
-            style={{ cursor: 'pointer', zIndex: 10000 }}
             aria-label="Previous slide"
             type="button"
           >
@@ -790,7 +827,6 @@ export default function HomePage() {
               nextSlide()
             }}
             className="bg-white/10 hover:bg-blue-600 active:bg-blue-800 backdrop-blur-sm border border-white/30 hover:border-blue-600 text-white rounded-full p-3 sm:p-4 transition-all duration-300 pointer-events-auto flex items-center justify-center shadow-lg hover:shadow-xl"
-            style={{ cursor: 'pointer', zIndex: 10000 }}
             aria-label="Next slide"
             type="button"
           >
@@ -1290,8 +1326,8 @@ export default function HomePage() {
       <section className="py-8 sm:py-12 bg-white dark:bg-gray-900">
         <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="pr-5 text-xl sm:text-2xl font-bold mb-6 sm:mb-8 text-gray-900 dark:text-white">Featured Tour Packages</h2>
-          <div className="relative">
-            {/* Slider Container */}
+          <div className="relative pl-12 pr-12 sm:pl-14 sm:pr-14">
+            {/* Slider Container - content inset so arrows sit outside */}
             <div 
               id="tour-slider"
               className="flex overflow-x-auto space-x-4 sm:space-x-6 pb-4 scrollbar-hide scroll-smooth px-2 sm:px-0 snap-x snap-mandatory"
@@ -1376,48 +1412,48 @@ export default function HomePage() {
             )}
             </div>
 
-            {/* Dots Indicator - Active highlighting and click navigation */}
+            {/* Left/Right arrows - outside slider, in padded area */}
             {featuredTours && featuredTours.length > 0 && (
-            <div className="flex justify-center mt-3 sm:mt-4 space-x-1.5">
-              {featuredTours.map((_: Tour, index: number) => (
+              <>
                 <button
-                  key={index}
-                  onClick={() => goToSlide(index)}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 hover:scale-110 active:scale-95 min-w-[28px] min-h-[28px] flex items-center justify-center touch-manipulation ${
-                    index === currentSlide 
-                      ? 'bg-blue-600 dark:bg-blue-500 shadow-md' 
-                      : 'bg-gray-300 dark:bg-gray-600 hover:bg-blue-400 dark:hover:bg-blue-600'
-                  }`}
-                  aria-label={`Go to slide ${index + 1}`}
+                  type="button"
+                  aria-label="Previous tour"
+                  onClick={() => goToSlide(Math.max(0, currentSlide - 1))}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-[1] w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600"
                 >
-                  <span className={`w-2 h-2 rounded-full block ${
-                    index === currentSlide 
-                      ? 'bg-white dark:bg-gray-200' 
-                      : 'bg-gray-500 dark:bg-gray-400'
-                  }`}></span>
+                  <ChevronLeft className="w-6 h-6" />
                 </button>
-              ))}
-            </div>
+                <button
+                  type="button"
+                  aria-label="Next tour"
+                  onClick={() => goToSlide(Math.min(featuredTours.length - 1, currentSlide + 1))}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-[1] w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
             )}
           </div>
         </div>
       </section>
 
-      {/* Statistics Section - Inspired by Swimlane's stats */}
-      <section className="py-12 sm:py-16 bg-gray-50 dark:bg-gray-800">
+      {/* Statistics Section – larger section with animated counters */}
+      <section ref={statsSectionRef} className="py-16 sm:py-20 md:py-24 bg-gray-50 dark:bg-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 md:gap-12">
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
-                <div className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-blue-600 dark:bg-blue-500 rounded-full mb-3 sm:mb-4">
-                  <stat.icon className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white" />
-          </div>
-                <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 sm:mb-2">{stat.number}</div>
-                <div className="text-sm sm:text-base text-gray-800 dark:text-gray-300">{stat.label}</div>
-                       </div>
+                <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-blue-600 dark:bg-blue-500 rounded-full mb-4 sm:mb-6">
+                  <stat.icon className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white" />
+                </div>
+                <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3 tabular-nums">
+                  {index === 3 ? '24/7' : (statsInView ? `${animatedValues[index]}${(stat as { suffix: string }).suffix}` : `0${(stat as { suffix: string }).suffix}`)}
+                </div>
+                <div className="text-base sm:text-lg md:text-xl text-gray-800 dark:text-gray-300">{stat.label}</div>
+              </div>
             ))}
-                     </div>
-                   </div>
+          </div>
+        </div>
       </section>
 
 
@@ -1599,12 +1635,12 @@ export default function HomePage() {
 
           {blogPosts.length > 0 ? (
             <>
-              <div className="relative">
+              <div className="relative pl-12 pr-12 sm:pl-14 sm:pr-14">
                 <button
                   type="button"
                   aria-label="Previous blog posts"
                   onClick={() => setBlogCarouselIndex(i => Math.max(0, i - 1))}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-100 -translate-x-2 sm:translate-x-0"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-[1] w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-100 border border-gray-200"
                 >
                   <ChevronLeft className="w-6 h-6" />
                 </button>
@@ -1612,7 +1648,7 @@ export default function HomePage() {
                   type="button"
                   aria-label="Next blog posts"
                   onClick={() => setBlogCarouselIndex(i => Math.min(Math.max(0, Math.ceil(blogPosts.length / 3) - 1), i + 1))}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-100 translate-x-2 sm:translate-x-0"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-[1] w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-100 border border-gray-200"
                 >
                   <ChevronRight className="w-6 h-6" />
                 </button>
@@ -1655,17 +1691,6 @@ export default function HomePage() {
                       </div>
                     ))}
                   </div>
-                </div>
-                <div className="flex justify-center gap-1.5 mt-4">
-                  {Array.from({ length: Math.ceil(blogPosts.length / 3) }).map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      aria-label={`Go to blog slide ${i + 1}`}
-                      onClick={() => setBlogCarouselIndex(i)}
-                      className={`w-1.5 h-1.5 rounded-full transition-colors ${i === blogCarouselIndex ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
-                    />
-                  ))}
                 </div>
               </div>
               <div className="text-center mt-10">

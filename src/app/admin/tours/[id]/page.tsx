@@ -377,10 +377,6 @@ export default function TourEditor() {
         alert('Please enter a duration')
         return
       }
-      if (!tour.price?.trim()) {
-        alert('Please enter a price')
-        return
-      }
 
       // Ensure itinerary includes ALL days and ALL fields - don't filter anything out
       const currentItinerary = tour.itinerary || []
@@ -1104,7 +1100,7 @@ export default function TourEditor() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Price <span className="text-red-500">*</span>
+                  Price <span className="text-gray-400 text-xs">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -1112,7 +1108,6 @@ export default function TourEditor() {
                   onChange={(e) => setTour({ ...tour, price: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., $899"
-                  required
                 />
               </div>
               <div>
