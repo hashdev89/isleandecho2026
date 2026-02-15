@@ -26,7 +26,7 @@ export default function ContactMap({ lat, lng, address }: ContactMapProps) {
         document.head.appendChild(link)
       }
       
-      mapboxgl.default.accessToken = 'pk.eyJ1IjoiaGFzaGRldjg5IiwiYSI6ImNtZWt3dTJ3cTBhc2Yya29jY2FpZHluZ20ifQ.ID9_-ktKbovDhmeQZL8_1Q'
+      mapboxgl.default.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || ''
 
       if (mapContainer.current) {
         map.current = new mapboxgl.default.Map({
