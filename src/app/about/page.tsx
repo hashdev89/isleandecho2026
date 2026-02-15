@@ -23,24 +23,9 @@ export default function AboutPage() {
   ]
 
   const teamMembers = [
-    {
-      name: 'Aravinda Silva',
-      position: 'Founder & CEO',
-      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop',
-      bio: 'Passionate about showcasing Sri Lanka&apos;s beauty to the world.'
-    },
-    {
-      name: 'Priya Fernando',
-      position: 'Head of Operations',
-      image: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=200&h=200&fit=crop',
-      bio: 'Ensuring every journey is seamless and memorable.'
-    },
-    {
-      name: 'Rajith Perera',
-      position: 'Travel Curator',
-      image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop',
-      bio: 'Creating authentic experiences that connect travelers with local culture.'
-    }
+    { name: 'Aravinda Silva', position: 'Founder & CEO', image: '/placeholder-image.svg', bio: 'Passionate about showcasing Sri Lanka&apos;s beauty to the world.' },
+    { name: 'Priya Fernando', position: 'Head of Operations', image: '/placeholder-image.svg', bio: 'Ensuring every journey is seamless and memorable.' },
+    { name: 'Rajith Perera', position: 'Travel Curator', image: '/placeholder-image.svg', bio: 'Creating authentic experiences that connect travelers with local culture.' }
   ]
 
   const values = [
@@ -130,7 +115,7 @@ export default function AboutPage() {
             </div>
             <div>
               <Image
-                src="https://images.unsplash.com/photo-1589308078059-be1415eab4c3?w=600&h=400&fit=crop"
+                src="/placeholder-image.svg"
                 alt="Sri Lanka Landscape"
                 width={600}
                 height={400}

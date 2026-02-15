@@ -43,8 +43,21 @@ type BlogRow = {
   status: string | null
   tags: unknown
   content: string | null
+  slug?: string | null
   created_at?: string
   updated_at?: string
+}
+
+/** Generate URL-safe slug from title (for DB slug column). */
+function slugFromTitle(title: string): string {
+  const s = (title || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+  return s || `post-${Date.now()}`
 }
 
 function rowToPost(row: BlogRow): BlogPost {
@@ -65,8 +78,10 @@ function rowToPost(row: BlogRow): BlogPost {
   }
 }
 
-function postToRow(post: Partial<BlogPost>): Record<string, unknown> {
+function postToRow(post: Partial<BlogPost> & { slug?: string }, slugOverride?: string): Record<string, unknown> {
+  const slug = slugOverride ?? post.slug ?? (post.title ? slugFromTitle(post.title) : `post-${Date.now()}`)
   return {
+    slug,
     title: post.title,
     description: post.description ?? null,
     excerpt: post.excerpt ?? null,

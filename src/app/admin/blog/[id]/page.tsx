@@ -62,7 +62,7 @@ export default function BlogPostEditor({ params }: { params: Promise<{ id: strin
           const posts = await response.json()
           const foundPost = posts.find((p: unknown) => {
             const post = p as Record<string, unknown>
-            return post.id === parseInt(resolvedParams.id)
+            return String(post.id) === String(resolvedParams.id)
           })
           
           if (foundPost) {

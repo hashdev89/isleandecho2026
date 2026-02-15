@@ -58,7 +58,7 @@ export default function DestinationsManagement() {
             lat: d.lat as number,
             lng: d.lng as number,
             description: (d.description as string) || '',
-            image: (d.image as string) || 'https://images.unsplash.com/photo-1506905925346-14b1e0dbb51e?w=400&h=300&fit=crop',
+            image: (d.image as string) || '/placeholder-image.svg',
             status: (d.status as 'active' | 'inactive') || 'active',
             toursCount: (d.toursCount as number) || 0, // Use toursCount from API
             lastUpdated: d.updated_at ? new Date(d.updated_at as string).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]

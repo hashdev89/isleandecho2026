@@ -127,17 +127,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
 
   const activities = destinationActivities[id] || []
 
-  // Get destination-specific images
-  const destinationImages: Record<string, string> = {
-    colombo: 'https://images.unsplash.com/photo-1587595431973-160d0d94add1?w=1600&h=900&fit=crop',
-    kandy: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1600&h=900&fit=crop',
-    sigiriya: 'https://images.unsplash.com/photo-1537953773345-d172ccf13cf1?w=1600&h=900&fit=crop',
-    ella: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=1600&h=900&fit=crop',
-    mirissa: 'https://images.unsplash.com/photo-1506905925346-14b1e0dbb51e?w=1600&h=900&fit=crop',
-    yala: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?w=1600&h=900&fit=crop'
-  }
-
-  const heroImage = destination.image || destinationImages[id] || 'https://images.unsplash.com/photo-1537953773345-d172ccf13cf1?w=1600&h=900&fit=crop'
+  const heroImage = destination.image || '/placeholder-image.svg'
 
   return (
     <div className="min-h-screen bg-gray-50">

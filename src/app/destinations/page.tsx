@@ -190,7 +190,7 @@ export default function DestinationsPage() {
                   <div key={destination.id} style={{ border: `1px solid ${colors.primary[100]}` }} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow flex flex-col h-[420px]">
                     <div className="relative shrink-0 h-44">
                       <Image
-                        src={destination.image || 'https://images.unsplash.com/photo-1506905925346-14b1e0dbb51e?w=400&h=300&fit=crop'}
+                        src={destination.image || '/placeholder-image.svg'}
                         alt={destination.name}
                         width={400}
                         height={176}

@@ -352,7 +352,7 @@ export default function CustomBookingPage() {
             </div>
             <div className="relative">
               <Image
-                src={selectedDestinations[0]?.image || 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop'}
+                src={selectedDestinations[0]?.image || '/placeholder-image.svg'}
                 alt="Custom Trip"
                 width={800}
                 height={384}

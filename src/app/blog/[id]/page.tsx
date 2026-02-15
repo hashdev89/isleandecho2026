@@ -29,7 +29,7 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
         
         if (response.ok) {
           setAllPosts(posts)
-          const foundPost = posts.find((p: any) => p.id === parseInt(resolvedParams.id))
+          const foundPost = posts.find((p: any) => String(p.id) === String(resolvedParams.id))
           
           if (foundPost && foundPost.status === 'Published') {
             setPost(foundPost)

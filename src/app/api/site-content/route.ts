@@ -133,9 +133,9 @@ const defaults: Record<string, unknown> = {
     sectionTitle: 'Discover Sri Lanka',
     sectionSubtitle: 'From ancient temples to pristine beaches, explore the diverse beauty of Sri Lanka.',
     items: [
-      { title: 'Cultural Heritage Tours', description: 'Explore ancient temples, UNESCO World Heritage sites, and rich cultural traditions.', image: 'https://images.unsplash.com/photo-1537953773345-d172ccf13cf1?w=400&h=300&fit=crop', highlights: ['Sigiriya Rock Fortress', 'Temple of the Tooth', 'Ancient Cities'] },
-      { title: 'Wildlife Safari Adventures', description: "Discover Sri Lanka's incredible biodiversity with expert-guided wildlife safaris.", image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=300&fit=crop', highlights: ['Yala National Park', 'Elephant Watching', 'Bird Watching'] },
-      { title: 'Beach & Coastal Escapes', description: "Relax on pristine beaches and enjoy water sports along Sri Lanka's beautiful coastline.", image: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=400&h=300&fit=crop', highlights: ['Mirissa Beach', 'Whale Watching', 'Water Sports'] },
+      { title: 'Cultural Heritage Tours', description: 'Explore ancient temples, UNESCO World Heritage sites, and rich cultural traditions.', image: '', highlights: ['Sigiriya Rock Fortress', 'Temple of the Tooth', 'Ancient Cities'] },
+      { title: 'Wildlife Safari Adventures', description: "Discover Sri Lanka's incredible biodiversity with expert-guided wildlife safaris.", image: '', highlights: ['Yala National Park', 'Elephant Watching', 'Bird Watching'] },
+      { title: 'Beach & Coastal Escapes', description: "Relax on pristine beaches and enjoy water sports along Sri Lanka's beautiful coastline.", image: '', highlights: ['Mirissa Beach', 'Whale Watching', 'Water Sports'] },
     ],
   },
   destinationsSection: {

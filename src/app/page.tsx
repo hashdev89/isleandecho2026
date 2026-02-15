@@ -78,65 +78,64 @@ export default function HomePage() {
   const [siteContent, setSiteContent] = useState<Record<string, unknown> | null>(null)
   const [blogPosts, setBlogPosts] = useState<Array<{ id: number; title: string; description?: string; excerpt?: string; image?: string; date?: string; readTime?: string; category?: string }>>([])
   const [blogCarouselIndex, setBlogCarouselIndex] = useState(0)
+  const [heroReady, setHeroReady] = useState(false)
+  const [failedHeroImageIndices, setFailedHeroImageIndices] = useState<Set<number>>(new Set())
   
-  // Hero carousel images - from Site Content CMS when available, else defaults
-  const defaultHeroImages = [
-    '/sigiriya.jpeg',
-    'https://images.unsplash.com/photo-1537953773345-d172ccf13cf1?w=1920&h=1080&fit=crop',
-    'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1920&h=1080&fit=crop',
-    'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?w=1920&h=1080&fit=crop',
-    'https://images.unsplash.com/photo-1589308078059-be1415eab4c3?w=1920&h=1080&fit=crop',
-    'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=1920&h=1080&fit=crop'
-  ]
+  // Hero carousel images - only from dashboard (Admin → Site content → Hero). No default image.
   const heroImages = useMemo(() => {
     const fromCms = (siteContent?.hero as Record<string, unknown>)?.heroImages
     if (Array.isArray(fromCms) && fromCms.length > 0) {
       const valid = fromCms.filter((u): u is string => typeof u === 'string' && u.length > 0)
       if (valid.length > 0) return valid
     }
-    return defaultHeroImages
+    return []
   }, [siteContent])
+  const hasHeroSlides = heroImages.length > 0
 
   // Keep currentSlide in bounds when heroImages from CMS changes
   useEffect(() => {
     setCurrentSlide((s) => Math.min(s, Math.max(0, heroImages.length - 1)))
   }, [heroImages.length])
 
-  // Auto-advance carousel when video is not playing (carousel is visible)
+  // Screen loader: hide as soon as site content is in (faster) or after 1s max
   useEffect(() => {
-    // Only auto-advance when carousel is visible (video not playing or on mobile)
+    if (heroReady) return
+    if (siteContent !== null) setHeroReady(true)
+  }, [siteContent, heroReady])
+
+  useEffect(() => {
+    const t = setTimeout(() => setHeroReady(true), 1000)
+    return () => clearTimeout(t)
+  }, [])
+
+  // Auto-advance carousel only when we have slides
+  useEffect(() => {
+    if (!hasHeroSlides) return
     const shouldShowCarousel = !isVideoPlaying || useFallbackImage
     if (shouldShowCarousel) {
       const interval = setInterval(() => {
         if (!isTransitioning) {
           setIsTransitioning(true)
           setCurrentSlide((prev) => (prev + 1) % heroImages.length)
-          setTimeout(() => setIsTransitioning(false), 4000) // Match fade duration
+          setTimeout(() => setIsTransitioning(false), 2500)
         }
-      }, 12000) // Change slide every 12 seconds for slower transition
+      }, 8000)
       return () => clearInterval(interval)
     } else {
-      // Reset to first slide when video starts playing
       setCurrentSlide(0)
       setIsTransitioning(false)
     }
-  }, [isVideoPlaying, useFallbackImage, heroImages.length, isTransitioning])
+  }, [isVideoPlaying, useFallbackImage, heroImages.length, isTransitioning, hasHeroSlides])
   
   const nextSlide = () => {
-    // Only prevent very rapid clicks (within 500ms), not the full fade duration
-    if (isTransitioning) return
+    if (!hasHeroSlides || isTransitioning) return
     setIsTransitioning(true)
-    const nextIndex = (currentSlide + 1) % heroImages.length
-    setCurrentSlide(nextIndex)
-    // Reset transition state quickly to allow clicks, fade will still happen
-    setTimeout(() => {
-      setIsTransitioning(false)
-    }, 500) // Short delay to prevent rapid clicking
+    setCurrentSlide((prev) => (prev + 1) % heroImages.length)
+    setTimeout(() => setIsTransitioning(false), 500)
   }
   
   const prevSlide = () => {
-    // Only prevent very rapid clicks (within 500ms), not the full fade duration
-    if (isTransitioning) return
+    if (!hasHeroSlides || isTransitioning) return
     setIsTransitioning(true)
     const prevIndex = (currentSlide - 1 + heroImages.length) % heroImages.length
     setCurrentSlide(prevIndex)
@@ -686,6 +685,17 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
+      {/* Full-screen loader until hero is ready - prevents "image not found" flash */}
+      {!heroReady && (
+        <div
+          className="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 transition-opacity duration-300"
+          aria-hidden="true"
+        >
+          <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+          <p className="mt-4 text-white/90 text-sm font-medium">Loading...</p>
+        </div>
+      )}
+
       <Header />
 
       {/* Hero Section - Inspired by Swimlane's hero */}
@@ -693,37 +703,34 @@ export default function HomePage() {
         {/* Background Video/Image */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           {/* Hero Carousel - shown when video is not playing or failed */}
-          {/* Always visible on mobile, conditionally hidden on desktop when video plays */}
           <div className={`absolute inset-0 z-0 transition-opacity duration-500 group ${isVideoPlaying && !useFallbackImage ? 'sm:opacity-0 opacity-100' : 'opacity-100'}`}>
-            {/* Full-screen carousel */}
             <div className="relative w-full h-full">
-              {/* Carousel Images with Fade Animation */}
-              {heroImages.map((image, index) => (
-                <div
-                  key={index}
-                  className={`absolute inset-0 transition-opacity ease-in-out duration-[4000ms] will-change-opacity ${
-                    index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-                  }`}
-                  style={{
-                    transition: 'opacity 4s ease-in-out'
-                  }}
-                >
-            <Image
-                    src={image}
-                    alt={`Sri Lanka Hero Image ${index + 1}`}
-              fill
-                    priority={index === 0}
-              className="object-cover"
-                    quality={85}
-              sizes="100vw"
-                    fetchPriority={index === 0 ? "high" : "auto"}
-              style={{ objectFit: 'cover' }}
-            />
-                </div>
-              ))}
-              
-            {/* Dark overlay - 50% opacity so images show through more */}
-              <div className="absolute inset-0 bg-black/50 z-20 pointer-events-none"></div>
+              {hasHeroSlides && heroImages.map((image, index) => {
+                const src = failedHeroImageIndices.has(index) ? '/placeholder-image.svg' : image
+                return (
+                  <div
+                    key={index}
+                    className={`absolute inset-0 transition-opacity ease-in-out duration-300 will-change-opacity ${
+                      index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+                    }`}
+                    style={{ transition: 'opacity 0.4s ease-out' }}
+                  >
+                    <Image
+                      src={src}
+                      alt={`Hero ${index + 1}`}
+                      fill
+                      priority={index <= 1}
+                      className="object-cover"
+                      quality={80}
+                      sizes="100vw"
+                      fetchPriority={index === 0 ? 'high' : 'auto'}
+                      style={{ objectFit: 'cover' }}
+                      onError={() => setFailedHeroImageIndices((prev) => new Set(prev).add(index))}
+                    />
+                  </div>
+                )
+              })}
+              <div className="absolute inset-0 bg-black/50 z-20 pointer-events-none" aria-hidden />
             </div>
           </div>
           
@@ -758,14 +765,13 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Carousel Navigation Controls - Moved outside nested containers for proper z-index */}
+        {/* Carousel Navigation - only when we have slides */}
+        {hasHeroSlides && (
         <div className="absolute inset-0 z-[9999] hidden sm:flex items-center justify-between px-4 sm:px-6 lg:px-8 pointer-events-none">
-          {/* Left Arrow */}
           <button
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              console.log('Left arrow clicked')
               prevSlide()
             }}
             className="bg-white/10 hover:bg-blue-600 active:bg-blue-800 backdrop-blur-sm border border-white/30 hover:border-blue-600 text-white rounded-full p-3 sm:p-4 transition-all duration-300 pointer-events-auto flex items-center justify-center shadow-lg hover:shadow-xl"
@@ -781,7 +787,6 @@ export default function HomePage() {
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              console.log('Right arrow clicked')
               nextSlide()
             }}
             className="bg-white/10 hover:bg-blue-600 active:bg-blue-800 backdrop-blur-sm border border-white/30 hover:border-blue-600 text-white rounded-full p-3 sm:p-4 transition-all duration-300 pointer-events-auto flex items-center justify-center shadow-lg hover:shadow-xl"
@@ -792,8 +797,8 @@ export default function HomePage() {
             <ChevronRight className="w-6 h-6 sm:w-8 sm:h-8 text-white pointer-events-none" />
           </button>
         </div>
+        )}
 
-        
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-16 sm:py-12 md:py-16 lg:py-20 xl:py-32 z-10 w-full">
           <div className="text-center max-w-4xl mx-auto w-full">
             {/* Badge */}
@@ -1524,7 +1529,7 @@ export default function HomePage() {
                   <div key={destination.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow border border-gray-100 dark:border-gray-700 flex flex-col h-[420px]">
                     <div className="relative shrink-0 h-44">
                       <Image
-                        src={destination.image || 'https://images.unsplash.com/photo-1506905925346-14b1e0dbb51e?w=400&h=300&fit=crop'}
+                        src={destination.image || '/placeholder-image.svg'}
                         alt={destination.name}
                         width={400}
                         height={176}
@@ -1624,7 +1629,7 @@ export default function HomePage() {
                         <Link href={`/blog/${post.id}`} className="block bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow h-full">
                           <div className="relative h-56">
                             <Image
-                              src={post.image || '/sigiriya.jpeg'}
+                              src={post.image || '/placeholder-image.svg'}
                               alt={post.title}
                               fill
                               className="object-cover"
