@@ -17,6 +17,7 @@ import Link from 'next/link'
 import { useAuth } from '../contexts/AuthContext'
 import { useMobileMenu } from '../contexts/MobileMenuContext'
 import AuthModal from './AuthModal'
+import { getGoogleTranslateLanguage, setGoogleTranslateLanguage } from './GoogleTranslate'
 
 
 export default function Header() {
@@ -24,6 +25,11 @@ export default function Header() {
   const [activeDropdown, setActiveDropdown] = useState('')
   const [selectedLanguage, setSelectedLanguage] = useState('EN')
   const [selectedCurrency, setSelectedCurrency] = useState('USD')
+
+  // Sync language with Google Translate cookie on load
+  useEffect(() => {
+    setSelectedLanguage(getGoogleTranslateLanguage())
+  }, [])
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [authModalTab, setAuthModalTab] = useState<'signin' | 'register'>('register')
   
@@ -50,11 +56,19 @@ export default function Header() {
 
   const languages = [
     { code: 'EN', name: 'English' },
-    { code: 'SI', name: 'සිංහල' },
-    { code: 'TA', name: 'தமிழ்' },
-    { code: 'FR', name: 'Français' },
+    { code: 'AR', name: 'العربية' },
     { code: 'DE', name: 'Deutsch' },
-    { code: 'ES', name: 'Español' }
+    { code: 'ES', name: 'Español' },
+    { code: 'FR', name: 'Français' },
+    { code: 'HI', name: 'हिन्दी' },
+    { code: 'IT', name: 'Italiano' },
+    { code: 'JA', name: '日本語' },
+    { code: 'KO', name: '한국어' },
+    { code: 'NL', name: 'Nederlands' },
+    { code: 'PT', name: 'Português' },
+    { code: 'RU', name: 'Русский' },
+    { code: 'TA', name: 'தமிழ்' },
+    { code: 'ZH', name: '中文' },
   ]
 
   const currencies = [
@@ -190,8 +204,8 @@ export default function Header() {
                       <button
                         key={language.code}
                         onClick={() => {
-                          setSelectedLanguage(language.code)
                           setActiveDropdown('')
+                          setGoogleTranslateLanguage(language.code)
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-white transition-all duration-200 rounded-lg mx-1 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
                       >
@@ -315,7 +329,7 @@ export default function Header() {
                       <span>Language:</span>
                       <select
                         value={selectedLanguage}
-                        onChange={(e) => setSelectedLanguage(e.target.value)}
+                        onChange={(e) => setGoogleTranslateLanguage(e.target.value)}
                         className="bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 font-medium text-base min-h-[44px] touch-manipulation"
                       >
                         {languages.map((language) => (

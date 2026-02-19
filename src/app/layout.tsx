@@ -3,6 +3,7 @@ import "./globals.css";
 import ConditionalFooter from "../components/ConditionalFooter";
 import ClientProviders from "../components/ClientProviders";
 import GoogleAnalytics from "../components/GoogleAnalytics";
+import { GoogleTranslateWidget } from "../components/GoogleTranslate";
 import MobileBottomNav from "../components/MobileBottomNav";
 import WhatsAppChat from "../components/WhatsAppChat";
 
@@ -101,6 +102,7 @@ export default function RootLayout({
           <ConditionalFooter />
           <MobileBottomNav />
           <WhatsAppChat />
+          <GoogleTranslateWidget />
         </ClientProviders>
         
         {/* Analytics & tracking from dashboard: Admin → SEO → Analytics tab (GA, GTM, Search Console, Facebook Pixel, Google Ads, Bing) */}

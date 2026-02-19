@@ -1347,9 +1347,9 @@ export default function HomePage() {
                   </div>
                 </div>
               ) : featuredTours && featuredTours.length > 0 ? featuredTours.map((tour, index) => (
-                <div key={tour.id || `tour-${index}`} className="flex-shrink-0 w-[280px] sm:w-72 md:w-80 snap-start">
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow border border-gray-100 dark:border-gray-700">
-                    <div className="relative">
+                <div key={tour.id || `tour-${index}`} className="flex-shrink-0 w-[280px] sm:w-72 md:w-80 snap-start h-[420px] sm:h-[440px] md:h-[460px]">
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow border border-gray-100 dark:border-gray-700 flex flex-col h-full">
+                    <div className="relative shrink-0">
                       <Image
                         src={tour.image || (tour.images?.[0] ?? '/next.svg')}
                         alt={tour.name}
@@ -1366,20 +1366,21 @@ export default function HomePage() {
                       <button className="absolute top-2 sm:top-3 right-2 sm:right-3 w-9 h-9 sm:w-10 sm:h-10 bg-white/90 dark:bg-gray-800/90 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-gray-700 active:bg-white/80 dark:active:bg-gray-700/80 transition-colors touch-manipulation min-w-[36px] min-h-[36px]">
                         <Heart className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-300" />
                       </button>
-              </div>
-                    <div className="p-4 sm:p-5">
-                      <h3 className="text-base sm:text-lg font-semibold mb-2 text-gray-900 dark:text-white line-clamp-2">{tour.name}</h3>
-                      <p className="text-gray-800 dark:text-gray-300 text-xs sm:text-sm mb-3">{tour.duration}</p>
-                      <div className="flex items-center justify-between mb-3">
+                    </div>
+                    <div className="p-4 sm:p-5 pb-5 sm:pb-6 flex flex-col flex-1 min-h-0">
+                      <h3 className="text-base sm:text-lg font-semibold mb-2 pb-2 text-gray-900 dark:text-white line-clamp-2 min-h-[3.25rem] leading-tight">{tour.name}</h3>
+                      <p className="text-gray-800 dark:text-gray-300 text-xs sm:text-sm mb-3 shrink-0">{tour.duration}</p>
+                      <div className="flex items-center justify-between mb-3 shrink-0">
                         <div className="flex items-center space-x-1">
                           <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
                           <span className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">{tour.rating} Excellent</span>
                           <span className="text-gray-700 dark:text-gray-400 text-xs sm:text-sm">({tour.reviews})</span>
-            </div>
-            </div>
-                      <div className="mb-3">
+                        </div>
+                      </div>
+                      <div className="flex-1 min-h-0" aria-hidden />
+                      <div className="mb-2 overflow-visible shrink-0">
                         <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-300 mb-2">Destinations:</p>
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1.5">
                           {(tour.destinations || []).slice(0, 2).map((dest: string, idx: number) => (
                             <span key={idx} className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs px-2 py-1 rounded">
                               {dest}
@@ -1388,9 +1389,9 @@ export default function HomePage() {
                           {(tour.destinations || []).length > 2 && (
                             <span className="text-gray-700 dark:text-gray-400 text-xs">+{(tour.destinations || []).length - 2} more</span>
                           )}
-          </div>
-        </div>
-                      <div className="flex items-center justify-center">
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center shrink-0">
                         <button 
                           onClick={() => handleViewTourDetails(tour.id)}
                           style={{ background: '#CAFA7C' }}
@@ -1399,9 +1400,9 @@ export default function HomePage() {
                           Book Now
                         </button>
                       </div>
-          </div>
-        </div>
-              </div>
+                    </div>
+                  </div>
+                </div>
             )) : (
               <div className="flex items-center justify-center w-full py-8">
                 <div className="text-center">
@@ -1497,14 +1498,17 @@ export default function HomePage() {
       </section>
       
       {/* Destinations & Activities Section */}
-      <section className="py-12 sm:py-16 md:py-20 bg-white dark:bg-gray-900">
+      <section className="py-10 sm:py-16 md:py-20 bg-white dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8 sm:mb-12 md:mb-16">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4 px-2">
+          <div className="text-center mb-6 sm:mb-12 md:mb-16 px-2">
+            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
               Discover Sri Lanka&apos;s Destinations
             </h2>
-            <p className="text-base sm:text-lg md:text-xl text-gray-800 dark:text-gray-300 max-w-3xl mx-auto px-2">
-              Explore the diverse beauty of Sri Lanka with our curated list of destinations and activities.
+            <p className="text-sm sm:text-base md:text-lg text-gray-800 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed whitespace-pre-line">
+              {`Explore the diverse beauty of Sri Lanka with our curated list of destinations and activities.
+From ancient temples and wildlife safaris to pristine beaches and misty highlands—each region offers unique experiences for every traveler.
+Whether you seek culture, nature, or relaxation, find inspiration here.
+Discover your next adventure and plan the perfect Sri Lankan journey.`}
             </p>
           </div>
 
@@ -1553,7 +1557,7 @@ export default function HomePage() {
             </div>
           ) : filteredDestinations.length > 0 ? (
             <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
               {displayedDestinations.map((destination) => {
                 const badge = destination.region === 'Cultural Triangle' ? 'Heritage' : 
                              destination.region === 'Wildlife' ? 'Nature' :
@@ -1562,8 +1566,8 @@ export default function HomePage() {
                 const reviews = 50 + (destination.id?.length ?? 0) % 200
 
                 return (
-                  <div key={destination.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow border border-gray-100 dark:border-gray-700 flex flex-col h-[420px]">
-                    <div className="relative shrink-0 h-44">
+                  <div key={destination.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow border border-gray-100 dark:border-gray-700 flex flex-col min-h-[380px] sm:h-[420px]">
+                    <div className="relative shrink-0 h-40 sm:h-44">
                       <Image
                         src={destination.image || '/placeholder-image.svg'}
                         alt={destination.name}
@@ -1585,7 +1589,7 @@ export default function HomePage() {
                         <Star className="w-4 h-4 text-yellow-400 fill-current shrink-0" />
                         <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">{rating.toFixed(1)} ({reviews})</span>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-[10] flex-1 min-h-0">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-4 flex-1 min-h-0">
                         {destination.description || 'Explore this destination.'}
                       </p>
                       <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">… more</p>
@@ -1622,35 +1626,35 @@ export default function HomePage() {
       </section>
 
       {/* Discover Sri Lanka – Blog short view */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-10 sm:py-16 md:py-20 bg-gray-50 dark:bg-gray-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+          <div className="text-center mb-8 sm:mb-12 px-2">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
               Discover Sri Lanka
             </h2>
-            <p className="text-xl text-gray-800 max-w-3xl mx-auto">
+            <p className="text-base sm:text-lg md:text-xl text-gray-800 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
               From ancient temples to pristine beaches, explore the diverse beauty of Sri Lanka.
             </p>
           </div>
 
           {blogPosts.length > 0 ? (
             <>
-              <div className="relative pl-12 pr-12 sm:pl-14 sm:pr-14">
+              <div className="relative pl-10 pr-10 sm:pl-14 sm:pr-14 md:pl-16 md:pr-16">
                 <button
                   type="button"
                   aria-label="Previous blog posts"
                   onClick={() => setBlogCarouselIndex(i => Math.max(0, i - 1))}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-[1] w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-100 border border-gray-200"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-[1] w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 touch-manipulation"
                 >
-                  <ChevronLeft className="w-6 h-6" />
+                  <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
                 <button
                   type="button"
                   aria-label="Next blog posts"
                   onClick={() => setBlogCarouselIndex(i => Math.min(Math.max(0, Math.ceil(blogPosts.length / 3) - 1), i + 1))}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-[1] w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-100 border border-gray-200"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-[1] w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 touch-manipulation"
                 >
-                  <ChevronRight className="w-6 h-6" />
+                  <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
                 <div className="overflow-hidden px-1">
                   <div
@@ -1662,8 +1666,8 @@ export default function HomePage() {
                         key={post.id}
                         className="flex-shrink-0 w-full sm:w-1/2 lg:w-1/3 px-2"
                       >
-                        <Link href={`/blog/${post.id}`} className="block bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow h-full">
-                          <div className="relative h-56">
+                        <Link href={`/blog/${post.id}`} className="block bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow h-full">
+                          <div className="relative h-48 sm:h-56">
                             <Image
                               src={post.image || '/placeholder-image.svg'}
                               alt={post.title}
@@ -1672,14 +1676,14 @@ export default function HomePage() {
                               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                             />
                           </div>
-                          <div className="p-6">
+                          <div className="p-4 sm:p-6">
                             {post.category && (
-                              <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm mb-3">
+                              <span className="inline-block px-2.5 py-0.5 sm:px-3 sm:py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-xs sm:text-sm mb-2 sm:mb-3">
                                 {post.category}
                               </span>
                             )}
-                            <h3 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">{post.title}</h3>
-                            <p className="text-gray-600 text-sm line-clamp-4 mb-3">
+                            <h3 className="text-base sm:text-xl font-semibold text-gray-900 dark:text-white mb-1.5 sm:mb-2 line-clamp-2">{post.title}</h3>
+                            <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm line-clamp-4 mb-2 sm:mb-3">
                               {post.description || post.excerpt || ''}
                             </p>
                             <div className="flex items-center gap-3 text-gray-500 text-xs">
