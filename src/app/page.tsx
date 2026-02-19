@@ -1368,7 +1368,7 @@ export default function HomePage() {
                       </button>
                     </div>
                     <div className="p-4 sm:p-5 pb-5 sm:pb-6 flex flex-col flex-1 min-h-0">
-                      <h3 className="text-base sm:text-lg font-semibold mb-2 pb-2 text-gray-900 dark:text-white line-clamp-2 min-h-[3.25rem] leading-tight">{tour.name}</h3>
+                      <h3 className="text-base sm:text-lg font-semibold mb-2 pb-2 text-gray-900 dark:text-white line-clamp-2 min-h-[3rem] leading-snug">{tour.name}</h3>
                       <p className="text-gray-800 dark:text-gray-300 text-xs sm:text-sm mb-3 shrink-0">{tour.duration}</p>
                       <div className="flex items-center justify-between mb-3 shrink-0">
                         <div className="flex items-center space-x-1">
