@@ -5,6 +5,8 @@ import path from 'path'
 
 // Persistent file-based storage for fallback
 const FALLBACK_FILE = path.join(process.cwd(), 'data', 'destinations.json')
+// Extras (things_to_do, gallery) - persisted even when using Supabase so they survive refresh
+const EXTRAS_FILE = path.join(process.cwd(), 'data', 'destinations-extras.json')
 
 // Ensure data directory exists
 const ensureDataDir = () => {
@@ -12,6 +14,37 @@ const ensureDataDir = () => {
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true })
   }
+}
+
+type DestinationExtras = Record<string, { things_to_do?: ThingToDo[]; gallery?: string[] }>
+
+const loadDestinationExtras = (): DestinationExtras => {
+  try {
+    ensureDataDir()
+    if (fs.existsSync(EXTRAS_FILE)) {
+      const data = fs.readFileSync(EXTRAS_FILE, 'utf8')
+      return JSON.parse(data) as DestinationExtras
+    }
+  } catch (error) {
+    console.error('Error loading destination extras:', error)
+  }
+  return {}
+}
+
+const saveDestinationExtras = (extras: DestinationExtras) => {
+  try {
+    ensureDataDir()
+    fs.writeFileSync(EXTRAS_FILE, JSON.stringify(extras, null, 2))
+  } catch (error) {
+    console.error('Error saving destination extras:', error)
+  }
+}
+
+export interface ThingToDo {
+  name: string
+  description?: string
+  duration?: string
+  difficulty?: string
 }
 
 interface Destination {
@@ -25,6 +58,8 @@ interface Destination {
   status: 'active' | 'inactive'
   created_at: string
   updated_at: string
+  things_to_do?: ThingToDo[]
+  gallery?: string[]
 }
 
 // Load destinations from file
@@ -201,6 +236,19 @@ export async function GET(request: Request) {
         toursCount: 0
       }))
     }
+
+    // Merge things_to_do and gallery from extras file (persists even when using Supabase)
+    const extras = loadDestinationExtras()
+    destinationsWithCount = destinationsWithCount.map(dest => {
+      const id = String(dest.id ?? '').trim()
+      const e = extras[id]
+      if (!e) return dest
+      return {
+        ...dest,
+        ...(e && 'things_to_do' in e && { things_to_do: Array.isArray(e.things_to_do) ? e.things_to_do : [] }),
+        ...(e && 'gallery' in e && { gallery: Array.isArray(e.gallery) ? e.gallery : [] })
+      }
+    })
     
     console.log('Current destinations count:', destinationsWithCount.length)
     return NextResponse.json({ 
@@ -216,13 +264,18 @@ export async function GET(request: Request) {
     console.error('Destinations API error:', error)
     console.log('Falling back to persistent storage')
     const fallbackDestinations = loadFallbackDestinations()
-    
-    // Don't calculate tour count in error case for faster response
-    const destinationsWithCount = fallbackDestinations.map(dest => ({
-      ...dest,
-      toursCount: 0
-    }))
-    
+    const extras = loadDestinationExtras()
+    const destinationsWithCount = fallbackDestinations.map(dest => {
+      const id = String(dest.id ?? '').trim()
+      const e = extras[id]
+      if (!e) return { ...dest, toursCount: 0 }
+      return {
+        ...dest,
+        toursCount: 0,
+        ...(e && 'things_to_do' in e && { things_to_do: Array.isArray(e.things_to_do) ? e.things_to_do : [] }),
+        ...(e && 'gallery' in e && { gallery: Array.isArray(e.gallery) ? e.gallery : [] })
+      }
+    })
     return NextResponse.json({ 
       success: true, 
       data: destinationsWithCount,
@@ -252,7 +305,9 @@ export async function POST(req: Request) {
       image: (body.image as string) || '',
       status: (body.status as 'active' | 'inactive') || 'active',
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      ...(Array.isArray(body.things_to_do) && { things_to_do: body.things_to_do as ThingToDo[] }),
+      ...(Array.isArray(body.gallery) && { gallery: body.gallery as string[] })
     }
     
     // Check if Supabase is configured
@@ -269,7 +324,14 @@ export async function POST(req: Request) {
       const fallbackDestinations = loadFallbackDestinations()
       const updatedDestinations = [...fallbackDestinations, newDestination]
       saveFallbackDestinations(updatedDestinations)
-      
+      if (Array.isArray(body.things_to_do) || Array.isArray(body.gallery)) {
+        const extras = loadDestinationExtras()
+        extras[newDestination.id] = {
+          ...(Array.isArray(body.things_to_do) && { things_to_do: body.things_to_do as ThingToDo[] }),
+          ...(Array.isArray(body.gallery) && { gallery: body.gallery as string[] })
+        }
+        saveDestinationExtras(extras)
+      }
       return NextResponse.json({ 
         success: true, 
         data: newDestination,
@@ -277,10 +339,22 @@ export async function POST(req: Request) {
       })
     }
     
-    console.log('Attempting to insert destination into Supabase:', newDestination)
+    const supabaseInsertRow = {
+      id: newDestination.id,
+      name: newDestination.name,
+      region: newDestination.region,
+      lat: newDestination.lat,
+      lng: newDestination.lng,
+      description: newDestination.description,
+      image: newDestination.image,
+      status: newDestination.status,
+      created_at: newDestination.created_at,
+      updated_at: newDestination.updated_at
+    }
+    console.log('Attempting to insert destination into Supabase:', supabaseInsertRow)
     const { data, error } = await supabaseAdmin
       .from('destinations')
-      .insert([newDestination])
+      .insert([supabaseInsertRow])
       .select()
       .single()
     
@@ -295,7 +369,7 @@ export async function POST(req: Request) {
       // Try without created_at/updated_at if columns don't exist
       if (error.message && (error.message.includes('created_at') || error.message.includes('updated_at') || error.code === '42703')) {
         console.log('Retrying insert without timestamp columns...')
-        const { created_at, updated_at, ...destinationWithoutTimestamps } = newDestination
+        const { created_at, updated_at, ...destinationWithoutTimestamps } = supabaseInsertRow
         const retryResult = await supabaseAdmin
           .from('destinations')
           .insert([destinationWithoutTimestamps])
@@ -306,11 +380,23 @@ export async function POST(req: Request) {
           console.error('Retry failed:', retryResult.error)
           throw retryResult.error
         }
-        
+        const retryId = (retryResult.data as { id?: string })?.id ?? newDestination.id
+        if (Array.isArray(body.things_to_do) || Array.isArray(body.gallery)) {
+          const extras = loadDestinationExtras()
+          extras[retryId] = {
+            ...(Array.isArray(body.things_to_do) && { things_to_do: body.things_to_do as ThingToDo[] }),
+            ...(Array.isArray(body.gallery) && { gallery: body.gallery as string[] })
+          }
+          saveDestinationExtras(extras)
+        }
         console.log('Destination created successfully (without timestamps)')
         return NextResponse.json({ 
           success: true, 
-          data: retryResult.data,
+          data: {
+            ...retryResult.data,
+            ...(Array.isArray(body.things_to_do) && { things_to_do: body.things_to_do }),
+            ...(Array.isArray(body.gallery) && { gallery: body.gallery })
+          },
           message: 'Destination created (timestamp columns not available)'
         })
       }
@@ -319,7 +405,21 @@ export async function POST(req: Request) {
     }
     
     console.log('Destination created successfully in Supabase:', data)
-    return NextResponse.json({ success: true, data: data })
+    const newId = (data as { id?: string })?.id ?? newDestination.id
+    if (Array.isArray(body.things_to_do) || Array.isArray(body.gallery)) {
+      const extras = loadDestinationExtras()
+      extras[newId] = {
+        ...(Array.isArray(body.things_to_do) && { things_to_do: body.things_to_do as ThingToDo[] }),
+        ...(Array.isArray(body.gallery) && { gallery: body.gallery as string[] })
+      }
+      saveDestinationExtras(extras)
+    }
+    const createResponseData = {
+      ...data,
+      ...(Array.isArray(body.things_to_do) && { things_to_do: body.things_to_do }),
+      ...(Array.isArray(body.gallery) && { gallery: body.gallery })
+    }
+    return NextResponse.json({ success: true, data: createResponseData })
   } catch (error: unknown) {
     console.error('Destination creation error:', error)
     
@@ -343,7 +443,9 @@ export async function POST(req: Request) {
         image: (body.image as string) || '',
         status: (body.status as 'active' | 'inactive') || 'active',
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        ...(Array.isArray(body.things_to_do) && { things_to_do: body.things_to_do as ThingToDo[] }),
+        ...(Array.isArray(body.gallery) && { gallery: body.gallery as string[] })
       }
       
       const fallbackDestinations = loadFallbackDestinations()
@@ -380,8 +482,8 @@ export async function PUT(req: Request) {
     const lng = typeof body.lng === 'number' ? body.lng : parseFloat(String(body.lng ?? 0))
     const updated_at = new Date().toISOString()
 
-    // Payload for Supabase: only columns that exist (destinations may not have updated_at)
-    const supabaseUpdatePayload = {
+    // Payload for Supabase: only columns that exist in the schema (no gallery/things_to_do unless you add them)
+    const supabaseUpdatePayload: Record<string, unknown> = {
       name: (body.name as string) ?? '',
       region: (body.region as string) ?? '',
       lat: Number.isFinite(lat) ? lat : 0,
@@ -391,8 +493,13 @@ export async function PUT(req: Request) {
       status: ((body.status as 'active' | 'inactive') || 'active') as 'active' | 'inactive'
     }
 
-    // Full payload for fallback (includes updated_at)
-    const updatePayload = { ...supabaseUpdatePayload, updated_at }
+    // Full payload for fallback storage (includes updated_at, things_to_do, gallery)
+    const updatePayload = {
+      ...supabaseUpdatePayload,
+      updated_at,
+      ...(Array.isArray(body.things_to_do) && { things_to_do: body.things_to_do }),
+      ...(Array.isArray(body.gallery) && { gallery: body.gallery })
+    }
     
     // Check if Supabase is configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -406,15 +513,37 @@ export async function PUT(req: Request) {
     if (!isSupabaseConfigured) {
       console.log('Supabase not configured, updating fallback storage')
       const fallbackDestinations = loadFallbackDestinations()
+      const existing = fallbackDestinations.find(d => String(d.id) === id)
       const updatedDestination: Destination = {
+        ...existing,
         id,
-        ...updatePayload,
-        created_at: fallbackDestinations.find(d => String(d.id) === id)?.created_at ?? updated_at
+        name: (supabaseUpdatePayload.name as string) ?? existing?.name ?? '',
+        region: (supabaseUpdatePayload.region as string) ?? existing?.region ?? '',
+        lat: (supabaseUpdatePayload.lat as number) ?? existing?.lat ?? 0,
+        lng: (supabaseUpdatePayload.lng as number) ?? existing?.lng ?? 0,
+        description: (supabaseUpdatePayload.description as string) ?? existing?.description ?? '',
+        image: (supabaseUpdatePayload.image as string) ?? existing?.image ?? '',
+        status: ((supabaseUpdatePayload.status as 'active' | 'inactive') ?? existing?.status) ?? 'active',
+        created_at: existing?.created_at ?? updated_at,
+        updated_at,
+        ...(Array.isArray(body.things_to_do) && { things_to_do: body.things_to_do as ThingToDo[] }),
+        ...(Array.isArray(body.gallery) && { gallery: body.gallery as string[] })
       }
       const updatedDestinations = fallbackDestinations.map(dest => 
         String(dest.id) === id ? { ...dest, ...updatePayload } : dest
       )
       saveFallbackDestinations(updatedDestinations)
+
+      if ('things_to_do' in body || 'gallery' in body) {
+        const extras = loadDestinationExtras()
+        const key = String(id).trim()
+        extras[key] = {
+          ...(extras[key] || {}),
+          ...('things_to_do' in body && { things_to_do: Array.isArray(body.things_to_do) ? (body.things_to_do as ThingToDo[]) : [] }),
+          ...('gallery' in body && { gallery: Array.isArray(body.gallery) ? (body.gallery as string[]) : [] })
+        }
+        saveDestinationExtras(extras)
+      }
       
       return NextResponse.json({ 
         success: true, 
@@ -443,8 +572,24 @@ export async function PUT(req: Request) {
         message: 'Could not save destination' 
       }, { status: 500 })
     }
-    
-    return NextResponse.json({ success: true, data: saved })
+
+    if ('things_to_do' in body || 'gallery' in body) {
+      const extras = loadDestinationExtras()
+      const key = String(id).trim()
+      extras[key] = {
+        ...(extras[key] || {}),
+        ...('things_to_do' in body && { things_to_do: Array.isArray(body.things_to_do) ? (body.things_to_do as ThingToDo[]) : [] }),
+        ...('gallery' in body && { gallery: Array.isArray(body.gallery) ? (body.gallery as string[]) : [] })
+      }
+      saveDestinationExtras(extras)
+    }
+
+    const responseData = {
+      ...saved,
+      ...(Array.isArray(body.things_to_do) && { things_to_do: body.things_to_do }),
+      ...(Array.isArray(body.gallery) && { gallery: body.gallery })
+    }
+    return NextResponse.json({ success: true, data: responseData })
   } catch (error: unknown) {
     const msg = error && typeof error === 'object' && 'message' in error ? String((error as { message: unknown }).message) : 'Unknown error'
     console.error('Destination update error:', msg, error)

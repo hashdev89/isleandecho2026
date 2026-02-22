@@ -7,6 +7,13 @@ import Image from 'next/image'
 import { ArrowLeft, Save, Trash2, Plus, X } from 'lucide-react'
 import ImageSelector from '@/components/ImageSelector'
 
+interface ThingToDo {
+  name: string
+  description?: string
+  duration?: string
+  difficulty?: string
+}
+
 interface Destination {
   id: string
   name: string
@@ -18,6 +25,8 @@ interface Destination {
   status: 'active' | 'inactive'
   created_at: string
   updated_at: string
+  things_to_do?: ThingToDo[]
+  gallery?: string[]
 }
 
 export default function EditDestination() {
@@ -40,6 +49,9 @@ export default function EditDestination() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [imageSelectorOpen, setImageSelectorOpen] = useState(false)
+  const [thingsToDo, setThingsToDo] = useState<ThingToDo[]>([])
+  const [galleryImages, setGalleryImages] = useState<string[]>([])
+  const [gallerySelectorOpen, setGallerySelectorOpen] = useState(false)
   const isCustomRegion = !formData.region || !PRESET_REGIONS.includes(formData.region)
 
   useEffect(() => {
@@ -62,6 +74,8 @@ export default function EditDestination() {
                 image: dest.image || '',
                 status: dest.status || 'active'
               })
+              setThingsToDo(Array.isArray(dest.things_to_do) ? dest.things_to_do : [])
+              setGalleryImages(Array.isArray(dest.gallery) ? dest.gallery : [])
             } else {
               setError('Destination not found')
             }
@@ -126,7 +140,9 @@ export default function EditDestination() {
           id: destinationId,
           ...formData,
           lat: lat,
-          lng: lng
+          lng: lng,
+          things_to_do: thingsToDo,
+          gallery: galleryImages
         })
       })
 
@@ -422,6 +438,114 @@ export default function EditDestination() {
                   setImageSelectorOpen(false)
                 }}
                 currentImageUrl={formData.image}
+              />
+            </div>
+
+            {/* Things to Do */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Things to Do
+              </label>
+              <p className="text-xs text-gray-500 mb-3">Add activities visitors can do at this destination.</p>
+              <div className="space-y-4">
+                {thingsToDo.map((item, index) => (
+                  <div key={index} className="p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm font-medium text-gray-700">Item {index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => setThingsToDo(prev => prev.filter((_, i) => i !== index))}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={item.name}
+                      onChange={(e) => setThingsToDo(prev => prev.map((x, i) => i === index ? { ...x, name: e.target.value } : x))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="Activity name *"
+                    />
+                    <input
+                      type="text"
+                      value={item.description || ''}
+                      onChange={(e) => setThingsToDo(prev => prev.map((x, i) => i === index ? { ...x, description: e.target.value } : x))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="Description (optional)"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={item.duration || ''}
+                        onChange={(e) => setThingsToDo(prev => prev.map((x, i) => i === index ? { ...x, duration: e.target.value } : x))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        placeholder="Duration (e.g. 2-3 hours)"
+                      />
+                      <input
+                        type="text"
+                        value={item.difficulty || ''}
+                        onChange={(e) => setThingsToDo(prev => prev.map((x, i) => i === index ? { ...x, difficulty: e.target.value } : x))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        placeholder="Difficulty (e.g. Easy)"
+                      />
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setThingsToDo(prev => [...prev, { name: '', description: '', duration: '', difficulty: '' }])}
+                  className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-gray-700 text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add activity
+                </button>
+              </div>
+            </div>
+
+            {/* Gallery */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Gallery images
+              </label>
+              <p className="text-xs text-gray-500 mb-3">Additional images shown in the destination gallery (besides the main image).</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {galleryImages.map((url, index) => (
+                  <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-gray-300 bg-gray-100">
+                    <Image
+                      src={url}
+                      alt={`Gallery ${index + 1}`}
+                      fill
+                      className="object-cover"
+                      sizes="120px"
+                      unoptimized
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setGalleryImages(prev => prev.filter((_, i) => i !== index))}
+                      className="absolute top-1 right-1 bg-red-600 text-white p-1.5 rounded-full hover:bg-red-700"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setGallerySelectorOpen(true)}
+                  className="aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50 flex items-center justify-center text-gray-500"
+                >
+                  <Plus className="w-8 h-8" />
+                </button>
+              </div>
+              <ImageSelector
+                isOpen={gallerySelectorOpen}
+                onClose={() => setGallerySelectorOpen(false)}
+                onSelect={(url) => {
+                  setGalleryImages(prev => [...prev, url])
+                  setGallerySelectorOpen(false)
+                }}
+                currentImageUrl={undefined}
               />
             </div>
           </div>

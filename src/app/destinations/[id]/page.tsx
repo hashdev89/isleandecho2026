@@ -9,6 +9,13 @@ const Header = dynamic(() => import('../../../components/Header'), {
   ssr: true
 })
 
+interface ThingToDo {
+  name: string
+  description?: string
+  duration?: string
+  difficulty?: string
+}
+
 interface Destination {
   id: string
   name: string
@@ -20,6 +27,8 @@ interface Destination {
   status: 'active' | 'inactive'
   created_at: string
   updated_at: string
+  things_to_do?: ThingToDo[]
+  gallery?: string[]
 }
 
 interface DestinationPageProps {
@@ -44,16 +53,18 @@ export async function generateMetadata({ params }: DestinationPageProps): Promis
   }
 }
 
-// Fetch destination data
+// Fetch destination data (no cache so things_to_do and gallery from extras are always fresh)
 async function getDestination(id: string): Promise<Destination | null> {
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/destinations`, {
-      next: { revalidate: 300 } // Cache for 5 minutes
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' }
     })
     const data = await response.json()
     
     if (data.success && data.data) {
-      return data.data.find((dest: Destination) => dest.id === id) || null
+      const list = data.data as Destination[]
+      return list.find((dest: Destination) => String(dest.id) === String(id)) || null
     }
     return null
   } catch (error) {
@@ -125,7 +136,10 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
     )
   }
 
-  const activities = destinationActivities[id] || []
+  const activities: Array<{ name: string; description?: string; duration?: string; difficulty?: string }> =
+    (destination.things_to_do && destination.things_to_do.length > 0)
+      ? destination.things_to_do
+      : (destinationActivities[id] || [])
 
   const heroImage = destination.image || '/placeholder-image.svg'
 
@@ -175,45 +189,63 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
               <p className="text-lg text-gray-700 leading-relaxed">{destination.description}</p>
             </div>
 
-            {/* Activities */}
+            {/* Things to Do */}
             <div className="bg-white rounded-xl shadow-lg p-8">
               <h2 className="text-3xl font-bold text-gray-900 mb-6">Things to Do</h2>
-              <div className="space-y-6">
-                {activities.map((activity, index) => (
-                  <div key={index} className="border-l-4 border-blue-500 pl-6 py-4">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{activity.name}</h3>
-                    <p className="text-gray-700 mb-3">{activity.description}</p>
-                    <div className="flex gap-4 text-sm text-gray-600">
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        <span>{activity.duration}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4" />
-                        <span>{activity.difficulty}</span>
+              {activities.length > 0 ? (
+                <div className="space-y-6">
+                  {activities.map((activity, index) => (
+                    <div key={index} className="border-l-4 border-blue-500 pl-6 py-4">
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">{activity.name}</h3>
+                      {activity.description && <p className="text-gray-700 mb-3">{activity.description}</p>}
+                      <div className="flex gap-4 text-sm text-gray-600">
+                        {activity.duration && (
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{activity.duration}</span>
+                          </div>
+                        )}
+                        {activity.difficulty && (
+                          <div className="flex items-center gap-1">
+                            <Star className="w-4 h-4" />
+                            <span>{activity.difficulty}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500">No activities listed yet. Check back later or explore nearby attractions.</p>
+              )}
             </div>
           </div>
 
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            {/* Image */}
+            {/* Gallery */}
             <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Gallery</h3>
-              <div className="aspect-video relative rounded-lg overflow-hidden">
-                <Image
-                  src={destination.image}
-                  alt={destination.name}
-                  fill
-                  className="object-cover"
-                  priority
-                  unoptimized
-                />
-              </div>
+              {(() => {
+                const images = (destination.gallery && destination.gallery.length > 0) ? destination.gallery : (destination.image ? [destination.image] : [])
+                if (images.length === 0) return <p className="text-gray-500 text-sm">No images yet.</p>
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    {images.map((src, i) => (
+                      <div key={i} className="aspect-square relative rounded-lg overflow-hidden bg-gray-100">
+                        <Image
+                          src={src}
+                          alt={`${destination.name} ${i + 1}`}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 50vw, 200px"
+                          unoptimized
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
 
             {/* Quick Info */}
