@@ -202,15 +202,14 @@ export default function HomePage() {
         setLoadingTours(true)
         setLoadingDestinations(true)
         
-        // Fetch with timeout (longer timeouts for slow/cold-start APIs)
-        const fetchWithTimeout = async (url: string, timeout = 20000) => {
+        // Fetch with timeout; allow browser cache for faster repeat loads
+        const fetchWithTimeout = async (url: string, timeout = 12000) => {
           try {
             const controller = new AbortController()
             const timeoutId = setTimeout(() => controller.abort(), timeout)
             const response = await fetch(url, {
               signal: controller.signal,
-              cache: 'no-store',
-              headers: { 'Cache-Control': 'no-cache' }
+              cache: 'default'
             })
             clearTimeout(timeoutId)
             return response
@@ -225,8 +224,8 @@ export default function HomePage() {
         // Fetch featured tours and destinations in parallel (priority)
         try {
           const [toursRes, destinationsRes] = await Promise.allSettled([
-            fetchWithTimeout('/api/tours/featured', 20000),
-            fetchWithTimeout('/api/destinations?includeTourCount=false', 20000)
+            fetchWithTimeout('/api/tours/featured', 12000),
+            fetchWithTimeout('/api/destinations?includeTourCount=false', 12000)
           ])
           
           // Handle featured tours
@@ -1334,12 +1333,26 @@ export default function HomePage() {
               style={{ scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}
             >
               {loadingTours ? (
-                <div className="flex items-center justify-center w-full py-12">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-500 dark:text-gray-400 text-lg">Loading featured tours...</p>
-                  </div>
-                </div>
+                <>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex-shrink-0 w-[280px] sm:w-72 md:w-80 snap-start h-[440px] sm:h-[460px] md:h-[480px] animate-pulse">
+                      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col h-full">
+                        <div className="h-36 sm:h-44 bg-gray-200 dark:bg-gray-700 rounded-t-xl" />
+                        <div className="p-4 sm:p-5 flex flex-col flex-1">
+                          <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-3/4" />
+                          <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded mb-3 w-1/2" />
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-3 w-full" />
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-3 w-2/3" />
+                          <div className="flex gap-2 mb-4">
+                            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-16" />
+                            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-14" />
+                          </div>
+                          <div className="mt-auto h-12 bg-gray-200 dark:bg-gray-700 rounded-lg w-full" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
               ) : !loadingTours && (!featuredTours || featuredTours.length === 0) ? (
                 <div className="flex items-center justify-center w-full py-12">
                   <div className="text-center">
@@ -1543,11 +1556,20 @@ Discover your next adventure and plan the perfect Sri Lankan journey.`}
 
           {/* Destinations Grid */}
           {loadingDestinations ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-500 dark:text-gray-400 text-lg">Loading destinations...</p>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col min-h-[380px] sm:h-[420px] animate-pulse">
+                  <div className="h-40 sm:h-44 bg-gray-200 dark:bg-gray-700" />
+                  <div className="p-4 sm:p-5 flex flex-col flex-1">
+                    <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-2/3" />
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-1/3" />
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-full" />
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-full" />
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded flex-1 w-4/5" />
+                    <div className="h-11 bg-gray-200 dark:bg-gray-700 rounded-lg w-full mt-3" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : !loadingDestinations && filteredDestinations.length === 0 ? (
             <div className="flex items-center justify-center py-12">

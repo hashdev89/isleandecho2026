@@ -178,8 +178,10 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const includeTourCount = searchParams.get('includeTourCount') === 'true'
+    const limitParam = searchParams.get('limit')
+    const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10)), 200) : undefined
     
-    console.log('GET /api/destinations - Fetching destinations...', { includeTourCount })
+    console.log('GET /api/destinations - Fetching destinations...', { includeTourCount, limit })
     
     // Check if Supabase is configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -237,27 +239,31 @@ export async function GET(request: Request) {
       }))
     }
 
-    // Merge things_to_do and gallery from extras file (persists even when using Supabase)
+    // Merge things_to_do and gallery: use DB if present, else fall back to extras file (for local / before migration)
     const extras = loadDestinationExtras()
     destinationsWithCount = destinationsWithCount.map(dest => {
       const id = String(dest.id ?? '').trim()
       const e = extras[id]
+      const hasThingsFromDb = Array.isArray(dest.things_to_do)
+      const hasGalleryFromDb = Array.isArray(dest.gallery)
+      if (hasThingsFromDb && hasGalleryFromDb) return dest
       if (!e) return dest
       return {
         ...dest,
-        ...(e && 'things_to_do' in e && { things_to_do: Array.isArray(e.things_to_do) ? e.things_to_do : [] }),
-        ...(e && 'gallery' in e && { gallery: Array.isArray(e.gallery) ? e.gallery : [] })
+        ...(!hasThingsFromDb && e && 'things_to_do' in e && { things_to_do: Array.isArray(e.things_to_do) ? e.things_to_do : [] }),
+        ...(!hasGalleryFromDb && e && 'gallery' in e && { gallery: Array.isArray(e.gallery) ? e.gallery : [] })
       }
     })
     
     console.log('Current destinations count:', destinationsWithCount.length)
+    const limited = limit != null ? destinationsWithCount.slice(0, limit) : destinationsWithCount
     return NextResponse.json({ 
       success: true, 
-      data: destinationsWithCount,
+      data: limited,
       message: isSupabaseConfigured ? 'Destinations retrieved from Supabase' : 'Destinations retrieved from fallback storage'
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600',
       }
     })
   } catch (error: unknown) {
@@ -339,7 +345,7 @@ export async function POST(req: Request) {
       })
     }
     
-    const supabaseInsertRow = {
+    const supabaseInsertRow: Record<string, unknown> = {
       id: newDestination.id,
       name: newDestination.name,
       region: newDestination.region,
@@ -349,7 +355,9 @@ export async function POST(req: Request) {
       image: newDestination.image,
       status: newDestination.status,
       created_at: newDestination.created_at,
-      updated_at: newDestination.updated_at
+      updated_at: newDestination.updated_at,
+      things_to_do: Array.isArray(body.things_to_do) ? body.things_to_do : [],
+      gallery: Array.isArray(body.gallery) ? body.gallery : []
     }
     console.log('Attempting to insert destination into Supabase:', supabaseInsertRow)
     const { data, error } = await supabaseAdmin
@@ -482,7 +490,7 @@ export async function PUT(req: Request) {
     const lng = typeof body.lng === 'number' ? body.lng : parseFloat(String(body.lng ?? 0))
     const updated_at = new Date().toISOString()
 
-    // Payload for Supabase: only columns that exist in the schema (no gallery/things_to_do unless you add them)
+    // Payload for Supabase (includes things_to_do and gallery once migration is run)
     const supabaseUpdatePayload: Record<string, unknown> = {
       name: (body.name as string) ?? '',
       region: (body.region as string) ?? '',
@@ -490,7 +498,9 @@ export async function PUT(req: Request) {
       lng: Number.isFinite(lng) ? lng : 0,
       description: (body.description as string) ?? '',
       image: (body.image as string) ?? '',
-      status: ((body.status as 'active' | 'inactive') || 'active') as 'active' | 'inactive'
+      status: ((body.status as 'active' | 'inactive') || 'active') as 'active' | 'inactive',
+      things_to_do: Array.isArray(body.things_to_do) ? body.things_to_do : [],
+      gallery: Array.isArray(body.gallery) ? body.gallery : []
     }
 
     // Full payload for fallback storage (includes updated_at, things_to_do, gallery)
