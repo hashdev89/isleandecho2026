@@ -3,6 +3,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { ArrowLeft, MapPin, Clock, Star } from 'lucide-react'
+import { getDestinationByIdForServer } from '@/lib/destinationsData'
 
 // Dynamically import Header since it's a client component
 const Header = dynamic(() => import('../../../components/Header'), {
@@ -40,8 +41,8 @@ interface DestinationPageProps {
 // Generate metadata for SEO
 export async function generateMetadata({ params }: DestinationPageProps): Promise<Metadata> {
   const { id } = await params
-  const destination = await getDestination(id)
-  
+  const destination = await getDestinationByIdForServer(id)
+
   return {
     title: `${destination?.name || 'Destination'} - ISLE & ECHO`,
     description: destination?.description || 'Discover amazing destinations in Sri Lanka',
@@ -50,26 +51,6 @@ export async function generateMetadata({ params }: DestinationPageProps): Promis
       description: destination?.description || 'Discover amazing destinations in Sri Lanka',
       images: destination?.image ? [destination.image] : [],
     },
-  }
-}
-
-// Fetch destination data (no cache so things_to_do and gallery from extras are always fresh)
-async function getDestination(id: string): Promise<Destination | null> {
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/destinations`, {
-      cache: 'no-store',
-      headers: { 'Cache-Control': 'no-cache' }
-    })
-    const data = await response.json()
-    
-    if (data.success && data.data) {
-      const list = data.data as Destination[]
-      return list.find((dest: Destination) => String(dest.id) === String(id)) || null
-    }
-    return null
-  } catch (error) {
-    console.error('Error fetching destination:', error)
-    return null
   }
 }
 
@@ -121,7 +102,7 @@ const destinationActivities: Record<string, Array<{name: string, description: st
 
 export default async function DestinationPage({ params }: DestinationPageProps) {
   const { id } = await params
-  const destination = await getDestination(id)
+  const destination = await getDestinationByIdForServer(id)
   
   if (!destination) {
     return (
