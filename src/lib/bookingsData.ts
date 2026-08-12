@@ -98,7 +98,12 @@ export async function loadAllBookings(): Promise<BookingRecord[]> {
     console.error('Supabase error loading bookings:', error)
     return fallbackBookings
   }
-  return mergeBookings((data || []) as BookingRecord[], fallbackBookings)
+  // Shared Supabase is the source of truth so local JSON cannot diverge from live.
+  return ((data || []) as BookingRecord[]).sort(
+    (a, b) =>
+      new Date(b.updated_at || b.created_at || 0).getTime() -
+      new Date(a.updated_at || a.created_at || 0).getTime()
+  )
 }
 
 const parseOrderNumber = (value?: string) => {

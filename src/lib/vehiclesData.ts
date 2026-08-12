@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { Vehicle } from '@/lib/vehicleTypes'
+import { loadAppJson, saveAppJson } from '@/lib/supabaseJsonStore'
 
 const FALLBACK_FILE = path.join(process.cwd(), 'data', 'vehicles.json')
 
@@ -99,12 +100,26 @@ const ensureDataDir = () => {
   }
 }
 
-export function loadVehicles(): Vehicle[] {
+export async function loadVehicles(): Promise<Vehicle[]> {
   try {
     const now = Date.now()
     if (vehiclesCache && now - cacheTimestamp < CACHE_DURATION) {
       return vehiclesCache
     }
+
+    const remote = await loadAppJson<Vehicle[]>('vehicles.json')
+    if (Array.isArray(remote) && remote.length > 0) {
+      vehiclesCache = remote
+      cacheTimestamp = now
+      try {
+        ensureDataDir()
+        fs.writeFileSync(FALLBACK_FILE, JSON.stringify(remote, null, 2))
+      } catch {
+        /* local cache is optional */
+      }
+      return remote
+    }
+
     ensureDataDir()
     if (fs.existsSync(FALLBACK_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(FALLBACK_FILE, 'utf8')) as Vehicle[]
@@ -114,6 +129,9 @@ export function loadVehicles(): Vehicle[] {
       fs.writeFileSync(FALLBACK_FILE, JSON.stringify(DEFAULT_VEHICLES, null, 2))
     }
     cacheTimestamp = now
+    if (vehiclesCache.length) {
+      await saveAppJson('vehicles.json', vehiclesCache)
+    }
     return vehiclesCache
   } catch (error) {
     console.error('Error loading vehicles:', error)
@@ -121,11 +139,12 @@ export function loadVehicles(): Vehicle[] {
   }
 }
 
-export function saveVehicles(vehicles: Vehicle[]) {
+export async function saveVehicles(vehicles: Vehicle[]) {
   ensureDataDir()
   fs.writeFileSync(FALLBACK_FILE, JSON.stringify(vehicles, null, 2))
   vehiclesCache = vehicles
   cacheTimestamp = Date.now()
+  await saveAppJson('vehicles.json', vehicles)
 }
 
 export function invalidateVehiclesCache() {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import Image from 'next/image'
+import SafeImage from '../components/SafeImage'
 import Link from 'next/link'
 import {
   Search,
@@ -949,7 +949,7 @@ export default function HomePage() {
                       index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
                     }`}
                   >
-                    <Image
+                    <SafeImage
                       src={src}
                       alt={`Hero ${index + 1}`}
                       fill
@@ -2098,7 +2098,7 @@ export default function HomePage() {
                     onClick={() => handleViewTourDetails(tour.id)}
                     className="lp-photo-card group w-full h-full text-left cursor-pointer"
                   >
-                    <Image
+                    <SafeImage
                       src={tour.image || (tour.images?.[0] ?? '/placeholder-image.svg')}
                       alt={tour.name}
                       fill
@@ -2329,7 +2329,7 @@ export default function HomePage() {
                     href={`/destinations/${destination.id}`}
                     className="lp-photo-card group block min-h-[320px] sm:min-h-[380px]"
                   >
-                      <Image
+                      <SafeImage
                         src={destination.image || '/placeholder-image.svg'}
                         alt={destination.name}
                         fill
@@ -2425,7 +2425,7 @@ export default function HomePage() {
                         className="flex-shrink-0 w-full sm:w-1/2 lg:w-1/3 px-2"
                       >
                         <Link href={`/blog/${post.id}`} className="lp-photo-card group block h-[360px] sm:h-[400px]">
-                            <Image
+                            <SafeImage
                               src={post.image || '/placeholder-image.svg'}
                               alt={post.title}
                               fill
