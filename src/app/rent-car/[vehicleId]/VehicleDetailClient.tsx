@@ -177,6 +177,8 @@ export default function VehicleDetailClient({ params }: { params: Promise<{ vehi
           booking_type: 'vehicle_rental',
           vehicle_id: vehicle.id,
           vehicle_name: vehicle.name,
+          tour_id: vehicle.id,
+          tour_name: `Car rental: ${vehicle.name}`,
           tour_package_id: vehicle.id,
           tour_package_name: `Car rental: ${vehicle.name}`,
           pickup_city_id: rentalData.pickupCityId,

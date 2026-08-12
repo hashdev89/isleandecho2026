@@ -657,7 +657,7 @@ export default function HomePage() {
     }
   ]
 
-  const availableDestinations = [
+  const fallbackPlanDestinations = [
     { id: 'colombo', name: 'Colombo', region: 'Western Province' },
     { id: 'kandy', name: 'Kandy', region: 'Central Province' },
     { id: 'galle', name: 'Galle', region: 'Southern Province' },
@@ -677,8 +677,20 @@ export default function HomePage() {
     { id: 'tangalle', name: 'Tangalle', region: 'Southern Province' },
     { id: 'yala', name: 'Yala', region: 'Southern Province' },
     { id: 'udawalawe', name: 'Udawalawe', region: 'Southern Province' },
-    { id: 'sinharaja', name: 'Sinharaja', region: 'Southern Province' }
+    { id: 'sinharaja', name: 'Sinharaja', region: 'Southern Province' },
   ]
+
+  // Prefer live CMS destinations so Plan Your Trip IDs match /custom-booking
+  const availableDestinations = useMemo(() => {
+    const live = (destinations || [])
+      .filter((d: { status?: string; id?: string; name?: string }) => d.status !== 'inactive' && d.id && d.name)
+      .map((d: { id: string; name: string; region?: string }) => ({
+        id: String(d.id),
+        name: String(d.name),
+        region: String(d.region || ''),
+      }))
+    return live.length > 0 ? live : fallbackPlanDestinations
+  }, [destinations])
 
   const tripInterests = [
     { id: 'culture', name: 'Culture & History' },
@@ -738,18 +750,33 @@ export default function HomePage() {
   }
 
   const handleCustomTripBooking = () => {
-    // Create custom trip booking
-    const tripData = {
-      destinations: customTripData.destinations,
-      dateRange: customTripData.dateRange,
-      guests: customTripData.guests,
-      interests: customTripData.interests
+    if (customTripData.destinations.length === 0) {
+      alert('Please select at least one destination.')
+      return
     }
-    
-    // Store in localStorage for the booking page
+    if (!customTripData.dateRange || !selectedStartDate || !selectedEndDate) {
+      alert('Please select your travel date range.')
+      return
+    }
+
+    const startDate = formatDate(selectedStartDate)
+    const endDate = formatDate(selectedEndDate)
+    const selected = customTripData.destinations
+      .map((id) => availableDestinations.find((d) => d.id === id))
+      .filter(Boolean) as { id: string; name: string; region: string }[]
+
+    const tripData = {
+      destinations: selected.map((d) => d.id),
+      destinationNames: selected.map((d) => d.name),
+      destinationDetails: selected,
+      startDate,
+      endDate,
+      dateRange: `${startDate} to ${endDate}`,
+      guests: customTripData.guests,
+      interests: customTripData.interests,
+    }
+
     localStorage.setItem('customTripData', JSON.stringify(tripData))
-    
-    // Navigate to custom booking page
     window.location.href = '/custom-booking'
   }
 

@@ -348,6 +348,8 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
       
       const payload = {
         booking_type: 'tour',
+        tour_id: tourPackage.id,
+        tour_name: tourPackage.name,
         tour_package_id: tourPackage.id,
         tour_package_name: tourPackage.name,
         customer_name: bookingData.name,

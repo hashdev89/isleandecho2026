@@ -65,6 +65,24 @@ alter table bookings add column if not exists additional_charges jsonb;
 alter table bookings add column if not exists created_at timestamptz default now();
 alter table bookings add column if not exists updated_at timestamptz default now();
 
+alter table bookings add column if not exists updated_at timestamptz default now();
+
+-- Legacy columns used by older Supabase schemas
+alter table bookings add column if not exists tour_id text;
+alter table bookings add column if not exists tour_name text;
+
+-- Relax NOT NULL on tour_id so custom trips without a package still save
+alter table bookings alter column tour_id drop not null;
+alter table bookings alter column tour_id set default 'custom-trip';
+
+update bookings
+set tour_id = coalesce(nullif(tour_id, ''), nullif(tour_package_id, ''), 'custom-trip')
+where tour_id is null or tour_id = '';
+
+update bookings
+set tour_name = coalesce(nullif(tour_name, ''), nullif(tour_package_name, ''), 'Custom trip')
+where tour_name is null or tour_name = '';
+
 create index if not exists bookings_booking_ref_idx on bookings(booking_ref);
 create index if not exists bookings_customer_email_idx on bookings(customer_email);
 create index if not exists bookings_created_at_idx on bookings(created_at desc);
