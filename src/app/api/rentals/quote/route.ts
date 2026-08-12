@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const vehicles = loadVehicles()
+    const vehicles = await loadVehicles()
     const vehicle = vehicles.find((v) => v.id === vehicleId)
     if (!vehicle) {
       return NextResponse.json({ success: false, message: 'Vehicle not found' }, { status: 404 })
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const settings = loadRentalSettings()
+    const settings = await loadRentalSettings()
     const quote = calculateRentalQuote({
       vehicle,
       settings,

@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -17,9 +18,13 @@ import {
   Hotel,
   UtensilsCrossed,
   Car,
-  Moon
+  Moon,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import Header from '../../../components/Header'
+import SafeImage from '../../../components/SafeImage'
 import dynamic from 'next/dynamic'
 import { formatDistanceKm, getRouteSegments, getTotalRouteKm } from '@/lib/geoDistance'
 import { tourFitsGuestCount } from '@/lib/tourGroupSize'
@@ -285,6 +290,22 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
     if (galleryImages.length === 0) return
     setSelectedImage((idx) => (idx + 1) % galleryImages.length)
   }
+
+  useEffect(() => {
+    if (!showLightbox) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLightbox()
+      if (e.key === 'ArrowLeft') prevImage()
+      if (e.key === 'ArrowRight') nextImage()
+    }
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [showLightbox, galleryImages.length])
 
   if (loading) {
     return (
@@ -639,60 +660,88 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
               {/* Image Gallery */}
               <div>
                 <h2 className="lp-section-title text-2xl mb-6">Tour Gallery</h2>
-                <div className="grid grid-cols-3 gap-4">
-                  {galleryImages.map((image, index) => (
-                    <Image
-                      key={index}
-                      src={image}
-                      alt={`${tourPackage.name} - Image ${index + 1}`}
-                      width={200}
-                      height={150}
-                      className={`rounded-lg cursor-pointer transition-all ${
-                        selectedImage === index ? 'ring-4 ring-[var(--lagoon)]' : 'hover:opacity-80'
-                      }`}
-                      onClick={() => openLightbox(index)}
-                    />
-                  ))}
-                </div>
+                {galleryImages.length === 0 ? (
+                  <p className="text-sm text-[var(--ink-soft)]">No gallery images yet.</p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                    {galleryImages.map((image, index) => (
+                      <button
+                        key={`${image}-${index}`}
+                        type="button"
+                        onClick={() => openLightbox(index)}
+                        className="group relative aspect-[4/3] overflow-hidden rounded-xl bg-black/5 ring-1 ring-black/5 transition hover:ring-[var(--lagoon)] focus:outline-none focus:ring-2 focus:ring-[var(--lagoon)]"
+                      >
+                        <SafeImage
+                          src={image}
+                          alt={`${tourPackage.name} - Image ${index + 1}`}
+                          fill
+                          className="object-cover transition duration-300 group-hover:scale-105"
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {showLightbox && galleryImages.length > 0 && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-                  <button
-                    aria-label="Close"
-                    onClick={closeLightbox}
-                    className="absolute top-4 right-4 text-white text-3xl leading-none px-3"
-                  >
-                    ×
-                  </button>
-                  <button
-                    aria-label="Previous image"
-                    onClick={prevImage}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 rounded-full w-10 h-10 flex items-center justify-center"
-                  >
-                    ‹
-                  </button>
-                  <div className="max-w-5xl w-full">
-                    <Image
-                      src={galleryImages[selectedImage]}
-                      alt={`${tourPackage.name} - Image ${selectedImage + 1}`}
-                      width={1280}
-                      height={720}
-                      className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
-                    />
-                    <div className="mt-3 text-center text-white text-sm">
-                      {selectedImage + 1} / {galleryImages.length}
-                    </div>
-                  </div>
-                  <button
-                    aria-label="Next image"
-                    onClick={nextImage}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 rounded-full w-10 h-10 flex items-center justify-center"
-                  >
-                    ›
-                  </button>
-                </div>
-              )}
+              {showLightbox && galleryImages.length > 0 && typeof document !== 'undefined'
+                ? createPortal(
+                    <div
+                      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4 sm:p-8"
+                      onClick={closeLightbox}
+                      role="dialog"
+                      aria-modal="true"
+                      aria-label="Tour gallery"
+                    >
+                      <button
+                        type="button"
+                        aria-label="Close gallery"
+                        onClick={closeLightbox}
+                        className="absolute top-4 right-4 z-[210] inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                      >
+                        <X className="h-6 w-6" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Previous image"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          prevImage()
+                        }}
+                        className="absolute left-3 sm:left-6 top-1/2 z-[210] -translate-y-1/2 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                      >
+                        <ChevronLeft className="h-6 w-6" />
+                      </button>
+                      <div
+                        className="relative max-h-[85vh] w-full max-w-5xl"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <SafeImage
+                          src={galleryImages[selectedImage]}
+                          alt={`${tourPackage.name} - Image ${selectedImage + 1}`}
+                          width={1280}
+                          height={720}
+                          className="mx-auto max-h-[80vh] w-auto max-w-full rounded-lg object-contain"
+                        />
+                        <p className="mt-3 text-center text-sm text-white/90">
+                          {selectedImage + 1} / {galleryImages.length}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Next image"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          nextImage()
+                        }}
+                        className="absolute right-3 sm:right-6 top-1/2 z-[210] -translate-y-1/2 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                      >
+                        <ChevronRight className="h-6 w-6" />
+                      </button>
+                    </div>,
+                    document.body
+                  )
+                : null}
 
 
             </div>

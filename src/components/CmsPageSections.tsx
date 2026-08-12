@@ -1,6 +1,6 @@
 'use client'
 
-import Image from 'next/image'
+import SafeImage from './SafeImage'
 import Link from 'next/link'
 import {
   getEnabledSections,
@@ -41,7 +41,7 @@ function RichTextBlock({ data }: { data: Record<string, unknown> }) {
         </div>
         {image ? (
           <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-black/5">
-            <Image src={image} alt="" fill className="object-cover" sizes="(max-width: 1024px) 100vw, 50vw" />
+            <SafeImage src={image} alt="" fill className="object-cover" sizes="(max-width: 1024px) 100vw, 50vw" />
           </div>
         ) : null}
       </div>

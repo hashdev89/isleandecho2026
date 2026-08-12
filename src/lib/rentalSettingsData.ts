@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { RentalSettings } from '@/lib/vehicleTypes'
+import { loadAppJson, saveAppJson } from '@/lib/supabaseJsonStore'
 
 const SETTINGS_FILE = path.join(process.cwd(), 'data', 'rental-settings.json')
 
@@ -49,13 +50,28 @@ const ensureDataDir = () => {
   }
 }
 
-export function loadRentalSettings(): RentalSettings {
+export async function loadRentalSettings(): Promise<RentalSettings> {
   try {
+    const remote = await loadAppJson<RentalSettings>('rental-settings.json')
+    if (remote && typeof remote === 'object') {
+      const merged = { ...DEFAULT_RENTAL_SETTINGS, ...remote }
+      try {
+        ensureDataDir()
+        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2))
+      } catch {
+        /* local cache is optional */
+      }
+      return merged
+    }
+
     ensureDataDir()
     if (fs.existsSync(SETTINGS_FILE)) {
-      return { ...DEFAULT_RENTAL_SETTINGS, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) }
+      const local = { ...DEFAULT_RENTAL_SETTINGS, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) }
+      await saveAppJson('rental-settings.json', local)
+      return local
     }
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_RENTAL_SETTINGS, null, 2))
+    await saveAppJson('rental-settings.json', DEFAULT_RENTAL_SETTINGS)
     return DEFAULT_RENTAL_SETTINGS
   } catch (error) {
     console.error('Error loading rental settings:', error)
@@ -63,8 +79,9 @@ export function loadRentalSettings(): RentalSettings {
   }
 }
 
-export function saveRentalSettings(settings: RentalSettings) {
+export async function saveRentalSettings(settings: RentalSettings) {
   ensureDataDir()
   const payload = { ...settings, updatedAt: new Date().toISOString() }
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(payload, null, 2))
+  await saveAppJson('rental-settings.json', payload)
 }
