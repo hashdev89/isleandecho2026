@@ -160,9 +160,14 @@ export function buildTourBookingUrl(
 }
 
 export function buildCustomTripPayload(intake: ChatBookingIntake) {
+  const startDate = intake.startDate || ''
   return {
     destinations: [] as string[],
-    dateRange: intake.startDate || '',
+    destinationNames: [] as string[],
+    destinationDetails: [] as { id: string; name: string; region?: string }[],
+    startDate,
+    endDate: '',
+    dateRange: startDate,
     guests: intake.guests || 1,
     interests: intake.travelType ? [intake.travelType.toLowerCase().replace(/\s+/g, '-')] : [],
     specialRequests: intake.specialRequests || '',
