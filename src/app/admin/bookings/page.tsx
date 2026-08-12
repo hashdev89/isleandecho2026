@@ -20,6 +20,7 @@ import { useAuth } from '../../../contexts/AuthContext'
 
 interface Booking {
   id: string
+  bookingRef: string
   tourPackageId: string
   tourPackageName: string
   customerName: string
@@ -45,7 +46,7 @@ async function fetchBookings(userEmail?: string, userRole?: string, userId?: str
     if (userRole) headers['x-user-role'] = userRole
     if (userId) headers['x-user-id'] = userId
     
-    const res = await fetch('/api/bookings', { headers })
+    const res = await fetch('/api/bookings', { headers, cache: 'no-store' })
     const json = await res.json()
     console.log('Bookings API response:', json)
     console.log('Bookings API response data:', json.data)
@@ -66,6 +67,7 @@ async function fetchBookings(userEmail?: string, userRole?: string, userId?: str
       const booking = b as Record<string, unknown>
       return {
         id: booking.id as string,
+        bookingRef: (booking.booking_ref as string) || (booking.bookingRef as string) || (booking.id as string),
         tourPackageId: (booking.tour_package_id as string) || (booking.tourPackageId as string),
         tourPackageName: (booking.tour_package_name as string) || (booking.tourPackageName as string),
         customerName: (booking.customer_name as string) || (booking.customerName as string),
@@ -185,7 +187,7 @@ export default function BookingsPage() {
 
   useEffect(() => {
     loadBookings()
-  }, [])
+  }, [user?.email, user?.role])
 
   // Auto-refresh when returning from other pages
   useEffect(() => {
@@ -204,7 +206,9 @@ export default function BookingsPage() {
     const matchesSearch = 
       (booking.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (booking.customerEmail || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (booking.tourPackageName || '').toLowerCase().includes(searchTerm.toLowerCase())
+      (booking.tourPackageName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (booking.bookingRef || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (booking.id || '').toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesStatus = statusFilter === 'all' || booking.status === statusFilter
     
@@ -445,7 +449,7 @@ export default function BookingsPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Booking Details
+                  Order No.
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Customer
@@ -465,11 +469,11 @@ export default function BookingsPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredBookings.map((booking) => (
-                <tr key={booking.id} className="hover:bg-gray-50">
+              {filteredBookings.map((booking, index) => (
+                <tr key={`${booking.id}-${booking.bookingDate}-${index}`} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">#{booking.id}</p>
+                      <p className="text-sm font-medium text-gray-900">Order #{booking.bookingRef || booking.id}</p>
                       <p className="text-sm text-gray-500">{booking.bookingDate}</p>
                     </div>
                   </td>

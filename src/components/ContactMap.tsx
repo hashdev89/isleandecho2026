@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface ContactMapProps {
   lat: number
@@ -12,23 +12,30 @@ export default function ContactMap({ lat, lng, address }: ContactMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const marker = useRef<mapboxgl.Marker | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (map.current || typeof window === 'undefined') return
 
-    // Dynamically import mapbox-gl
+    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || ''
+    if (!token) {
+      setError('Mapbox token is missing. Add NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to .env.local and restart the dev server.')
+      return
+    }
+
     import('mapbox-gl').then((mapboxgl) => {
-      // Load CSS dynamically
       if (!document.querySelector('link[href*="mapbox-gl.css"]')) {
         const link = document.createElement('link')
         link.rel = 'stylesheet'
         link.href = 'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css'
         document.head.appendChild(link)
       }
-      
-      mapboxgl.default.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || ''
 
-      if (mapContainer.current) {
+      mapboxgl.default.accessToken = token
+
+      if (!mapContainer.current) return
+
+      try {
         map.current = new mapboxgl.default.Map({
           container: mapContainer.current,
           style: 'mapbox://styles/mapbox/streets-v12',
@@ -37,76 +44,89 @@ export default function ContactMap({ lat, lng, address }: ContactMapProps) {
           pitch: 45,
           bearing: 0
         })
-
-        // Add navigation controls
-        map.current.addControl(new mapboxgl.default.NavigationControl(), 'top-right')
-        
-        // Add fullscreen control
-        map.current.addControl(new mapboxgl.default.FullscreenControl(), 'top-right')
-
-        // Wait for map to load before adding marker
-        map.current.on('load', () => {
-          if (map.current && mapContainer.current) {
-            // Create custom marker element with logo
-            const markerEl = document.createElement('div')
-            markerEl.className = 'contact-marker'
-            markerEl.style.cursor = 'pointer'
-            markerEl.style.transition = 'transform 0.3s ease'
-            markerEl.style.width = '60px'
-            markerEl.style.height = '60px'
-            markerEl.style.borderRadius = '50%'
-            markerEl.style.backgroundColor = 'white'
-            markerEl.style.border = '4px solid #3B82F6'
-            markerEl.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)'
-            markerEl.style.display = 'flex'
-            markerEl.style.alignItems = 'center'
-            markerEl.style.justifyContent = 'center'
-            markerEl.style.padding = '4px'
-            markerEl.style.overflow = 'hidden'
-            
-            // Create image element for logo
-            const logoImg = document.createElement('img')
-            logoImg.src = '/logoisle&echo.png'
-            logoImg.alt = 'ISLE & ECHO Logo'
-            logoImg.style.width = '100%'
-            logoImg.style.height = '100%'
-            logoImg.style.objectFit = 'contain'
-            logoImg.style.pointerEvents = 'none'
-            
-            markerEl.appendChild(logoImg)
-
-            // Create marker
-            marker.current = new mapboxgl.default.Marker(markerEl)
-              .setLngLat([lng, lat])
-              .addTo(map.current)
-
-            // Create popup with address
-            const popup = new mapboxgl.default.Popup({ offset: 25 })
-              .setHTML(`
-                <div style="padding: 12px; max-width: 250px;">
-                  <h3 style="margin: 0 0 8px 0; color: #333; font-weight: bold; font-size: 16px;">Our Location</h3>
-                  <p style="margin: 0; color: #666; font-size: 14px; line-height: 1.5;">${address}</p>
-                </div>
-              `)
-
-            markerEl.addEventListener('click', () => {
-              if (map.current) {
-                popup.setLngLat([lng, lat]).addTo(map.current)
-              }
-            })
-            
-            marker.current.setPopup(popup)
-
-            // Add hover effect
-            markerEl.addEventListener('mouseenter', () => {
-              markerEl.style.transform = 'scale(1.2)'
-            })
-            markerEl.addEventListener('mouseleave', () => {
-              markerEl.style.transform = 'scale(1)'
-            })
-          }
-        })
+      } catch (err) {
+        console.error('Mapbox init error:', err)
+        setError('Unable to initialize the map.')
+        return
       }
+
+      map.current.on('error', (e) => {
+        console.error('Mapbox error:', e)
+        setError('Map failed to load. Check your Mapbox token and network connection.')
+      })
+
+      map.current.addControl(new mapboxgl.default.NavigationControl(), 'top-right')
+      map.current.addControl(new mapboxgl.default.FullscreenControl(), 'top-right')
+
+      map.current.on('load', () => {
+        if (!map.current) return
+
+        const markerEl = document.createElement('div')
+        markerEl.className = 'contact-marker'
+        markerEl.style.cursor = 'pointer'
+        // Outer shell stays transform-free so Mapbox positioning is not overwritten on hover
+        markerEl.style.width = '60px'
+        markerEl.style.height = '60px'
+
+        const markerInner = document.createElement('div')
+        markerInner.className = 'contact-marker-inner'
+        markerInner.style.width = '100%'
+        markerInner.style.height = '100%'
+        markerInner.style.borderRadius = '50%'
+        markerInner.style.backgroundColor = 'white'
+        markerInner.style.border = '4px solid #0b6e7a'
+        markerInner.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)'
+        markerInner.style.display = 'flex'
+        markerInner.style.alignItems = 'center'
+        markerInner.style.justifyContent = 'center'
+        markerInner.style.padding = '4px'
+        markerInner.style.overflow = 'hidden'
+        markerInner.style.transition = 'transform 0.25s ease'
+        markerInner.style.transformOrigin = 'center bottom'
+        markerInner.style.willChange = 'transform'
+
+        const logoImg = document.createElement('img')
+        logoImg.src = '/logoisle&echo.png'
+        logoImg.alt = 'ISLE & ECHO Logo'
+        logoImg.style.width = '100%'
+        logoImg.style.height = '100%'
+        logoImg.style.objectFit = 'contain'
+        logoImg.style.pointerEvents = 'none'
+        markerInner.appendChild(logoImg)
+        markerEl.appendChild(markerInner)
+
+        marker.current = new mapboxgl.default.Marker({
+          element: markerEl,
+          anchor: 'bottom',
+        })
+          .setLngLat([lng, lat])
+          .addTo(map.current)
+
+        const popup = new mapboxgl.default.Popup({
+          offset: 25,
+          closeButton: true,
+          closeOnClick: true,
+          maxWidth: '280px',
+          anchor: 'bottom',
+        }).setHTML(`
+            <div style="padding: 12px; max-width: 250px;">
+              <h3 style="margin: 0 0 8px 0; color: #102429; font-weight: bold; font-size: 16px;">Our Location</h3>
+              <p style="margin: 0; color: #3a5459; font-size: 14px; line-height: 1.5;">${address}</p>
+            </div>
+          `)
+
+        marker.current.setPopup(popup)
+
+        markerEl.addEventListener('mouseenter', () => {
+          markerInner.style.transform = 'scale(1.15)'
+        })
+        markerEl.addEventListener('mouseleave', () => {
+          markerInner.style.transform = 'scale(1)'
+        })
+      })
+    }).catch((err) => {
+      console.error('Failed to load mapbox-gl:', err)
+      setError('Failed to load Mapbox library.')
     })
 
     return () => {
@@ -121,15 +141,20 @@ export default function ContactMap({ lat, lng, address }: ContactMapProps) {
     }
   }, [lat, lng, address])
 
+  if (error) {
+    return (
+      <div className="relative w-full h-96 rounded-2xl overflow-hidden border border-black/10 bg-[var(--foam)] flex items-center justify-center p-6 text-center">
+        <div>
+          <p className="font-semibold text-[var(--ink)] mb-2">Map unavailable</p>
+          <p className="text-sm text-[var(--ink-soft)] max-w-md">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="relative w-full h-96 rounded-lg overflow-hidden shadow-lg">
+    <div className="relative w-full h-96 rounded-2xl overflow-hidden shadow-lg">
       <div ref={mapContainer} className="w-full h-full" />
-      <style jsx>{`
-        .contact-marker:hover {
-          transform: scale(1.2);
-        }
-      `}</style>
     </div>
   )
 }
-

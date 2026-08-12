@@ -1,5 +1,10 @@
-import PDFDocument from 'pdfkit'
+import { createRequire } from 'module'
 import { supabaseAdmin } from './supabaseClient'
+
+// Load pdfkit at runtime from node_modules so Helvetica.afm resolves
+const require = createRequire(import.meta.url)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const PDFDocument = require('pdfkit') as typeof import('pdfkit')
 
 interface BookingData {
   id: string
@@ -16,7 +21,27 @@ interface BookingData {
   payment_method?: string
   payment_id?: string
   created_at: string
+  vehicle_name?: string
+  pickup_city_name?: string
+  dropoff_city_name?: string
 }
+
+export interface InvoiceOptions {
+  mode?: 'standard' | 'deposit'
+  depositPercent?: number
+  paymentLink?: string
+}
+
+export function getDepositBreakdown(total: number, percent = 50) {
+  const safeTotal = Number(total) || 0
+  const safePercent = Math.min(100, Math.max(1, Number(percent) || 50))
+  const deposit = Math.round(safeTotal * (safePercent / 100) * 100) / 100
+  const balance = Math.round((safeTotal - deposit) * 100) / 100
+  return { total: safeTotal, deposit, balance, percent: safePercent }
+}
+
+const formatLkr = (amount: number) =>
+  `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 interface CompanyInfo {
   name: string
@@ -59,11 +84,11 @@ async function getCompanyInfo(): Promise<CompanyInfo> {
 }
 
 // Generate invoice PDF
-export async function generateInvoicePDF(booking: BookingData): Promise<Buffer> {
+export async function generateInvoicePDF(booking: BookingData, options: InvoiceOptions = {}): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     try {
       const companyInfo = await getCompanyInfo()
-      const doc = new PDFDocument({ margin: 50, size: 'A4' })
+      const doc = new PDFDocument({ margin: 50, size: 'A4', font: 'Helvetica' })
       const buffers: Buffer[] = []
       
       doc.on('data', buffers.push.bind(buffers))
@@ -179,11 +204,12 @@ export async function generateInvoicePDF(booking: BookingData): Promise<Buffer> 
       
       // Item row
       const itemRowY = doc.y
+      const packageLabel = booking.tour_package_name || booking.vehicle_name || 'Isle & Echo booking'
       doc
         .font('Helvetica')
-        .text(booking.tour_package_name, 50, itemRowY)
-        .text(`${booking.guests} guest(s)`, 350, itemRowY)
-        .text(`LKR ${booking.total_price.toFixed(2)}`, 450, itemRowY, { align: 'right' })
+        .text(packageLabel, 50, itemRowY)
+        .text(`${booking.guests || 1} guest(s)`, 350, itemRowY)
+        .text(formatLkr(Number(booking.total_price) || 0), 450, itemRowY, { align: 'right' })
       doc.y = itemRowY + 15
       
       // Line separator
@@ -198,7 +224,7 @@ export async function generateInvoicePDF(booking: BookingData): Promise<Buffer> 
       doc
         .fontSize(10)
         .font('Helvetica')
-        .text(`Payment Status: ${booking.payment_status.toUpperCase()}`, 50, paymentY)
+        .text(`Payment Status: ${(booking.payment_status || 'pending').toUpperCase()}`, 50, paymentY)
       if (booking.payment_method) {
         paymentY += 15
         doc.text(`Payment Method: ${booking.payment_method}`, 50, paymentY)
@@ -211,12 +237,50 @@ export async function generateInvoicePDF(booking: BookingData): Promise<Buffer> 
       
       // Total
       const totalY = doc.y
+      const breakdown = getDepositBreakdown(Number(booking.total_price) || 0, options.depositPercent || 50)
       doc
         .fontSize(12)
         .font('Helvetica-Bold')
         .text('Total Amount:', 350, totalY)
-        .text(`LKR ${booking.total_price.toFixed(2)}`, 450, totalY, { align: 'right' })
+        .text(formatLkr(breakdown.total), 450, totalY, { align: 'right' })
       doc.y = totalY + 20
+
+      if (options.mode === 'deposit') {
+        doc
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .text(`Deposit due now (${breakdown.percent}%):`, 300, doc.y)
+          .text(formatLkr(breakdown.deposit), 450, doc.y, { align: 'right' })
+        doc.moveDown(0.8)
+        doc
+          .font('Helvetica')
+          .text('Balance before travel:', 300, doc.y)
+          .text(formatLkr(breakdown.balance), 450, doc.y, { align: 'right' })
+        doc.moveDown(1.2)
+        doc
+          .fontSize(12)
+          .font('Helvetica-Bold')
+          .fillColor('#0b3d4a')
+          .text(`Payment instructions — ${breakdown.percent}% to confirm`, 50)
+          .fillColor('#000000')
+          .moveDown(0.4)
+          .fontSize(10)
+          .font('Helvetica')
+          .text(`To confirm this booking, please pay ${formatLkr(breakdown.deposit)} (${breakdown.percent}% of the total). Quote booking reference ${booking.id} with your transfer.`, 50, doc.y, { width: 500 })
+          .moveDown(0.5)
+          .text(`Pay by bank transfer or use the secure PayHere payment link below.`, 50, doc.y, { width: 500 })
+          .moveDown(0.4)
+        if (options.paymentLink) {
+          doc
+            .fillColor('#0b6e7a')
+            .text(options.paymentLink, 50, doc.y, { width: 500, link: options.paymentLink, underline: true })
+            .fillColor('#000000')
+            .moveDown(0.4)
+        }
+        doc
+          .text(`The remaining ${formatLkr(breakdown.balance)} is due before the travel start date.`, 50, doc.y, { width: 500 })
+        doc.moveDown(1)
+      }
       
       // Line separator
       doc

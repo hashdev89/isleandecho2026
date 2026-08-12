@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
   Search,
   Star,
-  Heart,
   Globe,
   Calendar,
   Users,
@@ -25,6 +24,15 @@ import {
 } from 'lucide-react'
 import Header from '../components/Header'
 import StructuredData, { organizationSchema, websiteSchema } from '../components/StructuredData'
+import { useClickOutside } from '../hooks/useClickOutside'
+import { tourFitsGuestCountFromTour, getTourGroupSize, formatGroupSizeRange } from '@/lib/tourGroupSize'
+import {
+  getPageBySlug,
+  getSection,
+  isSectionEnabled,
+  normalizeSiteContent,
+  type SiteContentDoc,
+} from '@/lib/siteContent'
 
 interface Tour {
   id: string
@@ -38,6 +46,9 @@ interface Tour {
   destinations?: string[]
   style?: string
   featured?: boolean
+  groupSize?: string
+  group_size?: string
+  status?: string
 }
 
 export default function HomePage() {
@@ -47,6 +58,12 @@ export default function HomePage() {
     startDate: '',
     endDate: '',
     guests: 1
+  })
+  const [rentCarData, setRentCarData] = useState({
+    pickupCityId: '',
+    dropoffCityId: '',
+    pickupDate: '',
+    returnDate: '',
   })
   const [customTripData, setCustomTripData] = useState({
     destinations: [] as string[],
@@ -59,8 +76,73 @@ export default function HomePage() {
   const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [showToursDatePicker, setShowToursDatePicker] = useState(false)
+  const [showPackageDropdown, setShowPackageDropdown] = useState(false)
+  const [showDestDropdown, setShowDestDropdown] = useState(false)
+  const [showPickupDropdown, setShowPickupDropdown] = useState(false)
+  const [showDropoffDropdown, setShowDropoffDropdown] = useState(false)
+  const [showRentPickupDatePicker, setShowRentPickupDatePicker] = useState(false)
+  const [showRentReturnDatePicker, setShowRentReturnDatePicker] = useState(false)
+  const [currentRentPickupMonth, setCurrentRentPickupMonth] = useState(new Date())
+  const [currentRentReturnMonth, setCurrentRentReturnMonth] = useState(new Date())
   const [selectedTourStartDate, setSelectedTourStartDate] = useState<Date | null>(null)
   const [currentToursMonth, setCurrentToursMonth] = useState(new Date())
+  const toursDatePickerRef = useRef<HTMLDivElement>(null)
+  const customDatePickerRef = useRef<HTMLDivElement>(null)
+  const packageDropdownRef = useRef<HTMLDivElement>(null)
+  const destDropdownRef = useRef<HTMLDivElement>(null)
+  const pickupDropdownRef = useRef<HTMLDivElement>(null)
+  const dropoffDropdownRef = useRef<HTMLDivElement>(null)
+  const rentPickupDatePickerRef = useRef<HTMLDivElement>(null)
+  const rentReturnDatePickerRef = useRef<HTMLDivElement>(null)
+  const closeToursDatePicker = useCallback(() => setShowToursDatePicker(false), [])
+  const closeCustomDatePicker = useCallback(() => setShowDatePicker(false), [])
+  const closePackageDropdown = useCallback(() => setShowPackageDropdown(false), [])
+  const closeDestDropdown = useCallback(() => setShowDestDropdown(false), [])
+  const closePickupDropdown = useCallback(() => setShowPickupDropdown(false), [])
+  const closeDropoffDropdown = useCallback(() => setShowDropoffDropdown(false), [])
+  const closeRentPickupDatePicker = useCallback(() => setShowRentPickupDatePicker(false), [])
+  const closeRentReturnDatePicker = useCallback(() => setShowRentReturnDatePicker(false), [])
+  useClickOutside(toursDatePickerRef, showToursDatePicker, closeToursDatePicker)
+  useClickOutside(customDatePickerRef, showDatePicker, closeCustomDatePicker)
+  useClickOutside(packageDropdownRef, showPackageDropdown, closePackageDropdown)
+  useClickOutside(destDropdownRef, showDestDropdown, closeDestDropdown)
+  useClickOutside(pickupDropdownRef, showPickupDropdown, closePickupDropdown)
+  useClickOutside(dropoffDropdownRef, showDropoffDropdown, closeDropoffDropdown)
+  useClickOutside(rentPickupDatePickerRef, showRentPickupDatePicker, closeRentPickupDatePicker)
+  useClickOutside(rentReturnDatePickerRef, showRentReturnDatePicker, closeRentReturnDatePicker)
+
+  useEffect(() => {
+    setShowPackageDropdown(false)
+    setShowDestDropdown(false)
+    setShowPickupDropdown(false)
+    setShowDropoffDropdown(false)
+    setShowToursDatePicker(false)
+    setShowDatePicker(false)
+    setShowRentPickupDatePicker(false)
+    setShowRentReturnDatePicker(false)
+  }, [searchTab])
+
+  const closeSearchOverlays = useCallback(() => {
+    setShowPackageDropdown(false)
+    setShowDestDropdown(false)
+    setShowPickupDropdown(false)
+    setShowDropoffDropdown(false)
+    setShowToursDatePicker(false)
+    setShowDatePicker(false)
+    setShowRentPickupDatePicker(false)
+    setShowRentReturnDatePicker(false)
+  }, [])
+
+  const searchOverlayOpen =
+    showPackageDropdown ||
+    showToursDatePicker ||
+    showDatePicker ||
+    showDestDropdown ||
+    showPickupDropdown ||
+    showDropoffDropdown ||
+    showRentPickupDatePicker ||
+    showRentReturnDatePicker
+
   const [featuredTours, setFeaturedTours] = useState<Tour[]>([])
   const [allTours, setAllTours] = useState<Tour[]>([])
   const [loadingTours, setLoadingTours] = useState(true)
@@ -74,22 +156,79 @@ export default function HomePage() {
   const [videoLoaded, setVideoLoaded] = useState(false)
   const [useFallbackImage, setUseFallbackImage] = useState(false)
   const [currentSlide, setCurrentSlide] = useState(0)
+  const [featuredTourSlide, setFeaturedTourSlide] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
-  const [siteContent, setSiteContent] = useState<Record<string, unknown> | null>(null)
+  const [selectedHeroArrow, setSelectedHeroArrow] = useState<'prev' | 'next'>('next')
+  const [siteContent, setSiteContent] = useState<SiteContentDoc | null>(null)
   const [blogPosts, setBlogPosts] = useState<Array<{ id: number; title: string; description?: string; excerpt?: string; image?: string; date?: string; readTime?: string; category?: string }>>([])
   const [blogCarouselIndex, setBlogCarouselIndex] = useState(0)
   const [heroReady, setHeroReady] = useState(false)
   const [failedHeroImageIndices, setFailedHeroImageIndices] = useState<Set<number>>(new Set())
+
+  const toursForGuestCount = useMemo(
+    () => allTours.filter((tour) => tourFitsGuestCountFromTour(tour, searchData.guests)),
+    [allTours, searchData.guests]
+  )
+
+  useEffect(() => {
+    if (!searchData.tourPackage) return
+    const selected = allTours.find((t) => t.id === searchData.tourPackage)
+    if (selected && !tourFitsGuestCountFromTour(selected, searchData.guests)) {
+      setSearchData((prev) => ({ ...prev, tourPackage: '' }))
+      setShowPackageDropdown(false)
+    }
+  }, [searchData.guests, searchData.tourPackage, allTours])
+
+  const rentCityOptions = useMemo(() => {
+    if (destinations.length > 0) {
+      return destinations.filter((d: { status?: string }) => d.status !== 'inactive')
+    }
+    return [
+      { id: 'colombo', name: 'Colombo', region: 'Western Province' },
+      { id: 'kandy', name: 'Kandy', region: 'Central Province' },
+      { id: 'galle', name: 'Galle', region: 'Southern Province' },
+      { id: 'sigiriya', name: 'Sigiriya', region: 'Cultural Triangle' },
+      { id: 'ella', name: 'Ella', region: 'Uva Province' },
+    ]
+  }, [destinations])
+
+  const handleRentCarSearch = () => {
+    const params = new URLSearchParams()
+    if (rentCarData.pickupCityId) params.set('pickup', rentCarData.pickupCityId)
+    if (rentCarData.dropoffCityId) params.set('dropoff', rentCarData.dropoffCityId)
+    if (rentCarData.pickupDate) params.set('pickupDate', rentCarData.pickupDate)
+    if (rentCarData.returnDate) params.set('returnDate', rentCarData.returnDate)
+    const query = params.toString()
+    window.location.href = `/rent-car${query ? `?${query}` : ''}`
+  }
   
   // Hero carousel images - only from dashboard (Admin → Site content → Hero). No default image.
+  const homePage = siteContent ? getPageBySlug(siteContent, '/') : undefined
+  const heroCms = getSection(homePage, 'hero') || (siteContent?.hero as Record<string, unknown> | undefined)
+  const featuredCms = getSection(homePage, 'featuredTours')
+  const bannerCms =
+    getSection(homePage, 'sriLankaBanner') ||
+    (siteContent?.sriLankaBanner as Record<string, unknown> | undefined)
+  const featuresCms = getSection(homePage, 'features')
+  const destinationsCms = getSection(homePage, 'destinations')
+  const blogCms = getSection(homePage, 'blogPreview')
+  const ctaCms = getSection(homePage, 'cta')
+  const showFeatured = !homePage || isSectionEnabled(homePage, 'featuredTours')
+  const showStats = !homePage || isSectionEnabled(homePage, 'stats')
+  const showBanner = !homePage || isSectionEnabled(homePage, 'sriLankaBanner')
+  const showFeatures = !homePage || isSectionEnabled(homePage, 'features')
+  const showDestinations = !homePage || isSectionEnabled(homePage, 'destinations')
+  const showBlog = !homePage || isSectionEnabled(homePage, 'blogPreview')
+  const showCta = !homePage || isSectionEnabled(homePage, 'cta')
+
   const heroImages = useMemo(() => {
-    const fromCms = (siteContent?.hero as Record<string, unknown>)?.heroImages
+    const fromCms = heroCms?.heroImages
     if (Array.isArray(fromCms) && fromCms.length > 0) {
       const valid = fromCms.filter((u): u is string => typeof u === 'string' && u.length > 0)
       if (valid.length > 0) return valid
     }
     return []
-  }, [siteContent])
+  }, [heroCms])
   const hasHeroSlides = heroImages.length > 0
 
   // Keep currentSlide in bounds when heroImages from CMS changes
@@ -116,6 +255,7 @@ export default function HomePage() {
       const interval = setInterval(() => {
         if (!isTransitioning) {
           setIsTransitioning(true)
+          setSelectedHeroArrow('next')
           setCurrentSlide((prev) => (prev + 1) % heroImages.length)
           setTimeout(() => setIsTransitioning(false), 2500)
         }
@@ -129,6 +269,7 @@ export default function HomePage() {
   
   const nextSlide = () => {
     if (!hasHeroSlides || isTransitioning) return
+    setSelectedHeroArrow('next')
     setIsTransitioning(true)
     setCurrentSlide((prev) => (prev + 1) % heroImages.length)
     setTimeout(() => setIsTransitioning(false), 500)
@@ -136,6 +277,7 @@ export default function HomePage() {
   
   const prevSlide = () => {
     if (!hasHeroSlides || isTransitioning) return
+    setSelectedHeroArrow('prev')
     setIsTransitioning(true)
     const prevIndex = (currentSlide - 1 + heroImages.length) % heroImages.length
     setCurrentSlide(prevIndex)
@@ -343,23 +485,17 @@ export default function HomePage() {
 
   useEffect(() => {
     let isMounted = true
-    fetch('/api/site-content', { cache: 'no-store' })
-      .then(res => (res.ok ? res.json() : null))
-      .then((json: { success?: boolean; data?: Record<string, unknown> } | null) => {
-        if (isMounted && json?.success && json.data) setSiteContent(json.data)
-      })
-      .catch(() => {})
-    return () => { isMounted = false }
-  }, [])
-
-  useEffect(() => {
-    let isMounted = true
-    fetch('/api/blog', { cache: 'no-store' })
-      .then(res => (res.ok ? res.json() : []))
-      .then((posts: Array<{ id: number; title: string; description?: string; excerpt?: string; image?: string; date?: string; readTime?: string; category?: string; status?: string }>) => {
-        if (!isMounted || !Array.isArray(posts)) return
-        const published = posts.filter(p => p.status === 'Published')
-        setBlogPosts(published)
+    // Parallel CMS fetches; allow browser cache for faster repeat visits
+    Promise.all([
+      fetch('/api/site-content', { cache: 'force-cache' }).then(res => (res.ok ? res.json() : null)),
+      fetch('/api/blog', { cache: 'force-cache' }).then(res => (res.ok ? res.json() : [])),
+    ])
+      .then(([siteJson, posts]) => {
+        if (!isMounted) return
+        if (siteJson?.success && siteJson.data) setSiteContent(normalizeSiteContent(siteJson.data))
+        if (Array.isArray(posts)) {
+          setBlogPosts(posts.filter((p: { status?: string }) => p.status === 'Published'))
+        }
       })
       .catch(() => {})
     return () => { isMounted = false }
@@ -577,12 +713,23 @@ export default function HomePage() {
   }
 
   const handleSearch = () => {
+    const params = new URLSearchParams()
+    if (searchData.guests > 0) params.set('guests', String(searchData.guests))
+    if (searchData.startDate) params.set('startDate', searchData.startDate)
+    if (searchData.endDate) params.set('endDate', searchData.endDate)
+    const query = params.toString()
+
     if (searchData.tourPackage) {
-      // Navigate to the specific tour package page
-      window.location.href = `/tours/${searchData.tourPackage}?startDate=${searchData.startDate}&endDate=${searchData.endDate}&guests=${searchData.guests}`
+      const selected = allTours.find((t) => t.id === searchData.tourPackage)
+      if (selected && !tourFitsGuestCountFromTour(selected, searchData.guests)) {
+        alert(
+          `This tour is listed for ${getTourGroupSize(selected) || 'a different group size'}. Please pick a package that fits ${searchData.guests} guest${searchData.guests === 1 ? '' : 's'}.`
+        )
+        return
+      }
+      window.location.href = `/tours/${searchData.tourPackage}${query ? `?${query}` : ''}`
     } else {
-      // Navigate to general tours page
-      window.location.href = '/tours'
+      window.location.href = `/tours${query ? `?${query}` : ''}`
     }
   }
 
@@ -664,6 +811,39 @@ export default function HomePage() {
     return formatDate(date) === formatDate(selectedTourStartDate)
   }
 
+  const handleRentPickupDateSelect = (date: Date) => {
+    const dateStr = formatDate(date)
+    setRentCarData((prev) => ({
+      ...prev,
+      pickupDate: dateStr,
+      returnDate: prev.returnDate && prev.returnDate < dateStr ? '' : prev.returnDate,
+    }))
+    setShowRentPickupDatePicker(false)
+  }
+
+  const handleRentReturnDateSelect = (date: Date) => {
+    const dateStr = formatDate(date)
+    setRentCarData((prev) => ({ ...prev, returnDate: dateStr }))
+    setShowRentReturnDatePicker(false)
+  }
+
+  const isRentPickupDateSelected = (date: Date) =>
+    !!rentCarData.pickupDate && formatDate(date) === rentCarData.pickupDate
+
+  const isRentReturnDateSelected = (date: Date) =>
+    !!rentCarData.returnDate && formatDate(date) === rentCarData.returnDate
+
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return dateStr
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  }
+
   const getDaysInMonth = (year: number, month: number) => {
     return new Date(year, month + 1, 0).getDate()
   }
@@ -699,44 +879,62 @@ export default function HomePage() {
     const container = document.getElementById('tour-slider');
     if (!container) return;
 
+    const getCardStep = () => {
+      const first = container.children[0] as HTMLElement | undefined
+      const second = container.children[1] as HTMLElement | undefined
+      if (!first) return 300
+      if (second) return second.offsetLeft - first.offsetLeft
+      return first.offsetWidth
+    }
+
     const handleScroll = () => {
-      const cardWidth = window.innerWidth < 640 ? 288 : 320; // Mobile vs desktop card width (including gap)
-      const scrollPosition = container.scrollLeft;
-      const newSlide = Math.round(scrollPosition / cardWidth);
-      setCurrentSlide(Math.max(0, Math.min(newSlide, featuredTours.length - 1)));
+      const cardStep = getCardStep()
+      if (cardStep <= 0) return
+      const newSlide = Math.round(container.scrollLeft / cardStep)
+      setFeaturedTourSlide(Math.max(0, Math.min(newSlide, featuredTours.length - 1)))
     };
 
-    container.addEventListener('scroll', handleScroll);
+    container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
   }, [featuredTours.length]);
 
-  // Function to navigate to specific slide
-  const goToSlide = (slideIndex: number) => {
+  useEffect(() => {
+    setFeaturedTourSlide((s) => Math.min(s, Math.max(0, featuredTours.length - 1)))
+  }, [featuredTours.length]);
+
+  // Function to navigate to specific featured tour slide
+  const goToFeaturedSlide = (slideIndex: number) => {
     const container = document.getElementById('tour-slider');
-    if (container) {
-      const cardWidth = window.innerWidth < 640 ? 288 : 320; // Mobile vs desktop card width (including gap)
-      container.scrollLeft = slideIndex * cardWidth;
-      setCurrentSlide(slideIndex);
-    }
+    if (!container) return
+    const first = container.children[0] as HTMLElement | undefined
+    const second = container.children[1] as HTMLElement | undefined
+    const cardStep = first
+      ? (second ? second.offsetLeft - first.offsetLeft : first.offsetWidth)
+      : 300
+    container.scrollTo({ left: slideIndex * cardStep, behavior: 'smooth' })
+    setFeaturedTourSlide(slideIndex)
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
+    <div className="min-h-screen bg-[var(--foam)] dark:bg-[var(--foam)] lp-section-ink">
       {/* Full-screen loader until hero is ready - prevents "image not found" flash */}
       {!heroReady && (
         <div
-          className="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 transition-opacity duration-300"
+          className="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-[var(--lagoon-deep)] transition-opacity duration-300"
           aria-hidden="true"
         >
-          <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-          <p className="mt-4 text-white/90 text-sm font-medium">Loading...</p>
+          <div className="w-12 h-12 border-4 border-white/30 border-t-[var(--sun)] rounded-full animate-spin" />
+          <p className="mt-4 text-white/90 text-sm font-medium tracking-wide">Loading...</p>
         </div>
       )}
 
       <Header />
 
-      {/* Hero Section - Inspired by Swimlane's hero */}
-      <section className="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 text-white overflow-visible sm:overflow-hidden min-h-auto sm:min-h-screen w-full flex items-start sm:items-center pt-20 pb-11 sm:pt-0 sm:pb-0">
+      {/* Hero — mobile + iPad Mini (<820px): auto height, 48px top/bottom
+          iPad Air/Pro: centered · large desktop: bottom-aligned */}
+      <section
+        className="relative text-white overflow-visible w-full flex items-start min-[820px]:min-h-[100dvh] min-[820px]:items-center min-[1400px]:items-end"
+      >
         {/* Background Video/Image */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           {/* Hero Carousel - shown when video is not playing or failed */}
@@ -747,17 +945,16 @@ export default function HomePage() {
                 return (
                   <div
                     key={index}
-                    className={`absolute inset-0 transition-opacity ease-in-out duration-300 will-change-opacity ${
+                    className={`absolute inset-0 transition-opacity ease-in-out duration-700 will-change-opacity ${
                       index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
                     }`}
-                    style={{ transition: 'opacity 0.4s ease-out' }}
                   >
                     <Image
                       src={src}
                       alt={`Hero ${index + 1}`}
                       fill
                       priority={index <= 1}
-                      className="object-cover"
+                      className={`object-cover ${index === currentSlide ? 'lp-kenburns' : ''}`}
                       quality={80}
                       sizes="100vw"
                       fetchPriority={index === 0 ? 'high' : 'auto'}
@@ -767,7 +964,7 @@ export default function HomePage() {
                   </div>
                 )
               })}
-              <div className="absolute inset-0 bg-black/50 z-20 pointer-events-none" aria-hidden />
+              <div className="absolute inset-0 bg-gradient-to-t from-[var(--lagoon-deep)]/90 via-[var(--lagoon-deep)]/35 to-black/20 z-20 pointer-events-none" aria-hidden />
             </div>
           </div>
           
@@ -776,7 +973,10 @@ export default function HomePage() {
             <div className="youtube-container">
               <iframe
                 id="hero-video"
-                src="https://www.youtube.com/embed/y5bHGWAE50c?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1&start=0&cc_load_policy=0&playsinline=1&enablejsapi=1&origin=*&widget_referrer=*&widgetid=1&autohide=1&wmode=transparent"
+                src={
+                  String(heroCms?.videoUrl || '') ||
+                  'https://www.youtube.com/embed/y5bHGWAE50c?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1&start=0&cc_load_policy=0&playsinline=1&enablejsapi=1&origin=*&widget_referrer=*&widgetid=1&autohide=1&wmode=transparent'
+                }
                 title="Sri Lanka Travel Video"
                 frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -802,72 +1002,37 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Carousel Navigation - z-index below navbar (navbar is z-[100]) so arrows don't overlap header */}
-        {hasHeroSlides && (
-        <div className="absolute inset-0 z-10 hidden sm:flex items-center justify-between px-4 sm:px-6 lg:px-8 pointer-events-none">
-          <button
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              prevSlide()
-            }}
-            className="bg-white/10 hover:bg-blue-600 active:bg-blue-800 backdrop-blur-sm border border-white/30 hover:border-blue-600 text-white rounded-full p-3 sm:p-4 transition-all duration-300 pointer-events-auto flex items-center justify-center shadow-lg hover:shadow-xl"
-            aria-label="Previous slide"
-            type="button"
-          >
-            <ChevronLeft className="w-6 h-6 sm:w-8 sm:h-8 text-white pointer-events-none" />
-          </button>
-          
-          {/* Right Arrow */}
-          <button
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              nextSlide()
-            }}
-            className="bg-white/10 hover:bg-blue-600 active:bg-blue-800 backdrop-blur-sm border border-white/30 hover:border-blue-600 text-white rounded-full p-3 sm:p-4 transition-all duration-300 pointer-events-auto flex items-center justify-center shadow-lg hover:shadow-xl"
-            aria-label="Next slide"
-            type="button"
-          >
-            <ChevronRight className="w-6 h-6 sm:w-8 sm:h-8 text-white pointer-events-none" />
-          </button>
-        </div>
-        )}
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-16 sm:py-12 md:py-16 lg:py-20 xl:py-32 z-10 w-full">
-          <div className="text-center max-w-4xl mx-auto w-full">
-            {/* Badge */}
-            <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-blue-600/20 backdrop-blur-sm border border-blue-400/30 mb-4 sm:mb-4 md:mb-6">
-              <Award className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 text-blue-100" />
-              <span className="text-blue-100 font-medium text-xs sm:text-sm">Top Rated Travel Agency</span>
-            </div>
-
-            {/* Main Headline */}
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-4 md:mb-6 leading-tight px-2">
-              Discover the Magic of{' '}<br className="hidden sm:block"/>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 animated-gradient-text">
-                Sri Lanka
-              </span>
+        <div className="relative w-full max-w-[1920px] mx-auto lp-gutter z-30 py-12 min-[820px]:py-16 min-[1400px]:py-24">
+          <div className="max-w-3xl w-full lp-reveal text-left">
+            <p className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-white mb-3 sm:mb-4 tracking-tight">
+              {String(heroCms?.brandLine || 'ISLE & ECHO')}
+            </p>
+            <h1 className="font-display text-xl sm:text-2xl md:text-2xl lg:text-3xl font-semibold mb-4 sm:mb-5 leading-snug tracking-tight">
+              {heroCms?.headlineHighlight
+                ? `${String(heroCms.headline || '')} ${String(heroCms.headlineHighlight)}`.trim()
+                : String(heroCms?.headline || 'Your next Sri Lanka trip starts here')}
             </h1>
-
-            {/* Subtitle */}
-            <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-white mb-6 sm:mb-6 md:mb-8 max-w-3xl mx-auto leading-relaxed px-2">
-              Experience breathtaking landscapes, rich culture, and unforgettable adventures with our expertly crafted tour packages.
+            <p className="text-base sm:text-lg md:text-xl text-white/90 mb-7 sm:mb-8 max-w-2xl leading-relaxed">
+              {String(
+                heroCms?.subtitle ||
+                  'Feel the isle, hear the echo — curated journeys through culture, coastline, and wild nature.'
+              )}
             </p>
 
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-6 sm:mb-8 md:mb-12 px-2">
+            {/* CTA Buttons + carousel arrows (iPad Air+ / desktop) */}
+            <div className="flex flex-col min-[820px]:flex-row min-[820px]:flex-wrap items-stretch min-[820px]:items-center gap-3 min-[820px]:gap-4 mb-8 min-[820px]:mb-10">
               <button 
-                onClick={() => window.location.href = '/tours'}
-                className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-colors flex items-center justify-center min-h-[44px] touch-manipulation"
+                onClick={() => window.location.href = String(heroCms?.ctaPrimaryUrl || '/tours')}
+                className="bg-[var(--sun)] hover:brightness-105 active:brightness-95 text-[var(--lagoon-deep)] px-7 sm:px-8 py-3.5 sm:py-4 rounded-full font-bold text-base sm:text-lg transition-all flex items-center justify-center min-h-[44px] touch-manipulation shadow-lg"
               >
-                <Search className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                Explore Tours
+                {String(heroCms?.ctaPrimaryText || 'Start discovering')}
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
               </button>
               <button 
                 onClick={handleVideoPlay}
                 disabled={videoError}
-                className="hidden sm:flex bg-white/10 hover:bg-white/20 active:bg-white/30 backdrop-blur-sm border border-white/30 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-colors items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
+                className="hidden min-[820px]:flex px-7 sm:px-8 py-3.5 sm:py-4 rounded-full font-semibold text-base sm:text-lg transition-colors items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation hover:brightness-110"
+                style={{ background: '#0b3d4a', color: '#d4f06a' }}
               >
                 {videoError || useFallbackImage ? (
                   <>
@@ -884,16 +1049,58 @@ export default function HomePage() {
                 ) : (
                   <>
                     <Play className="w-5 h-5 mr-2" />
-                    Play
+                    Watch the film
                   </>
                 )}
               </button>
+
+              {hasHeroSlides && (
+                <div className="hidden min-[820px]:flex items-center gap-2 sm:gap-3 ml-0 sm:ml-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      prevSlide()
+                    }}
+                    style={
+                      selectedHeroArrow === 'prev'
+                        ? { color: '#0b3d4a', background: '#d4f06a', borderColor: '#d4f06a' }
+                        : { color: '#d4f06a', background: '#0b3d4a', borderColor: 'rgba(212, 240, 106, 0.4)' }
+                    }
+                    className="flex items-center justify-center w-11 h-11 md:w-12 md:h-12 lg:w-[3.25rem] lg:h-[3.25rem] rounded-full border shadow-lg hover:brightness-110 active:scale-95 transition-all duration-200"
+                    aria-label="Previous slide"
+                    aria-pressed={selectedHeroArrow === 'prev'}
+                  >
+                    <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" strokeWidth={2.25} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      nextSlide()
+                    }}
+                    style={
+                      selectedHeroArrow === 'next'
+                        ? { color: '#0b3d4a', background: '#d4f06a', borderColor: '#d4f06a' }
+                        : { color: '#d4f06a', background: '#0b3d4a', borderColor: 'rgba(212, 240, 106, 0.4)' }
+                    }
+                    className="flex items-center justify-center w-11 h-11 md:w-12 md:h-12 lg:w-[3.25rem] lg:h-[3.25rem] rounded-full border shadow-lg hover:brightness-110 active:scale-95 transition-all duration-200"
+                    aria-label="Next slide"
+                    aria-pressed={selectedHeroArrow === 'next'}
+                  >
+                    <ChevronRight className="w-5 h-5 md:w-6 md:h-6" strokeWidth={2.25} />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           
-          {/* Search Section */}
-          <div className="w-full max-w-7xl mx-auto animate-fade-in-up delay-100 pt-7 sm:pt-0 pb-8 sm:pb-8 md:pb-12 lg:pb-20 px-2 sm:px-4">
+          {/* Search Section — full width on tablet & desktop; allow popovers to escape */}
+          <div className="w-full mt-6 min-[820px]:mt-8 min-[1400px]:mt-10 animate-fade-in-up delay-100 relative overflow-visible z-40">
               {/* Search Tabs */}
-              <div className="flex flex-wrap gap-2 sm:gap-1 mb-3 sm:mb-6 justify-center">
+              <div className="flex flex-wrap gap-1 sm:gap-2 mb-3 sm:mb-4 md:mb-5">
                 {[
                 { id: 'tours', label: 'Tours' },
                 { id: 'plan-trip', label: 'Plan Your Trip' },
@@ -902,47 +1109,129 @@ export default function HomePage() {
                   <button
                     key={tab.id}
                     onClick={() => setSearchTab(tab.id)}
-                  style={searchTab === tab.id ? { color: '#fff', borderBottom: '2px solid #fff' } : { color: 'rgba(255,255,255,0.7)' }}
-                  className={`px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-medium transition-all duration-200 min-h-[44px] touch-manipulation ${searchTab === tab.id ? 'border-b-2' : 'hover:text-white'}`}
+                  style={
+                    searchTab === tab.id
+                      ? { color: '#0b3d4a', background: '#d4f06a' }
+                      : { color: '#d4f06a', background: '#0b3d4a' }
+                  }
+                  className="px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 text-sm sm:text-base md:text-lg font-semibold rounded-full transition-all duration-200 min-h-[40px] touch-manipulation hover:brightness-110"
                   >
                   {tab.label}
                   </button>
                 ))}
               </div>
             
-                             {/* Search Form */}
-             <div className="rounded-xl sm:rounded-2xl shadow-2xl p-3 sm:p-6 md:p-8 backdrop-blur-lg border bg-white/60 dark:bg-gray-800 relative z-10">
+                             {/* Search Form — overflow visible so package list + calendars can pop outside the glass panel */}
+             <div
+               className={`rounded-2xl sm:rounded-3xl shadow-2xl p-3 sm:p-6 md:p-8 lg:p-10 xl:p-12 lp-glass relative overflow-visible ${
+                 searchOverlayOpen ? 'z-50' : 'z-30'
+               }`}
+             >
                {searchTab === 'tours' && (
                  <>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 relative z-10">
+                   <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1024px]:grid-cols-3 gap-3 min-[820px]:gap-5 min-[1024px]:gap-6 lg:gap-8 relative min-w-0 overflow-visible items-start">
                      {/* Tour Package */}
-                     <div className="relative">
-                       <label className="block text-xs sm:text-sm font-medium mb-1 sm:mb-2 text-blue-950 dark:text-white">Tour Package</label>
-                       <div className="relative">
-                         <select
-                           value={searchData.tourPackage}
-                           onChange={(e) => setSearchData({...searchData, tourPackage: e.target.value})}
-                           className="w-full pl-3 sm:pl-4 pr-8 sm:pr-10 py-3 sm:py-4 text-base sm:text-base border rounded-lg focus:ring-2 focus:ring-[#187BFF] focus:border-transparent appearance-none cursor-pointer hover:border-[#187BFF] transition-colors bg-white/60 dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px] touch-manipulation"
+                     <div className={`relative min-w-0 w-full self-start ${showPackageDropdown ? 'z-[100]' : 'z-10'}`} ref={packageDropdownRef}>
+                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Tour Package</label>
+                       <div className="relative min-w-0 w-full overflow-visible">
+                         <button
+                           type="button"
+                           onClick={() => {
+                             if (showPackageDropdown) {
+                               setShowPackageDropdown(false)
+                             } else {
+                               closeSearchOverlays()
+                               setShowPackageDropdown(true)
+                             }
+                           }}
+                           aria-expanded={showPackageDropdown}
+                           aria-haspopup="listbox"
+                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-10 sm:pr-11 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation flex items-center"
                          >
-                           <option value="" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">Select Your Package</option>
-                          {allTours.map((tourPackage: Tour, index: number) => (
-                            <option key={`${tourPackage.id}-${index}`} value={tourPackage.id} className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
-                              {tourPackage.name}
-                            </option>
-                          ))}
-                         </select>
-                         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-600 dark:text-gray-400" />
+                           <span className="block truncate">
+                             {(() => {
+                               if (!searchData.tourPackage) return 'Select Your Package'
+                               const selected = toursForGuestCount.find((t) => t.id === searchData.tourPackage)
+                                 || allTours.find((t) => t.id === searchData.tourPackage)
+                               if (!selected) return 'Select Your Package'
+                               const paxLabel = formatGroupSizeRange(getTourGroupSize(selected))
+                               return `${selected.name}${paxLabel ? ` (${paxLabel})` : ''}`
+                             })()}
+                           </span>
+                         </button>
+                         <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-600 dark:text-gray-400 transition-transform ${showPackageDropdown ? 'rotate-180' : ''}`} />
+
+                         {showPackageDropdown && (
+                           <ul
+                             role="listbox"
+                             className="absolute left-0 right-0 top-full mt-1 z-[110] max-h-[min(280px,50vh)] sm:max-h-[min(320px,45vh)] overflow-y-auto overscroll-contain rounded-xl border border-black/10 bg-white dark:bg-gray-800 shadow-2xl py-1 w-full min-w-0"
+                           >
+                             <li>
+                               <button
+                                 type="button"
+                                 role="option"
+                                 aria-selected={!searchData.tourPackage}
+                                 onClick={() => {
+                                   setSearchData({ ...searchData, tourPackage: '' })
+                                   setShowPackageDropdown(false)
+                                 }}
+                                 className="w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-700 dark:text-gray-200 hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)] transition-colors"
+                               >
+                                 Select Your Package
+                               </button>
+                             </li>
+                             {toursForGuestCount.map((tourPackage: Tour, index: number) => {
+                               const paxLabel = formatGroupSizeRange(getTourGroupSize(tourPackage))
+                               const label = `${tourPackage.name}${paxLabel ? ` (${paxLabel})` : ''}`
+                               const isSelected = searchData.tourPackage === tourPackage.id
+                               return (
+                                 <li key={`${tourPackage.id}-${index}`}>
+                                   <button
+                                     type="button"
+                                     role="option"
+                                     aria-selected={isSelected}
+                                     title={label}
+                                     onClick={() => {
+                                       setSearchData({ ...searchData, tourPackage: tourPackage.id })
+                                       setShowPackageDropdown(false)
+                                     }}
+                                     className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base transition-colors break-words ${
+                                       isSelected
+                                         ? 'bg-[var(--lagoon-deep)] text-[var(--sun)]'
+                                         : 'text-gray-900 dark:text-white hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
+                                     }`}
+                                   >
+                                     {label}
+                                   </button>
+                                 </li>
+                               )
+                             })}
+                             {toursForGuestCount.length === 0 && allTours.length > 0 && (
+                               <li className="px-3 sm:px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400">
+                                 No packages for {searchData.guests} guest{searchData.guests === 1 ? '' : 's'}
+                               </li>
+                             )}
+                           </ul>
+                         )}
                        </div>
                      </div>
                      
                      {/* Start Date */}
-                     <div className="relative">
-                       <label className="block text-xs sm:text-sm font-medium mb-1 sm:mb-2 text-blue-950 dark:text-white">Start Date</label>
-                       <div className="relative">
+                     <div className={`relative min-w-0 w-full self-start overflow-visible ${showToursDatePicker ? 'z-[120]' : 'z-20'}`} ref={toursDatePickerRef}>
+                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Start Date</label>
+                       <div className="relative min-w-0 w-full overflow-visible">
                          <button
                            type="button"
-                           onClick={() => setShowToursDatePicker(!showToursDatePicker)}
-                           className="w-full px-3 sm:px-4 py-3 sm:py-4 pr-10 text-base sm:text-base border rounded-lg focus:ring-2 focus:ring-[#187BFF] focus:border-transparent cursor-pointer hover:border-[#187BFF] active:border-[#187BFF] transition-colors text-left bg-white/60 dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px] touch-manipulation"
+                           onClick={() => {
+                             if (showToursDatePicker) {
+                               setShowToursDatePicker(false)
+                             } else {
+                               closeSearchOverlays()
+                               setShowToursDatePicker(true)
+                             }
+                           }}
+                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-8 sm:pr-10 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation truncate"
+                           aria-expanded={showToursDatePicker}
                          >
                            {searchData.startDate 
                              ? new Date(searchData.startDate).toLocaleDateString('en-US', { 
@@ -953,105 +1242,127 @@ export default function HomePage() {
                              : 'Select start date'}
                          </button>
                          <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-600 pointer-events-none" />
-                       </div>
-                       
-                       {/* Date Picker Popup */}
-                       {showToursDatePicker && (
-                         <div className="absolute top-full left-0 mt-1 text-black dark:text-white bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 p-3 sm:p-4 min-w-[280px] max-w-[90vw] sm:max-w-none">
-                           {/* Calendar Header */}
-                           <div className="flex items-center justify-between mb-4">
-                             <button
-                               onClick={() => setCurrentToursMonth(new Date(currentToursMonth.getFullYear(), currentToursMonth.getMonth() - 1))}
-                               className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
-                             >
-                               ←
-                             </button>
-                             <h3 className="font-semibold text-gray-900 dark:text-white">
-                               {currentToursMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                             </h3>
-                             <button
-                               onClick={() => setCurrentToursMonth(new Date(currentToursMonth.getFullYear(), currentToursMonth.getMonth() + 1))}
-                               className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
-                             >
-                               →
-                             </button>
-                           </div>
-                           
-                           {/* Calendar Grid */}
-                           <div className="grid grid-cols-7 gap-1 mb-2">
-                             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                               <div key={day} className="text-center text-xs font-medium text-gray-700 dark:text-gray-300 p-1">
-                                 {day}
-                               </div>
-                             ))}
-                           </div>
-                           
-                           <div className="grid grid-cols-7 gap-1">
-                             {/* Empty cells for days before first day of month */}
-                             {Array.from({ length: getFirstDayOfMonth(currentToursMonth.getFullYear(), currentToursMonth.getMonth()) }).map((_, i) => (
-                               <div key={`empty-${i}`} className="p-2"></div>
-                             ))}
-                             
-                             {/* Days of the month */}
-                             {Array.from({ length: getDaysInMonth(currentToursMonth.getFullYear(), currentToursMonth.getMonth()) }).map((_, i) => {
-                               const day = i + 1
-                               const date = new Date(currentToursMonth.getFullYear(), currentToursMonth.getMonth(), day)
-                               const isToday = formatDate(date) === formatDate(new Date())
-                               const isPast = date < new Date(new Date().setHours(0, 0, 0, 0))
-                               
-                               return (
-                                 <button
-                                   key={day}
-                                   onClick={() => !isPast && handleTourDateSelect(date)}
-                                   disabled={isPast}
-                                   className={`p-2 text-sm rounded transition-colors ${
-                                     isPast
-                                       ? 'text-gray-500 dark:text-gray-500 cursor-not-allowed'
-                                       : isTourDateSelected(date)
-                                       ? 'bg-blue-600 dark:bg-blue-500 text-white'
-                                       : isToday
-                                       ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                                       : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
-                                   }`}
-                                 >
+
+                         {/* Date Picker Popup — anchored to the date button */}
+                         {showToursDatePicker && (
+                           <div className="absolute top-full left-0 right-0 mt-1 text-black dark:text-white bg-white dark:bg-gray-800 border border-black/10 rounded-xl shadow-2xl z-[130] p-3 sm:p-4 w-full max-w-full min-w-0 sm:w-auto sm:min-w-[300px]">
+                             <div className="flex items-center justify-between mb-4">
+                               <button
+                                 type="button"
+                                 onClick={() => setCurrentToursMonth(new Date(currentToursMonth.getFullYear(), currentToursMonth.getMonth() - 1))}
+                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                               >
+                                 ←
+                               </button>
+                               <h3 className="font-semibold text-gray-900 dark:text-white">
+                                 {currentToursMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                               </h3>
+                               <button
+                                 type="button"
+                                 onClick={() => setCurrentToursMonth(new Date(currentToursMonth.getFullYear(), currentToursMonth.getMonth() + 1))}
+                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                               >
+                                 →
+                               </button>
+                             </div>
+
+                             <div className="grid grid-cols-7 gap-1 mb-2">
+                               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                 <div key={day} className="text-center text-xs font-medium text-gray-700 dark:text-gray-300 p-1">
                                    {day}
-                                 </button>
-                               )
-                             })}
+                                 </div>
+                               ))}
+                             </div>
+
+                             <div className="grid grid-cols-7 gap-1">
+                               {Array.from({ length: getFirstDayOfMonth(currentToursMonth.getFullYear(), currentToursMonth.getMonth()) }).map((_, i) => (
+                                 <div key={`empty-${i}`} className="p-2"></div>
+                               ))}
+
+                               {Array.from({ length: getDaysInMonth(currentToursMonth.getFullYear(), currentToursMonth.getMonth()) }).map((_, i) => {
+                                 const day = i + 1
+                                 const date = new Date(currentToursMonth.getFullYear(), currentToursMonth.getMonth(), day)
+                                 const isToday = formatDate(date) === formatDate(new Date())
+                                 const isPast = date < new Date(new Date().setHours(0, 0, 0, 0))
+
+                                 return (
+                                   <button
+                                     key={day}
+                                     type="button"
+                                     onClick={() => !isPast && handleTourDateSelect(date)}
+                                     disabled={isPast}
+                                     className={`p-2 text-sm rounded transition-colors ${
+                                       isPast
+                                         ? 'text-gray-500 dark:text-gray-500 cursor-not-allowed'
+                                         : isTourDateSelected(date)
+                                         ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                                         : isToday
+                                         ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                                         : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
+                                     }`}
+                                   >
+                                     {day}
+                                   </button>
+                                 )
+                               })}
+                             </div>
+
+                             <div className="mt-3 text-xs text-gray-700 dark:text-gray-300 text-center">
+                               {!selectedTourStartDate
+                                 ? 'Click to select start date'
+                                 : 'Date selected'
+                               }
+                             </div>
                            </div>
-                           
-                           {/* Instructions */}
-                           <div className="mt-3 text-xs text-gray-700 dark:text-gray-300 text-center">
-                             {!selectedTourStartDate 
-                               ? 'Click to select start date'
-                               : 'Date selected'
-                             }
-                           </div>
-                         </div>
-                       )}
+                         )}
+                       </div>
                      </div>
                      
                      {/* Number of Guests */}
-                     <div className="relative">
-                     <label className="block text-xs sm:text-sm font-medium mb-1 sm:mb-2 text-blue-950 dark:text-white">Number of Guests</label>
-                       <div className="relative">
-                         <select
-                           value={searchData.guests}
-                           onChange={(e) => setSearchData({...searchData, guests: parseInt(e.target.value)})}
-                           className="w-full pl-3 sm:pl-4 pr-8 sm:pr-10 py-3 sm:py-4 text-base sm:text-base border rounded-lg focus:ring-2 focus:ring-[#187BFF] focus:border-transparent appearance-none cursor-pointer hover:border-[#187BFF] transition-colors text-gray-900 dark:text-white bg-white/60 dark:bg-gray-800 min-h-[44px] touch-manipulation"
+                     <div className="relative z-10 self-start min-w-0 w-full">
+                     <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Number of Guests</label>
+                       <div className="relative flex items-center min-w-0 w-full">
+                         <button
+                           type="button"
+                           aria-label="Decrease guests"
+                           onClick={() => setSearchData({ ...searchData, guests: Math.max(1, (searchData.guests || 1) - 1) })}
+                           className="absolute left-2 z-10 w-9 h-9 rounded-full bg-[var(--lagoon-deep)] text-[var(--sun)] border border-[var(--sun)]/40 font-bold hover:bg-[var(--sun)] hover:text-[var(--lagoon-deep)] transition-colors flex items-center justify-center"
                          >
-                           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
-                             <option key={num} value={num}>{num} {num === 1 ? 'Guest' : 'Guests'}</option>
-                           ))}
-                       </select>
-                          <Users className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none text-blue-600" />
+                           −
+                         </button>
+                         <input
+                           type="number"
+                           min={1}
+                           inputMode="numeric"
+                           value={searchData.guests}
+                           onChange={(e) => {
+                             const raw = e.target.value
+                             if (raw === '') {
+                               setSearchData({ ...searchData, guests: 1 })
+                               return
+                             }
+                             const n = parseInt(raw, 10)
+                             if (!Number.isFinite(n)) return
+                             setSearchData({ ...searchData, guests: Math.max(1, Math.min(999, n)) })
+                           }}
+                           className="w-full pl-12 pr-12 py-3 sm:py-4 md:py-5 text-base md:text-lg text-center border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent transition-colors text-gray-900 dark:text-white bg-white/70 dark:bg-gray-800/80 min-h-[44px] md:min-h-[56px] touch-manipulation [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                         />
+                         <button
+                           type="button"
+                           aria-label="Increase guests"
+                           onClick={() => setSearchData({ ...searchData, guests: Math.min(999, (searchData.guests || 1) + 1) })}
+                           className="absolute right-2 z-10 w-9 h-9 rounded-full bg-[var(--lagoon-deep)] text-[var(--sun)] border border-[var(--sun)]/40 font-bold hover:bg-[var(--sun)] hover:text-[var(--lagoon-deep)] transition-colors flex items-center justify-center"
+                         >
+                           +
+                         </button>
                        </div>
+                       <p className="mt-1.5 text-[11px] md:text-xs text-[var(--lagoon-deep)]/70 dark:text-white/70">Enter any number of guests</p>
                      </div>
                    </div>
                    
                    {/* Tour Package Summary */}
                    {searchData.tourPackage && (
-                     <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                     <div className="mt-6 md:mt-8 p-4 md:p-6 rounded-xl border border-white/40 bg-white/70 dark:bg-gray-800/80 backdrop-blur-sm">
                        {(() => {
                          const selectedTour = allTours.find((tour: Tour) => tour.id === searchData.tourPackage);
                          if (!selectedTour) return null;
@@ -1059,29 +1370,31 @@ export default function HomePage() {
                          return (
                            <div className="space-y-4">
                              {/* Tour Info */}
-                             <div className="flex items-center justify-between">
-                               <div className="text-left">
-                                 <h3 className="text-lg font-bold text-blue-900 dark:text-blue-100">{selectedTour.name}</h3>
-                                 <p className="text-blue-600 dark:text-blue-400 font-medium pb-2">{selectedTour.duration}</p>
+                             <div className="flex items-center justify-between gap-4">
+                               <div className="text-left min-w-0">
+                                 <h3 className="text-lg font-bold text-[var(--lagoon-deep)] dark:text-white">{selectedTour.name}</h3>
+                                 <p className="text-[var(--lagoon)] dark:text-[var(--sun)] font-medium pb-2">{selectedTour.duration}</p>
                                </div>
-                               <div className="text-right">
-                                 <div className="flex items-center space-x-1">
-                                   <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                                   <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">{selectedTour.rating}</span>
+                               <div className="text-right shrink-0">
+                                 <div className="flex items-center justify-end space-x-1">
+                                   <Star className="w-4 h-4 text-[var(--sun)] fill-current" />
+                                   <span className="text-sm font-semibold text-[var(--lagoon-deep)] dark:text-white">{selectedTour.rating}</span>
                                  </div>
-                                 <p className="text-xs text-blue-600 dark:text-blue-400">({selectedTour.reviews} reviews)</p>
+                                 <p className="text-xs text-[var(--lagoon-deep)]/70 dark:text-white/70">({selectedTour.reviews} reviews)</p>
                                </div>
                              </div>
                              
                              {/* Location Summary */}
                              <div>
-                               <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center">
-                                 <span className="mr-2">🗺️</span>
+                               <h4 className="text-xs sm:text-sm font-semibold text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase mb-2">
                                  Tour Locations
                                </h4>
-                               <div className="flex flex-wrap gap-2">
+                               <div className="flex flex-wrap gap-1.5 sm:gap-2">
                                  {(selectedTour.destinations || []).map((destination: string, idx: number) => (
-                                   <span key={idx} className="bg-white dark:bg-blue-800 text-blue-700 dark:text-blue-200 px-3 py-1 rounded-full text-sm font-medium shadow-sm">
+                                   <span
+                                     key={idx}
+                                     className="inline-flex items-center px-2.5 py-1 bg-white/90 dark:bg-gray-800/90 text-[var(--lagoon-deep)] dark:text-white text-xs sm:text-sm rounded-full border border-white/40 shadow-sm font-medium"
+                                   >
                                      {destination}
                                    </span>
                                  ))}
@@ -1094,12 +1407,12 @@ export default function HomePage() {
                    )}
                    
                    {/* Search Button */}
-                   <div className="flex justify-center mt-4 sm:mt-6">
+                   <div className="flex justify-center mt-4 sm:mt-6 md:mt-8">
                      <button 
                        onClick={handleSearch}
-                        className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-all flex items-center justify-center space-x-2 shadow-lg w-full sm:w-auto min-h-[44px] touch-manipulation"
+                        className="bg-[var(--lagoon-deep)] hover:bg-[var(--lagoon)] active:brightness-95 text-white px-6 sm:px-10 md:px-14 py-3 sm:py-4 md:py-5 rounded-full font-bold text-base sm:text-lg md:text-xl transition-all flex items-center justify-center space-x-2 shadow-lg w-full sm:w-auto md:min-w-[280px] min-h-[44px] md:min-h-[56px] touch-manipulation"
                      >
-                     <Search className="w-4 h-4 sm:w-5 sm:h-5" />
+                     <Search className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
                      <span>Search</span>
                      </button>
                    </div>
@@ -1108,132 +1421,145 @@ export default function HomePage() {
 
                                {searchTab === 'plan-trip' && (
                   <>
-                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 relative z-10">
+                    <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1024px]:grid-cols-3 gap-3 min-[820px]:gap-5 min-[1024px]:gap-6 lg:gap-8 relative min-w-0 overflow-visible items-start">
                       {/* Destinations Selection */}
-                      <div className="lg:col-span-2">
-                        <label className="block text-xs sm:text-sm font-medium mb-1 sm:mb-2 text-blue-950 dark:text-white">Destinations</label>
-                        <div className="relative">
-                          <select
-                            onChange={(e) => {
-                              if (e.target.value && !customTripData.destinations.includes(e.target.value)) {
-                                handleDestinationToggle(e.target.value)
-                              }
-                            }}
-                            className="w-full pl-3 pr-8 py-3 border rounded-lg focus:ring-2 focus:ring-[#187BFF] focus:border-transparent appearance-none cursor-pointer hover:border-[#187BFF] transition-colors text-base text-gray-900 dark:text-white bg-white/60 dark:bg-gray-800 min-h-[44px] touch-manipulation"
-                            value=""
-                          >
-                            <option value="" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">Select destinations</option>
-                            {availableDestinations.map((destination) => (
-                              <option key={destination.id} value={destination.id} className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
-                                {destination.name} - {destination.region}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-600 dark:text-gray-400" />
-                        </div>
-                        
-                        {/* Selected Destinations Display */}
-                        {customTripData.destinations.length > 0 && (
-                          <div className="mt-2">
-                            <div className="flex flex-wrap gap-1">
-                              {customTripData.destinations.map((destId) => {
-                                const destination = availableDestinations.find(d => d.id === destId)
-                                return destination ? (
-                                  <span
-                                    key={destId}
-                                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
-                                  >
-                                    {destination.name}
-                                    <button
-                                      onClick={() => handleDestinationToggle(destId)}
-                                      className="text-blue-600 hover:text-blue-800 active:text-blue-900 min-w-[24px] min-h-[24px] flex items-center justify-center touch-manipulation"
-                                      aria-label="Remove destination"
-                                    >
-                                      ×
-                                    </button>
-                                  </span>
-                                ) : null
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Trip Details */}
-                      <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4 z-20">
-                        {/* Date Range */}
-                        <div className="relative">
-                          <label className="block text-xs sm:text-sm font-medium mb-1 sm:mb-2 text-blue-950 dark:text-white">Date Range</label>
+                      <div className={`relative min-w-0 w-full self-start ${showDestDropdown ? 'z-[100]' : 'z-10'}`} ref={destDropdownRef}>
+                        <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Destinations</label>
+                        <div className="relative min-w-0 w-full overflow-visible">
                           <button
                             type="button"
-                            onClick={() => setShowDatePicker(!showDatePicker)}
-                            className="w-full px-3 py-3 border rounded-lg focus:ring-2 focus:ring-[#187BFF] focus:border-transparent cursor-pointer hover:border-[#187BFF] active:border-[#187BFF] transition-colors text-base text-left bg-white/60 dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px] touch-manipulation"
+                            onClick={() => {
+                              if (showDestDropdown) {
+                                setShowDestDropdown(false)
+                              } else {
+                                closeSearchOverlays()
+                                setShowDestDropdown(true)
+                              }
+                            }}
+                            aria-expanded={showDestDropdown}
+                            aria-haspopup="listbox"
+                            className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-10 sm:pr-11 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation flex items-center"
                           >
-                            {(() => {
-                              console.log('Displaying date range:', customTripData.dateRange);
-                              return customTripData.dateRange || 'Select date range';
-                            })()}
+                            <span className="block truncate">
+                              {customTripData.destinations.length > 0
+                                ? `${customTripData.destinations.length} destination${customTripData.destinations.length === 1 ? '' : 's'} selected`
+                                : 'Select destinations'}
+                            </span>
                           </button>
-                          
-                          {/* Date Picker Popup */}
+                          <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-600 dark:text-gray-400 transition-transform ${showDestDropdown ? 'rotate-180' : ''}`} />
+
+                          {showDestDropdown && (
+                            <ul
+                              role="listbox"
+                              aria-multiselectable="true"
+                              className="absolute left-0 right-0 top-full mt-1 z-[110] max-h-[min(280px,50vh)] sm:max-h-[min(320px,45vh)] overflow-y-auto overscroll-contain rounded-xl border border-black/10 bg-white dark:bg-gray-800 shadow-2xl py-1 w-full min-w-0"
+                            >
+                              {availableDestinations.map((destination) => {
+                                const isSelected = customTripData.destinations.includes(destination.id)
+                                const label = `${destination.name} - ${destination.region}`
+                                return (
+                                  <li key={destination.id}>
+                                    <button
+                                      type="button"
+                                      role="option"
+                                      aria-selected={isSelected}
+                                      title={label}
+                                      onClick={() => handleDestinationToggle(destination.id)}
+                                      className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base transition-colors break-words ${
+                                        isSelected
+                                          ? 'bg-[var(--lagoon-deep)] text-[var(--sun)]'
+                                          : 'text-gray-900 dark:text-white hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
+                                      }`}
+                                    >
+                                      {label}
+                                    </button>
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Date Range */}
+                      <div className={`relative min-w-0 w-full self-start overflow-visible ${showDatePicker ? 'z-[120]' : 'z-20'}`} ref={customDatePickerRef}>
+                        <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Date Range</label>
+                        <div className="relative min-w-0 w-full overflow-visible">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (showDatePicker) {
+                                setShowDatePicker(false)
+                              } else {
+                                closeSearchOverlays()
+                                setShowDatePicker(true)
+                              }
+                            }}
+                            className="w-full pl-3 sm:pl-4 md:pl-5 pr-8 sm:pr-10 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation"
+                            aria-expanded={showDatePicker}
+                          >
+                            {customTripData.dateRange || 'Select date range'}
+                          </button>
+                          <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-600 pointer-events-none" />
+
+                          {/* Date Picker Popup — anchored to the date button, not the stretched grid cell */}
                           {showDatePicker && (
-                            <div className="absolute top-full left-0 -mt-1 text-black bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 sm:p-4 min-w-[280px] max-w-[90vw] sm:max-w-none">
-                              {/* Calendar Header */}
+                            <div className="absolute top-full left-0 right-0 mt-1 text-black dark:text-white bg-white dark:bg-gray-800 border border-black/10 rounded-xl shadow-2xl z-[130] p-3 sm:p-4 w-full max-w-full min-w-0 sm:w-auto sm:min-w-[300px]">
                               <div className="flex items-center justify-between mb-4">
                                 <button
+                                  type="button"
                                   onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
-                                  className="p-1 hover:bg-gray-100 rounded"
+                                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
                                 >
                                   ←
                                 </button>
-                                <h3 className="font-semibold">
+                                <h3 className="font-semibold text-gray-900 dark:text-white">
                                   {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                                 </h3>
                                 <button
+                                  type="button"
                                   onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
-                                  className="p-1 hover:bg-gray-100 rounded"
+                                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
                                 >
                                   →
                                 </button>
                               </div>
-                              
-                              {/* Calendar Grid */}
+
                               <div className="grid grid-cols-7 gap-1 mb-2">
                                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                  <div key={day} className="text-center text-xs font-medium text-gray-700 p-1">
+                                  <div key={day} className="text-center text-xs font-medium text-gray-700 dark:text-gray-300 p-1">
                                     {day}
                                   </div>
                                 ))}
                               </div>
-                              
+
                               <div className="grid grid-cols-7 gap-1">
-                                {/* Empty cells for days before first day of month */}
                                 {Array.from({ length: getFirstDayOfMonth(currentMonth.getFullYear(), currentMonth.getMonth()) }).map((_, i) => (
                                   <div key={`empty-${i}`} className="p-2"></div>
                                 ))}
-                                
-                                {/* Days of the month */}
+
                                 {Array.from({ length: getDaysInMonth(currentMonth.getFullYear(), currentMonth.getMonth()) }).map((_, i) => {
                                   const day = i + 1
                                   const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
                                   const isToday = formatDate(date) === formatDate(new Date())
                                   const isPast = date < new Date(new Date().setHours(0, 0, 0, 0))
-                                  
+
                                   return (
                                     <button
                                       key={day}
+                                      type="button"
                                       onClick={() => !isPast && handleDateSelect(date)}
                                       disabled={isPast}
                                       className={`p-2 text-sm rounded transition-colors ${
                                         isPast
-                                          ? 'text-gray-500 cursor-not-allowed'
+                                          ? 'text-gray-500 dark:text-gray-500 cursor-not-allowed'
                                           : isDateSelected(date)
-                                          ? 'bg-blue-600 text-white'
+                                          ? 'bg-blue-600 dark:bg-blue-500 text-white'
                                           : isDateInRange(date)
-                                          ? 'bg-blue-100 text-blue-800'
+                                          ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200'
                                           : isToday
-                                          ? 'bg-gray-100 text-gray-900'
-                                          : 'hover:bg-gray-100 text-gray-900'
+                                          ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                                          : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
                                       }`}
                                     >
                                       {day}
@@ -1241,12 +1567,11 @@ export default function HomePage() {
                                   )
                                 })}
                               </div>
-                              
-                              {/* Instructions */}
-                              <div className="mt-3 text-xs text-gray-700 text-center">
-                                {!selectedStartDate 
+
+                              <div className="mt-3 text-xs text-gray-700 dark:text-gray-300 text-center">
+                                {!selectedStartDate
                                   ? 'Click to select start date'
-                                  : !selectedEndDate 
+                                  : !selectedEndDate
                                   ? 'Click to select end date'
                                   : 'Date range selected'
                                 }
@@ -1254,39 +1579,92 @@ export default function HomePage() {
                             </div>
                           )}
                         </div>
-                        
-                        {/* Number of Guests */}
-                        <div className="relative">
-                          <label className="block text-xs sm:text-sm font-medium mb-1 sm:mb-2 text-blue-950 dark:text-white">Guests</label>
-                          <div className="relative">
-                            <select
-                              value={customTripData.guests}
-                              onChange={(e) => setCustomTripData({...customTripData, guests: parseInt(e.target.value)})}
-                              className="w-full pl-3 sm:pl-4 pr-8 sm:pr-10 py-3 sm:py-4 text-base sm:text-base border rounded-lg focus:ring-2 focus:ring-[#187BFF] focus:border-transparent appearance-none cursor-pointer hover:border-[#187BFF] transition-colors bg-white/60 dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px] touch-manipulation"
-                            >
-                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
-                                <option key={num} value={num}>{num}</option>
-                              ))}
-                          </select>
-                            <Users className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 pointer-events-none text-blue-600" />
-                          </div>
+                      </div>
+
+                      {/* Number of Guests */}
+                      <div className="relative z-10 self-start min-w-0 w-full">
+                        <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Number of Guests</label>
+                        <div className="relative flex items-center">
+                          <button
+                            type="button"
+                            aria-label="Decrease guests"
+                            onClick={() => setCustomTripData({ ...customTripData, guests: Math.max(1, (customTripData.guests || 1) - 1) })}
+                            className="absolute left-2 z-10 w-9 h-9 rounded-full bg-[var(--lagoon-deep)] text-[var(--sun)] border border-[var(--sun)]/40 font-bold hover:bg-[var(--sun)] hover:text-[var(--lagoon-deep)] transition-colors flex items-center justify-center"
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            inputMode="numeric"
+                            value={customTripData.guests}
+                            onChange={(e) => {
+                              const raw = e.target.value
+                              if (raw === '') {
+                                setCustomTripData({ ...customTripData, guests: 1 })
+                                return
+                              }
+                              const n = parseInt(raw, 10)
+                              if (!Number.isFinite(n)) return
+                              setCustomTripData({ ...customTripData, guests: Math.max(1, Math.min(999, n)) })
+                            }}
+                            className="w-full pl-12 pr-12 py-3 sm:py-4 md:py-5 text-base md:text-lg text-center border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent transition-colors text-gray-900 dark:text-white bg-white/70 dark:bg-gray-800/80 min-h-[44px] md:min-h-[56px] touch-manipulation [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <button
+                            type="button"
+                            aria-label="Increase guests"
+                            onClick={() => setCustomTripData({ ...customTripData, guests: Math.min(999, (customTripData.guests || 1) + 1) })}
+                            className="absolute right-2 z-10 w-9 h-9 rounded-full bg-[var(--lagoon-deep)] text-[var(--sun)] border border-[var(--sun)]/40 font-bold hover:bg-[var(--sun)] hover:text-[var(--lagoon-deep)] transition-colors flex items-center justify-center"
+                          >
+                            +
+                          </button>
                         </div>
+                        <p className="mt-1.5 text-[11px] md:text-xs text-[var(--lagoon-deep)]/70 dark:text-white/70">Enter any number of guests</p>
                       </div>
                     </div>
 
+                    {/* Selected destinations — full section width, wrap inline to the edge */}
+                    {customTripData.destinations.length > 0 && (
+                      <div className="mt-3 sm:mt-4 w-full min-w-0">
+                        <div className="flex flex-wrap gap-1.5 sm:gap-2 content-start">
+                          {customTripData.destinations.map((destId) => {
+                            const destination = availableDestinations.find(d => d.id === destId)
+                            return destination ? (
+                              <span
+                                key={destId}
+                                className="inline-flex max-w-full items-center gap-1 px-2.5 py-1 bg-white/90 dark:bg-gray-800/90 text-[var(--lagoon-deep)] dark:text-white text-xs sm:text-sm rounded-full border border-white/40 shadow-sm"
+                              >
+                                <span className="truncate">{destination.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDestinationToggle(destId)}
+                                  className="text-[var(--lagoon)] hover:text-[var(--lagoon-deep)] active:text-[var(--lagoon-deep)] min-w-[24px] min-h-[24px] shrink-0 flex items-center justify-center touch-manipulation"
+                                  aria-label={`Remove ${destination.name}`}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ) : null
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Interests Row */}
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium mb-2 text-blue-950 dark:text-white">Interests</label>
-                      <div className="flex flex-wrap gap-2">
+                    <div className="mt-4 sm:mt-6 md:mt-8">
+                      <label className="block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Interests</label>
+                      <div className="flex flex-wrap gap-2 sm:gap-3">
                         {tripInterests.map((interest) => (
                           <button
                             key={interest.id}
+                            type="button"
                             onClick={() => handleInterestToggle(interest.id)}
-                            className={`px-4 py-2 rounded-full border text-sm transition-colors min-h-[36px] touch-manipulation ${
+                            style={
                               customTripData.interests.includes(interest.id)
-                                ? 'bg-blue-100 border-blue-300 text-blue-800 active:bg-blue-200'
-                                : 'bg-gray-50 border-gray-200 text-gray-800 hover:bg-gray-100 active:bg-gray-200'
-                            }`}
+                                ? { color: '#0b3d4a', background: '#d4f06a' }
+                                : { color: '#d4f06a', background: '#0b3d4a' }
+                            }
+                            className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-sm sm:text-base font-semibold transition-all duration-200 min-h-[40px] touch-manipulation hover:brightness-110"
                           >
                             {interest.name}
                           </button>
@@ -1295,12 +1673,13 @@ export default function HomePage() {
                     </div>
                     
                     {/* Plan Trip Button */}
-                    <div className="flex justify-center mt-6">
+                    <div className="flex justify-center mt-4 sm:mt-6 md:mt-8">
                       <button 
+                        type="button"
                         onClick={handleCustomTripBooking}
-                        className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-6 sm:px-8 py-3 rounded-lg font-semibold text-base sm:text-lg transition-all flex items-center justify-center space-x-2 shadow-lg w-full sm:w-auto min-h-[44px] touch-manipulation"
+                        className="bg-[var(--lagoon-deep)] hover:bg-[var(--lagoon)] active:brightness-95 text-white px-6 sm:px-10 md:px-14 py-3 sm:py-4 md:py-5 rounded-full font-bold text-base sm:text-lg md:text-xl transition-all flex items-center justify-center space-x-2 shadow-lg w-full sm:w-auto md:min-w-[280px] min-h-[44px] md:min-h-[56px] touch-manipulation"
                       >
-                      <Search className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <Search className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
                       <span>Plan My Trip</span>
                       </button>
                     </div>
@@ -1308,240 +1687,609 @@ export default function HomePage() {
                 )}
 
                {searchTab === 'rent-car' && (
-                 <div className="text-center py-8">
-                   <p className="text-gray-800 dark:text-gray-200 mb-4 text-sm sm:text-base">Car rental service coming soon!</p>
-                   <button className="bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-6 py-3 rounded-lg font-medium cursor-not-allowed min-h-[44px] touch-manipulation w-full sm:w-auto">
-                     Coming Soon
-                   </button>
-                 </div>
+                 <>
+                   <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1024px]:grid-cols-4 gap-3 min-[820px]:gap-5 min-[1024px]:gap-6 lg:gap-8 relative min-w-0 overflow-visible items-start">
+                     <div className={`relative min-w-0 w-full self-start ${showPickupDropdown ? 'z-[100]' : 'z-10'}`} ref={pickupDropdownRef}>
+                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Pickup City</label>
+                       <div className="relative min-w-0 w-full overflow-visible">
+                         <button
+                           type="button"
+                           onClick={() => {
+                             if (showPickupDropdown) {
+                               setShowPickupDropdown(false)
+                             } else {
+                               closeSearchOverlays()
+                               setShowPickupDropdown(true)
+                             }
+                           }}
+                           aria-expanded={showPickupDropdown}
+                           aria-haspopup="listbox"
+                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-10 sm:pr-11 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation flex items-center"
+                         >
+                           <span className="block truncate">
+                             {(() => {
+                               if (!rentCarData.pickupCityId) return 'Select pickup city'
+                               const city = rentCityOptions.find((c: { id: string }) => c.id === rentCarData.pickupCityId)
+                               if (!city) return 'Select pickup city'
+                               return `${city.name}${city.region ? ` — ${city.region}` : ''}`
+                             })()}
+                           </span>
+                         </button>
+                         <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-600 dark:text-gray-400 transition-transform ${showPickupDropdown ? 'rotate-180' : ''}`} />
+                         {showPickupDropdown && (
+                           <ul
+                             role="listbox"
+                             className="absolute left-0 right-0 top-full mt-1 z-[110] max-h-[min(280px,50vh)] sm:max-h-[min(320px,45vh)] overflow-y-auto overscroll-contain rounded-xl border border-black/10 bg-white dark:bg-gray-800 shadow-2xl py-1 w-full min-w-0"
+                           >
+                             <li>
+                               <button
+                                 type="button"
+                                 role="option"
+                                 aria-selected={!rentCarData.pickupCityId}
+                                 onClick={() => {
+                                   setRentCarData({ ...rentCarData, pickupCityId: '' })
+                                   setShowPickupDropdown(false)
+                                 }}
+                                 className="w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-700 dark:text-gray-200 hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)] transition-colors"
+                               >
+                                 Select pickup city
+                               </button>
+                             </li>
+                             {rentCityOptions.map((city: { id: string; name: string; region?: string }) => {
+                               const label = `${city.name}${city.region ? ` — ${city.region}` : ''}`
+                               const isSelected = rentCarData.pickupCityId === city.id
+                               return (
+                                 <li key={city.id}>
+                                   <button
+                                     type="button"
+                                     role="option"
+                                     aria-selected={isSelected}
+                                     title={label}
+                                     onClick={() => {
+                                       setRentCarData({ ...rentCarData, pickupCityId: city.id })
+                                       setShowPickupDropdown(false)
+                                     }}
+                                     className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base transition-colors break-words ${
+                                       isSelected
+                                         ? 'bg-[var(--lagoon-deep)] text-[var(--sun)]'
+                                         : 'text-gray-900 dark:text-white hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
+                                     }`}
+                                   >
+                                     {label}
+                                   </button>
+                                 </li>
+                               )
+                             })}
+                           </ul>
+                         )}
+                       </div>
+                     </div>
+
+                     <div className={`relative min-w-0 w-full self-start ${showDropoffDropdown ? 'z-[100]' : 'z-10'}`} ref={dropoffDropdownRef}>
+                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Drop-off City</label>
+                       <div className="relative min-w-0 w-full overflow-visible">
+                         <button
+                           type="button"
+                           onClick={() => {
+                             if (showDropoffDropdown) {
+                               setShowDropoffDropdown(false)
+                             } else {
+                               closeSearchOverlays()
+                               setShowDropoffDropdown(true)
+                             }
+                           }}
+                           aria-expanded={showDropoffDropdown}
+                           aria-haspopup="listbox"
+                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-10 sm:pr-11 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation flex items-center"
+                         >
+                           <span className="block truncate">
+                             {(() => {
+                               if (!rentCarData.dropoffCityId) return 'Select drop-off city'
+                               const city = rentCityOptions.find((c: { id: string }) => c.id === rentCarData.dropoffCityId)
+                               if (!city) return 'Select drop-off city'
+                               return `${city.name}${city.region ? ` — ${city.region}` : ''}`
+                             })()}
+                           </span>
+                         </button>
+                         <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-600 dark:text-gray-400 transition-transform ${showDropoffDropdown ? 'rotate-180' : ''}`} />
+                         {showDropoffDropdown && (
+                           <ul
+                             role="listbox"
+                             className="absolute left-0 right-0 top-full mt-1 z-[110] max-h-[min(280px,50vh)] sm:max-h-[min(320px,45vh)] overflow-y-auto overscroll-contain rounded-xl border border-black/10 bg-white dark:bg-gray-800 shadow-2xl py-1 w-full min-w-0"
+                           >
+                             <li>
+                               <button
+                                 type="button"
+                                 role="option"
+                                 aria-selected={!rentCarData.dropoffCityId}
+                                 onClick={() => {
+                                   setRentCarData({ ...rentCarData, dropoffCityId: '' })
+                                   setShowDropoffDropdown(false)
+                                 }}
+                                 className="w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-700 dark:text-gray-200 hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)] transition-colors"
+                               >
+                                 Select drop-off city
+                               </button>
+                             </li>
+                             {rentCityOptions.map((city: { id: string; name: string; region?: string }) => {
+                               const label = `${city.name}${city.region ? ` — ${city.region}` : ''}`
+                               const isSelected = rentCarData.dropoffCityId === city.id
+                               return (
+                                 <li key={city.id}>
+                                   <button
+                                     type="button"
+                                     role="option"
+                                     aria-selected={isSelected}
+                                     title={label}
+                                     onClick={() => {
+                                       setRentCarData({ ...rentCarData, dropoffCityId: city.id })
+                                       setShowDropoffDropdown(false)
+                                     }}
+                                     className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base transition-colors break-words ${
+                                       isSelected
+                                         ? 'bg-[var(--lagoon-deep)] text-[var(--sun)]'
+                                         : 'text-gray-900 dark:text-white hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
+                                     }`}
+                                   >
+                                     {label}
+                                   </button>
+                                 </li>
+                               )
+                             })}
+                           </ul>
+                         )}
+                       </div>
+                     </div>
+
+                     <div className={`relative min-w-0 w-full self-start overflow-visible ${showRentPickupDatePicker ? 'z-[120]' : 'z-20'}`} ref={rentPickupDatePickerRef}>
+                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Pickup Date</label>
+                       <div className="relative min-w-0 w-full overflow-visible">
+                         <button
+                           type="button"
+                           onClick={() => {
+                             if (showRentPickupDatePicker) {
+                               setShowRentPickupDatePicker(false)
+                             } else {
+                               closeSearchOverlays()
+                               setShowRentPickupDatePicker(true)
+                             }
+                           }}
+                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-8 sm:pr-10 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation truncate"
+                           aria-expanded={showRentPickupDatePicker}
+                         >
+                           {rentCarData.pickupDate
+                             ? formatDisplayDate(rentCarData.pickupDate)
+                             : 'Select pickup date'}
+                         </button>
+                         <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-600 pointer-events-none" />
+
+                         {showRentPickupDatePicker && (
+                           <div className="absolute top-full left-0 right-0 mt-1 text-black dark:text-white bg-white dark:bg-gray-800 border border-black/10 rounded-xl shadow-2xl z-[130] p-3 sm:p-4 w-full max-w-full min-w-0 sm:w-auto sm:min-w-[300px]">
+                             <div className="flex items-center justify-between mb-4">
+                               <button
+                                 type="button"
+                                 onClick={() => setCurrentRentPickupMonth(new Date(currentRentPickupMonth.getFullYear(), currentRentPickupMonth.getMonth() - 1))}
+                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                               >
+                                 ←
+                               </button>
+                               <h3 className="font-semibold text-gray-900 dark:text-white">
+                                 {currentRentPickupMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                               </h3>
+                               <button
+                                 type="button"
+                                 onClick={() => setCurrentRentPickupMonth(new Date(currentRentPickupMonth.getFullYear(), currentRentPickupMonth.getMonth() + 1))}
+                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                               >
+                                 →
+                               </button>
+                             </div>
+
+                             <div className="grid grid-cols-7 gap-1 mb-2">
+                               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                 <div key={day} className="text-center text-xs font-medium text-gray-700 dark:text-gray-300 p-1">
+                                   {day}
+                                 </div>
+                               ))}
+                             </div>
+
+                             <div className="grid grid-cols-7 gap-1">
+                               {Array.from({ length: getFirstDayOfMonth(currentRentPickupMonth.getFullYear(), currentRentPickupMonth.getMonth()) }).map((_, i) => (
+                                 <div key={`empty-pickup-${i}`} className="p-2"></div>
+                               ))}
+
+                               {Array.from({ length: getDaysInMonth(currentRentPickupMonth.getFullYear(), currentRentPickupMonth.getMonth()) }).map((_, i) => {
+                                 const day = i + 1
+                                 const date = new Date(currentRentPickupMonth.getFullYear(), currentRentPickupMonth.getMonth(), day)
+                                 const isToday = formatDate(date) === formatDate(new Date())
+                                 const isPast = date < new Date(new Date().setHours(0, 0, 0, 0))
+
+                                 return (
+                                   <button
+                                     key={`pickup-${day}`}
+                                     type="button"
+                                     onClick={() => !isPast && handleRentPickupDateSelect(date)}
+                                     disabled={isPast}
+                                     className={`p-2 text-sm rounded transition-colors ${
+                                       isPast
+                                         ? 'text-gray-500 dark:text-gray-500 cursor-not-allowed'
+                                         : isRentPickupDateSelected(date)
+                                         ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                                         : isToday
+                                         ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                                         : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
+                                     }`}
+                                   >
+                                     {day}
+                                   </button>
+                                 )
+                               })}
+                             </div>
+
+                             <div className="mt-3 text-xs text-gray-700 dark:text-gray-300 text-center">
+                               {!rentCarData.pickupDate
+                                 ? 'Click to select pickup date'
+                                 : 'Pickup date selected'}
+                             </div>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+
+                     <div className={`relative min-w-0 w-full self-start overflow-visible ${showRentReturnDatePicker ? 'z-[120]' : 'z-20'}`} ref={rentReturnDatePickerRef}>
+                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Return Date</label>
+                       <div className="relative min-w-0 w-full overflow-visible">
+                         <button
+                           type="button"
+                           onClick={() => {
+                             if (showRentReturnDatePicker) {
+                               setShowRentReturnDatePicker(false)
+                             } else {
+                               closeSearchOverlays()
+                               setShowRentReturnDatePicker(true)
+                             }
+                           }}
+                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-8 sm:pr-10 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation truncate"
+                           aria-expanded={showRentReturnDatePicker}
+                         >
+                           {rentCarData.returnDate
+                             ? formatDisplayDate(rentCarData.returnDate)
+                             : 'Select return date'}
+                         </button>
+                         <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-600 pointer-events-none" />
+
+                         {showRentReturnDatePicker && (
+                           <div className="absolute top-full left-0 right-0 mt-1 text-black dark:text-white bg-white dark:bg-gray-800 border border-black/10 rounded-xl shadow-2xl z-[130] p-3 sm:p-4 w-full max-w-full min-w-0 sm:w-auto sm:min-w-[300px]">
+                             <div className="flex items-center justify-between mb-4">
+                               <button
+                                 type="button"
+                                 onClick={() => setCurrentRentReturnMonth(new Date(currentRentReturnMonth.getFullYear(), currentRentReturnMonth.getMonth() - 1))}
+                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                               >
+                                 ←
+                               </button>
+                               <h3 className="font-semibold text-gray-900 dark:text-white">
+                                 {currentRentReturnMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                               </h3>
+                               <button
+                                 type="button"
+                                 onClick={() => setCurrentRentReturnMonth(new Date(currentRentReturnMonth.getFullYear(), currentRentReturnMonth.getMonth() + 1))}
+                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                               >
+                                 →
+                               </button>
+                             </div>
+
+                             <div className="grid grid-cols-7 gap-1 mb-2">
+                               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                 <div key={day} className="text-center text-xs font-medium text-gray-700 dark:text-gray-300 p-1">
+                                   {day}
+                                 </div>
+                               ))}
+                             </div>
+
+                             <div className="grid grid-cols-7 gap-1">
+                               {Array.from({ length: getFirstDayOfMonth(currentRentReturnMonth.getFullYear(), currentRentReturnMonth.getMonth()) }).map((_, i) => (
+                                 <div key={`empty-return-${i}`} className="p-2"></div>
+                               ))}
+
+                               {Array.from({ length: getDaysInMonth(currentRentReturnMonth.getFullYear(), currentRentReturnMonth.getMonth()) }).map((_, i) => {
+                                 const day = i + 1
+                                 const date = new Date(currentRentReturnMonth.getFullYear(), currentRentReturnMonth.getMonth(), day)
+                                 const dateStr = formatDate(date)
+                                 const isToday = dateStr === formatDate(new Date())
+                                 const isPast = date < new Date(new Date().setHours(0, 0, 0, 0))
+                                 const beforePickup = !!rentCarData.pickupDate && dateStr < rentCarData.pickupDate
+                                 const disabled = isPast || beforePickup
+
+                                 return (
+                                   <button
+                                     key={`return-${day}`}
+                                     type="button"
+                                     onClick={() => !disabled && handleRentReturnDateSelect(date)}
+                                     disabled={disabled}
+                                     className={`p-2 text-sm rounded transition-colors ${
+                                       disabled
+                                         ? 'text-gray-500 dark:text-gray-500 cursor-not-allowed'
+                                         : isRentReturnDateSelected(date)
+                                         ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                                         : isToday
+                                         ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                                         : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
+                                     }`}
+                                   >
+                                     {day}
+                                   </button>
+                                 )
+                               })}
+                             </div>
+
+                             <div className="mt-3 text-xs text-gray-700 dark:text-gray-300 text-center">
+                               {!rentCarData.returnDate
+                                 ? 'Click to select return date'
+                                 : 'Return date selected'}
+                             </div>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   </div>
+
+                   <div className="flex justify-center mt-4 sm:mt-6 md:mt-8">
+                     <button
+                       type="button"
+                       onClick={handleRentCarSearch}
+                       className="bg-[var(--lagoon-deep)] hover:bg-[var(--lagoon)] active:brightness-95 text-white px-6 sm:px-10 md:px-14 py-3 sm:py-4 md:py-5 rounded-full font-bold text-base sm:text-lg md:text-xl transition-all flex items-center justify-center space-x-2 shadow-lg w-full sm:w-auto md:min-w-[280px] min-h-[44px] md:min-h-[56px] touch-manipulation"
+                     >
+                       <Search className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                       <span>Search Cars</span>
+                     </button>
+                   </div>
+                 </>
                )}
              </div>
-          </div>
           </div>
         </div>
       </section>
       
-      {/* Featured Tour Packages */}
-      <section className="py-8 sm:py-12 bg-white dark:bg-gray-900">
-        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="pr-5 text-xl sm:text-2xl font-bold mb-6 sm:mb-8 text-gray-900 dark:text-white">Featured Tour Packages</h2>
-          <div className="relative pl-12 pr-12 sm:pl-14 sm:pr-14">
-            {/* Slider Container - content inset so arrows sit outside */}
+      {/* Featured Tour Packages — editorial discovery rail */}
+      {showFeatured && (
+      <section className="lp-section-ink py-14 sm:py-20 bg-[var(--foam)]">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8 sm:mb-10">
+            <div>
+              <p className="lp-kicker mb-2">Bookable trips</p>
+              <h2 className="lp-section-title text-3xl sm:text-4xl md:text-5xl">
+                {String(featuredCms?.title || 'Featured tour packages')}
+              </h2>
+              {featuredCms?.subtitle ? (
+                <p className="mt-2 text-[var(--ink-soft)]">{String(featuredCms.subtitle)}</p>
+              ) : null}
+            </div>
+            <Link href="/tours" className="inline-flex items-center gap-2 font-semibold text-[var(--lagoon)] hover:text-[var(--lagoon-deep)] transition-colors">
+              View all trips <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="relative">
+            {/* Slider Container */}
             <div 
               id="tour-slider"
-              className="flex overflow-x-auto space-x-4 sm:space-x-6 pb-4 scrollbar-hide scroll-smooth px-2 sm:px-0 snap-x snap-mandatory"
+              className="flex overflow-x-auto space-x-4 sm:space-x-5 pb-2 scrollbar-hide scroll-smooth px-0 snap-x snap-mandatory"
               style={{ scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}
             >
               {loadingTours ? (
                 <>
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex-shrink-0 w-[280px] sm:w-72 md:w-80 snap-start h-[440px] sm:h-[460px] md:h-[480px] animate-pulse">
-                      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col h-full">
-                        <div className="h-36 sm:h-44 bg-gray-200 dark:bg-gray-700 rounded-t-xl" />
-                        <div className="p-4 sm:p-5 flex flex-col flex-1">
-                          <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-3/4" />
-                          <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded mb-3 w-1/2" />
-                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-3 w-full" />
-                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-3 w-2/3" />
-                          <div className="flex gap-2 mb-4">
-                            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-16" />
-                            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-14" />
-                          </div>
-                          <div className="mt-auto h-12 bg-gray-200 dark:bg-gray-700 rounded-lg w-full" />
-                        </div>
-                      </div>
+                    <div key={i} className="flex-shrink-0 w-[280px] sm:w-[300px] md:w-[340px] snap-start h-[420px] animate-pulse">
+                      <div className="lp-photo-card h-full bg-gray-200 dark:bg-gray-700" />
                     </div>
                   ))}
                 </>
               ) : !loadingTours && (!featuredTours || featuredTours.length === 0) ? (
                 <div className="flex items-center justify-center w-full py-12">
                   <div className="text-center">
-                    <p className="text-gray-500 dark:text-gray-400 text-lg">No featured tours available at the moment.</p>
+                    <p className="text-[var(--ink-soft)] text-lg">No featured tours available at the moment.</p>
                   </div>
                 </div>
               ) : featuredTours && featuredTours.length > 0 ? featuredTours.map((tour, index) => (
-                <div key={tour.id || `tour-${index}`} className="flex-shrink-0 w-[280px] sm:w-72 md:w-80 snap-start h-[420px] sm:h-[440px] md:h-[460px]">
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow border border-gray-100 dark:border-gray-700 flex flex-col h-full">
-                    <div className="relative shrink-0">
-                      <Image
-                        src={tour.image || (tour.images?.[0] ?? '/next.svg')}
-                        alt={tour.name}
-                        width={320}
-                        height={192}
-                        className="w-full h-40 sm:h-48 object-cover"
-                        loading={index < 3 ? "eager" : "lazy"}
-                        priority={index < 3}
-                        sizes="(max-width: 640px) 280px, (max-width: 768px) 288px, 320px"
-                      />
-                      <div style={{ background: '#A0FF07' }} className="absolute top-2 sm:top-3 left-2 sm:left-3 text-gray-900 px-2 sm:px-3 py-1 rounded-full text-xs font-bold">
-                      {tour.style}
-                      </div>
-                      <button className="absolute top-2 sm:top-3 right-2 sm:right-3 w-9 h-9 sm:w-10 sm:h-10 bg-white/90 dark:bg-gray-800/90 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-gray-700 active:bg-white/80 dark:active:bg-gray-700/80 transition-colors touch-manipulation min-w-[36px] min-h-[36px]">
-                        <Heart className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-300" />
-                      </button>
+                <div key={tour.id || `tour-${index}`} className="flex-shrink-0 w-[280px] sm:w-[300px] md:w-[340px] snap-start h-[420px] sm:h-[440px]">
+                  <button
+                    type="button"
+                    onClick={() => handleViewTourDetails(tour.id)}
+                    className="lp-photo-card group w-full h-full text-left cursor-pointer"
+                  >
+                    <Image
+                      src={tour.image || (tour.images?.[0] ?? '/placeholder-image.svg')}
+                      alt={tour.name}
+                      fill
+                      className="object-cover"
+                      loading={index < 3 ? "eager" : "lazy"}
+                      priority={index < 3}
+                      sizes="(max-width: 640px) 280px, 340px"
+                    />
+                    <div className="absolute top-4 left-4 z-20">
+                      <span className="inline-block bg-[var(--sun)] text-[var(--lagoon-deep)] px-3 py-1 rounded-full text-xs font-bold tracking-wide">
+                        {tour.style || 'Trip'}
+                      </span>
                     </div>
-                    <div className="p-4 sm:p-5 pb-5 sm:pb-6 flex flex-col flex-1 min-h-0">
-                      <h3 className="text-base sm:text-lg font-semibold mb-2 pb-2 text-gray-900 dark:text-white line-clamp-2 min-h-[3rem] leading-snug">{tour.name}</h3>
-                      <p className="text-gray-800 dark:text-gray-300 text-xs sm:text-sm mb-3 shrink-0">{tour.duration}</p>
-                      <div className="flex items-center justify-between mb-3 shrink-0">
-                        <div className="flex items-center space-x-1">
-                          <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
-                          <span className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">{tour.rating} Excellent</span>
-                          <span className="text-gray-700 dark:text-gray-400 text-xs sm:text-sm">({tour.reviews})</span>
+                    <div className="absolute inset-x-0 bottom-0 z-20 p-5 sm:p-6">
+                      <p className="text-white/80 text-xs font-semibold tracking-[0.14em] uppercase mb-2">{tour.duration}</p>
+                      <h3 className="font-display text-xl sm:text-2xl text-white leading-tight mb-3 line-clamp-2">{tour.name}</h3>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center space-x-1 text-white/90 text-sm">
+                          <Star className="w-4 h-4 text-[var(--sun)] fill-current" />
+                          <span className="font-semibold">{tour.rating}</span>
+                          <span className="opacity-70">({tour.reviews})</span>
                         </div>
-                      </div>
-                      <div className="flex-1 min-h-0" aria-hidden />
-                      <div className="mb-2 overflow-visible shrink-0">
-                        <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-300 mb-2">Destinations:</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(tour.destinations || []).slice(0, 2).map((dest: string, idx: number) => (
-                            <span key={idx} className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs px-2 py-1 rounded">
-                              {dest}
-                            </span>
-                          ))}
-                          {(tour.destinations || []).length > 2 && (
-                            <span className="text-gray-700 dark:text-gray-400 text-xs">+{(tour.destinations || []).length - 2} more</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-center shrink-0">
-                        <button 
-                          onClick={() => handleViewTourDetails(tour.id)}
-                          style={{ background: '#CAFA7C' }}
-                          className="text-gray-900 px-6 sm:px-8 py-3 rounded-lg text-sm sm:text-base font-medium hover:opacity-90 active:opacity-80 transition-colors w-full min-h-[44px] touch-manipulation"
-                        >
-                          Book Now
-                        </button>
+                        <span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--sun)]">
+                          Explore <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                        </span>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 </div>
             )) : (
               <div className="flex items-center justify-center w-full py-8">
                 <div className="text-center">
-                  <p className="text-gray-500 dark:text-gray-400 text-lg">No featured tours available</p>
-                  <p className="text-gray-400 dark:text-gray-500 text-sm">Please check back later</p>
+                  <p className="text-[var(--ink-soft)] text-lg">No featured tours available</p>
                 </div>
               </div>
             )}
             </div>
 
-            {/* Left/Right arrows - outside slider, in padded area */}
-            {featuredTours && featuredTours.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  aria-label="Previous tour"
-                  onClick={() => goToSlide(Math.max(0, currentSlide - 1))}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-[1] w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600"
-                >
-                  <ChevronLeft className="w-6 h-6" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Next tour"
-                  onClick={() => goToSlide(Math.min(featuredTours.length - 1, currentSlide + 1))}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-[1] w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600"
-                >
-                  <ChevronRight className="w-6 h-6" />
-                </button>
-              </>
+            {/* Pagination dots — all breakpoints */}
+            {featuredTours && featuredTours.length > 1 && (
+              <div
+                className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5 mt-5 sm:mt-6"
+                role="tablist"
+                aria-label="Featured tour packages"
+              >
+                {featuredTours.map((tour, index) => (
+                  <button
+                    key={tour.id || `dot-${index}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={featuredTourSlide === index}
+                    aria-label={`Go to tour ${index + 1}: ${tour.name}`}
+                    onClick={() => goToFeaturedSlide(index)}
+                    className={`rounded-full transition-all duration-300 touch-manipulation min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${
+                      featuredTourSlide === index
+                        ? 'px-1'
+                        : 'px-1 opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <span
+                      className={`block rounded-full transition-all duration-300 ${
+                        featuredTourSlide === index
+                          ? 'w-6 sm:w-7 h-2.5 sm:h-3 bg-[var(--lagoon-deep)]'
+                          : 'w-2.5 sm:w-3 h-2.5 sm:h-3 bg-[var(--lagoon-deep)]/30'
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </div>
       </section>
+      )}
 
       {/* Statistics Section – larger section with animated counters */}
-      <section ref={statsSectionRef} className="py-16 sm:py-20 md:py-24 bg-gray-50 dark:bg-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {showStats && (
+      <section ref={statsSectionRef} className="py-16 sm:py-20 md:py-24 bg-[var(--lagoon-deep)] text-white">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 md:gap-12">
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-blue-600 dark:bg-blue-500 rounded-full mb-4 sm:mb-6">
-                  <stat.icon className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white" />
+                <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/10 border border-white/15 mb-4 sm:mb-5">
+                  <stat.icon className="w-7 h-7 sm:w-8 sm:h-8 text-[var(--sun)]" />
                 </div>
-                <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3 tabular-nums">
+                <div className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold mb-2 sm:mb-3 tabular-nums">
                   {index === 3 ? '24/7' : (statsInView ? `${animatedValues[index]}${(stat as { suffix: string }).suffix}` : `0${(stat as { suffix: string }).suffix}`)}
                 </div>
-                <div className="text-base sm:text-lg md:text-xl text-gray-800 dark:text-gray-300">{stat.label}</div>
+                <div className="text-sm sm:text-base md:text-lg text-white/75 tracking-wide">{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
+      )}
 
 
+      {showBanner && (
       <section
-        className='py-12 sm:py-16 md:py-20 bg-image-bg bg-cover bg-center bg-no-repeat'
-        style={((siteContent?.sriLankaBanner as Record<string, unknown>)?.backgroundImage as string) ? { backgroundImage: `url(${(siteContent?.sriLankaBanner as Record<string, unknown>).backgroundImage})` } : undefined}
+        className='relative py-24 sm:py-32 md:py-40 bg-image-bg bg-cover bg-center bg-no-repeat overflow-hidden'
+        style={
+          bannerCms?.backgroundImage
+            ? { backgroundImage: `url(${String(bannerCms.backgroundImage)})` }
+            : undefined
+        }
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className='text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-center text-white text-shadow-sri-lanka'>
-            {((siteContent?.sriLankaBanner as Record<string, unknown>)?.title as string) || 'Sri Lanka'}
+        <div className="absolute inset-0 bg-[var(--lagoon-deep)]/45" aria-hidden />
+        <div className="relative w-full max-w-[1920px] mx-auto lp-gutter">
+          <h1 className='font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl font-semibold text-center text-white tracking-tight'>
+            {String(bannerCms?.title || 'Sri Lanka')}
           </h1>
-          <p className='text-base sm:text-lg md:text-xl lg:text-2xl text-center text-black text-shadow-subtitle mt-2 sm:mt-4'>{((siteContent?.sriLankaBanner as Record<string, unknown>)?.subtitle as string) || 'Mystic Isle of Echoes'}</p>
+          <p className='text-base sm:text-lg md:text-xl lg:text-2xl text-center text-white/90 mt-3 sm:mt-5 font-medium tracking-wide'>
+            {String(bannerCms?.subtitle || 'Mystic Isle of Echoes')}
+          </p>
         </div>  
       </section>
-      {/* Features Section - Inspired by Swimlane's features */}
-      <section className="py-12 sm:py-16 md:py-20 bg-white dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8 sm:mb-12 md:mb-16">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4 px-2">
-              Why Choose ISLE & ECHO?
+      )}
+      {/* Features Section */}
+      {showFeatures && (
+      <section className="lp-section-ink py-14 sm:py-20 bg-[var(--foam)]">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
+          <div className="max-w-3xl mb-10 sm:mb-14">
+            <p className="lp-kicker mb-2">Why travel with us</p>
+            <h2 className="lp-section-title text-3xl sm:text-4xl md:text-5xl mb-4">
+              {String(featuresCms?.sectionTitle || 'Why choose ISLE & ECHO?')}
             </h2>
-            <p className="text-base sm:text-lg md:text-xl text-gray-800 dark:text-gray-300 max-w-3xl mx-auto px-2">
-              We provide exceptional travel experiences with unmatched service and attention to detail.
+            <p className="text-base sm:text-lg text-[var(--ink-soft)]">
+              {String(
+                featuresCms?.sectionSubtitle ||
+                  'Exceptional experiences with local expertise and care in every detail.'
+              )}
             </p>
                 </div>
                       
  
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-            {features.map((feature, index) => (
-              <div key={index} className="text-center p-4 sm:p-6 rounded-xl hover:shadow-lg transition-shadow bg-white dark:bg-gray-800">
-                <div className={`inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full bg-gray-100 dark:bg-gray-700 mb-3 sm:mb-4 ${feature.color}`}>
-                  <feature.icon className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-gray-700 dark:text-gray-300" />
+            {(
+              (featuresCms?.items as Array<{ title?: string; description?: string }>)?.length
+                ? (featuresCms!.items as Array<{ title?: string; description?: string }>).map((item, index) => ({
+                    ...features[index % features.length],
+                    title: item.title || features[index % features.length].title,
+                    description: item.description || features[index % features.length].description,
+                  }))
+                : features
+            ).map((feature, index) => (
+              <div key={index} className="p-5 sm:p-6 rounded-2xl bg-white/70 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:-translate-y-1 transition-transform duration-300">
+                <div className={`inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[var(--lagoon)]/10 mb-4 ${feature.color}`}>
+                  <feature.icon className="w-6 h-6 sm:w-7 sm:h-7 text-[var(--lagoon-deep)] dark:text-[var(--lagoon)]" />
                   </div>
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">{feature.title}</h3>
-                <p className="text-sm sm:text-base text-gray-800 dark:text-gray-300">{feature.description}</p>
+                <h3 className="font-display text-xl font-semibold text-[var(--ink)] mb-2">{feature.title}</h3>
+                <p className="text-sm sm:text-base text-[var(--ink-soft)] leading-relaxed">{feature.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
+      )}
       
-      {/* Destinations & Activities Section */}
-      <section className="py-10 sm:py-16 md:py-20 bg-white dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-6 sm:mb-12 md:mb-16 px-2">
-            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
-              Discover Sri Lanka&apos;s Destinations
-            </h2>
-            <p className="text-sm sm:text-base md:text-lg text-gray-800 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed whitespace-pre-line">
-              {`Explore the diverse beauty of Sri Lanka with our curated list of destinations and activities.
-From ancient temples and wildlife safaris to pristine beaches and misty highlands—each region offers unique experiences for every traveler.
-Whether you seek culture, nature, or relaxation, find inspiration here.
-Discover your next adventure and plan the perfect Sri Lankan journey.`}
-            </p>
-          </div>
-
-          {/* Top Filter Bar */}
-          <div className="mb-6 sm:mb-8">
-            <div className="flex flex-wrap justify-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-              <div className="relative w-full sm:w-auto">
+      {/* Destinations — photo-first explore tiles */}
+      {showDestinations && (
+      <section className="lp-section-ink py-14 sm:py-20 bg-white dark:bg-[var(--foam)]">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-8 sm:mb-12">
+            <div className="max-w-2xl">
+              <p className="lp-kicker mb-2">Where to go</p>
+              <h2 className="lp-section-title text-3xl sm:text-4xl md:text-5xl mb-3">
+                {String(destinationsCms?.title || "Discover Sri Lanka's destinations")}
+              </h2>
+              <p className="text-[var(--ink-soft)] text-base sm:text-lg leading-relaxed">
+                {String(
+                  destinationsCms?.subtitle ||
+                    'Ancient temples, wildlife, beaches, and misty highlands — find your next adventure.'
+                )}
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+              <div className="relative flex-1 sm:w-64">
                 <input
                   type="text"
                   placeholder="Search destinations..."
                   value={destinationSearchQuery}
                   onChange={(e) => setDestinationSearchQuery(e.target.value)}
-                  className="px-4 py-2.5 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px] touch-manipulation w-full sm:w-auto"
+                  className="w-full px-4 py-2.5 pl-10 border border-black/10 dark:border-white/15 rounded-full focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent text-base bg-[var(--foam)] text-[var(--ink)] min-h-[44px] touch-manipulation"
                 />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--ink-soft)]" />
               </div>
               <select 
                 value={selectedRegion}
                 onChange={(e) => setSelectedRegion(e.target.value)}
-                className="px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px] touch-manipulation w-full sm:w-auto"
+                className="px-4 py-2.5 border border-black/10 dark:border-white/15 rounded-full focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent text-base bg-[var(--foam)] text-[var(--ink)] min-h-[44px] touch-manipulation"
               >
                 <option value="all">All Regions</option>
                 <option value="Cultural Triangle">Cultural Triangle</option>
@@ -1556,73 +2304,54 @@ Discover your next adventure and plan the perfect Sri Lankan journey.`}
 
           {/* Destinations Grid */}
           {loadingDestinations ? (
-            <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col min-h-[380px] sm:h-[420px] animate-pulse">
-                  <div className="h-40 sm:h-44 bg-gray-200 dark:bg-gray-700" />
-                  <div className="p-4 sm:p-5 flex flex-col flex-1">
-                    <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-2/3" />
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-1/3" />
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-full" />
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-full" />
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded flex-1 w-4/5" />
-                    <div className="h-11 bg-gray-200 dark:bg-gray-700 rounded-lg w-full mt-3" />
-                  </div>
-                </div>
+                <div key={i} className="lp-photo-card min-h-[320px] sm:min-h-[360px] animate-pulse bg-gray-200" />
               ))}
             </div>
           ) : !loadingDestinations && filteredDestinations.length === 0 ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
-                <p className="text-gray-500 dark:text-gray-400 text-lg">No destinations found.</p>
+                <p className="text-[var(--ink-soft)] text-lg">No destinations found.</p>
               </div>
             </div>
           ) : filteredDestinations.length > 0 ? (
             <>
-            <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {displayedDestinations.map((destination) => {
                 const badge = destination.region === 'Cultural Triangle' ? 'Heritage' : 
                              destination.region === 'Wildlife' ? 'Nature' :
                              destination.region.includes('Province') ? 'Cultural' : 'Explore'
-                const rating = 4.5 + (destination.id?.length ?? 0) % 5 * 0.1
-                const reviews = 50 + (destination.id?.length ?? 0) % 200
 
                 return (
-                  <div key={destination.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow border border-gray-100 dark:border-gray-700 flex flex-col min-h-[380px] sm:h-[420px]">
-                    <div className="relative shrink-0 h-40 sm:h-44">
+                  <Link
+                    key={destination.id}
+                    href={`/destinations/${destination.id}`}
+                    className="lp-photo-card group block min-h-[320px] sm:min-h-[380px]"
+                  >
                       <Image
                         src={destination.image || '/placeholder-image.svg'}
                         alt={destination.name}
-                        width={400}
-                        height={176}
-                        className="w-full h-full object-cover"
-                        unoptimized={!!destination.image}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        loading="lazy"
                       />
-                      <div className="absolute top-3 left-3 bg-black px-3 py-1 rounded-full text-xs font-bold text-[#ADFF29]">
-                        {badge}
+                      <div className="absolute top-4 left-4 z-20">
+                        <span className="bg-black/70 text-[var(--sun)] px-3 py-1 rounded-full text-xs font-bold tracking-wide">
+                          {badge}
+                        </span>
                       </div>
-                      <button className="absolute top-3 right-3 w-10 h-10 bg-white/90 dark:bg-gray-800/90 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-gray-700 active:bg-white/80 dark:active:bg-gray-700/80 transition-colors touch-manipulation min-w-[44px] min-h-[44px]" aria-label="Save">
-                        <Heart className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-                      </button>
-                    </div>
-                    <div className="p-4 sm:p-5 flex flex-col flex-1 min-h-0">
-                      <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white line-clamp-2">{destination.name}</h3>
-                      <div className="flex items-center mb-2">
-                        <Star className="w-4 h-4 text-yellow-400 fill-current shrink-0" />
-                        <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">{rating.toFixed(1)} ({reviews})</span>
+                      <div className="absolute inset-x-0 bottom-0 z-20 p-5 sm:p-6">
+                        <h3 className="font-display text-2xl sm:text-3xl text-white leading-tight mb-2">{destination.name}</h3>
+                        <p className="text-white/80 text-sm line-clamp-2 mb-3">
+                          {destination.description || 'Explore this destination.'}
+                        </p>
+                        <span className="inline-flex items-center gap-2 text-[var(--sun)] font-bold text-sm tracking-wide uppercase">
+                          Explore <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-4 flex-1 min-h-0">
-                        {destination.description || 'Explore this destination.'}
-                      </p>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">… more</p>
-                      <Link href={`/destinations/${destination.id}`} className="mt-3 shrink-0">
-                        <button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-lg font-semibold hover:opacity-90 active:opacity-80 transition-all flex items-center justify-center space-x-2 min-h-[44px] touch-manipulation">
-                          <span>Explore</span>
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      </Link>
-                    </div>
-                  </div>
+                  </Link>
                 )
               })}
             </div>
@@ -1631,32 +2360,39 @@ Discover your next adventure and plan the perfect Sri Lankan journey.`}
                 <button
                   type="button"
                   onClick={() => setDestinationsDisplayLimit((prev) => prev + 10)}
-                  className="px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-semibold rounded-lg hover:opacity-90 active:opacity-80 transition-opacity"
+                  className="px-7 py-3 bg-[var(--lagoon-deep)] text-white font-semibold rounded-full hover:bg-[var(--lagoon)] active:opacity-90 transition-colors"
                 >
-                  More
+                  More destinations
                 </button>
               </div>
             )}
             </>
           ) : (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg mb-2">No destinations found</p>
-              <p className="text-gray-400 text-sm">Please check back later</p>
+              <p className="text-[var(--ink-soft)] text-lg mb-2">No destinations found</p>
             </div>
           )}
         </div>  
       </section>
+      )}
 
-      {/* Discover Sri Lanka – Blog short view */}
-      <section className="py-10 sm:py-16 md:py-20 bg-gray-50 dark:bg-gray-900/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8 sm:mb-12 px-2">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
-              Discover Sri Lanka
-            </h2>
-            <p className="text-base sm:text-lg md:text-xl text-gray-800 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
-              From ancient temples to pristine beaches, explore the diverse beauty of Sri Lanka.
-            </p>
+      {/* Inspiration — blog */}
+      {showBlog && (
+      <section className="lp-section-ink py-14 sm:py-20 bg-[var(--foam)]">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8 sm:mb-12">
+            <div>
+              <p className="lp-kicker mb-2">Inspiration</p>
+              <h2 className="lp-section-title text-3xl sm:text-4xl md:text-5xl">
+                {String(blogCms?.title || 'Your next trip starts here')}
+              </h2>
+              {blogCms?.subtitle ? (
+                <p className="mt-2 text-[var(--ink-soft)]">{String(blogCms.subtitle)}</p>
+              ) : null}
+            </div>
+            <Link href="/blog" className="inline-flex items-center gap-2 font-semibold text-[var(--lagoon)] hover:text-[var(--lagoon-deep)]">
+              View all stories <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
 
           {blogPosts.length > 0 ? (
@@ -1666,7 +2402,7 @@ Discover your next adventure and plan the perfect Sri Lankan journey.`}
                   type="button"
                   aria-label="Previous blog posts"
                   onClick={() => setBlogCarouselIndex(i => Math.max(0, i - 1))}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-[1] w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 touch-manipulation"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-[1] w-9 h-9 sm:w-12 sm:h-12 rounded-full lp-glass shadow-lg flex items-center justify-center text-[var(--ink)] hover:bg-white border border-white/50 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 touch-manipulation"
                 >
                   <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
@@ -1674,7 +2410,7 @@ Discover your next adventure and plan the perfect Sri Lankan journey.`}
                   type="button"
                   aria-label="Next blog posts"
                   onClick={() => setBlogCarouselIndex(i => Math.min(Math.max(0, Math.ceil(blogPosts.length / 3) - 1), i + 1))}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-[1] w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 touch-manipulation"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-[1] w-9 h-9 sm:w-12 sm:h-12 rounded-full lp-glass shadow-lg flex items-center justify-center text-[var(--ink)] hover:bg-white border border-white/50 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 touch-manipulation"
                 >
                   <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
@@ -1688,8 +2424,7 @@ Discover your next adventure and plan the perfect Sri Lankan journey.`}
                         key={post.id}
                         className="flex-shrink-0 w-full sm:w-1/2 lg:w-1/3 px-2"
                       >
-                        <Link href={`/blog/${post.id}`} className="block bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow h-full">
-                          <div className="relative h-48 sm:h-56">
+                        <Link href={`/blog/${post.id}`} className="lp-photo-card group block h-[360px] sm:h-[400px]">
                             <Image
                               src={post.image || '/placeholder-image.svg'}
                               alt={post.title}
@@ -1697,21 +2432,16 @@ Discover your next adventure and plan the perfect Sri Lankan journey.`}
                               className="object-cover"
                               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                             />
-                          </div>
-                          <div className="p-4 sm:p-6">
+                          <div className="absolute inset-x-0 bottom-0 z-20 p-5 sm:p-6">
                             {post.category && (
-                              <span className="inline-block px-2.5 py-0.5 sm:px-3 sm:py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-xs sm:text-sm mb-2 sm:mb-3">
+                              <span className="inline-block text-[var(--sun)] text-xs font-bold tracking-[0.14em] uppercase mb-2">
                                 {post.category}
                               </span>
                             )}
-                            <h3 className="text-base sm:text-xl font-semibold text-gray-900 dark:text-white mb-1.5 sm:mb-2 line-clamp-2">{post.title}</h3>
-                            <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm line-clamp-4 mb-2 sm:mb-3">
+                            <h3 className="font-display text-xl sm:text-2xl text-white leading-tight mb-2 line-clamp-2">{post.title}</h3>
+                            <p className="text-white/75 text-sm line-clamp-2">
                               {post.description || post.excerpt || ''}
                             </p>
-                            <div className="flex items-center gap-3 text-gray-500 text-xs">
-                              {post.date && <span>{post.date}</span>}
-                              {post.readTime && <span>{post.readTime}</span>}
-                            </div>
                           </div>
                         </Link>
                       </div>
@@ -1719,22 +2449,13 @@ Discover your next adventure and plan the perfect Sri Lankan journey.`}
                   </div>
                 </div>
               </div>
-              <div className="text-center mt-10">
-                <Link
-                  href="/blog"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  More
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </div>
             </>
           ) : (
             <div className="text-center py-12">
-              <p className="text-gray-600 mb-4">Explore stories and travel tips on our blog.</p>
+              <p className="text-[var(--ink-soft)] mb-4">Explore stories and travel tips on our blog.</p>
               <Link
                 href="/blog"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--lagoon-deep)] text-white font-semibold rounded-full hover:bg-[var(--lagoon)] transition-colors"
               >
                 View Blog
                 <ArrowRight className="w-4 h-4" />
@@ -1743,26 +2464,39 @@ Discover your next adventure and plan the perfect Sri Lankan journey.`}
           )}
         </div>
       </section>
+      )}
 
-      {/* CTA Section - Inspired by Swimlane's CTA */}
-      <section className="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-blue-600 to-blue-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 px-2">
-            Ready to Start Your Sri Lankan Adventure?
+      {/* CTA Section */}
+      {showCta && (
+      <section className="relative py-16 sm:py-24 overflow-hidden bg-[var(--lagoon)] text-white">
+        <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: 'radial-gradient(circle at 20% 20%, var(--sun), transparent 45%), radial-gradient(circle at 80% 80%, #fff, transparent 40%)' }} />
+        <div className="relative w-full max-w-[1920px] mx-auto lp-gutter text-center">
+          <p className="lp-kicker text-[var(--sun)] mb-3">Ready when you are</p>
+          <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-semibold mb-4 px-2 tracking-tight">
+            {String(ctaCms?.title || 'Start your Sri Lankan adventure')}
           </h2>
-          <p className="text-base sm:text-lg md:text-xl text-blue-100 mb-6 sm:mb-8 max-w-3xl mx-auto px-2">
-            Let us help you create unforgettable memories with our expertly crafted tour packages.
+          <p className="text-base sm:text-lg md:text-xl text-white/85 mb-8 max-w-2xl mx-auto px-2">
+            {String(ctaCms?.subtitle || "Tell us how you travel — we'll craft the itinerary that feels like you.")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center px-2">
-            <button className="bg-white text-blue-600 hover:bg-gray-100 px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-colors min-h-[44px] touch-manipulation">
-              Get Started Today
-              </button>
-            <button className="bg-transparent border-2 border-white text-white hover:bg-white hover:text-blue-600 px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-colors min-h-[44px] touch-manipulation">
-              Contact Us
-              </button>
-            </div>
+            <Link
+              href={String(ctaCms?.primaryButtonUrl || '/tours')}
+              className="hover:brightness-110 px-7 sm:px-8 py-3.5 sm:py-4 rounded-full font-bold text-base sm:text-lg transition-all min-h-[44px] touch-manipulation inline-flex items-center justify-center"
+              style={{ background: '#d4f06a', color: '#0b3d4a' }}
+            >
+              {String(ctaCms?.primaryButtonText || 'Get started today')}
+            </Link>
+            <Link
+              href={String(ctaCms?.secondaryButtonUrl || '/contact')}
+              className="hover:brightness-110 px-7 sm:px-8 py-3.5 sm:py-4 rounded-full font-semibold text-base sm:text-lg transition-colors min-h-[44px] touch-manipulation inline-flex items-center justify-center"
+              style={{ background: '#0b3d4a', color: '#d4f06a' }}
+            >
+              {String(ctaCms?.secondaryButtonText || 'Contact us')}
+            </Link>
+          </div>
           </div>
       </section>
+      )}
 
       {/* Structured Data */}
       <StructuredData data={organizationSchema} />

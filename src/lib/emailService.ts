@@ -1,5 +1,22 @@
+import { Resend } from 'resend'
 import nodemailer from 'nodemailer'
 import { supabaseAdmin } from './supabaseClient'
+import {
+  bookingReceivedAdmin,
+  bookingReceivedCustomer,
+  bookingUpdateAdmin,
+  bookingUpdateCustomer,
+  contactAdmin,
+  contactAutoReply,
+  depositInvoiceCustomer,
+  invoiceCustomer,
+  payLaterAdmin,
+  payLaterCustomer,
+  type BookingEmailPayload,
+  type ContactEmailPayload,
+} from './email/templates'
+
+export type BookingForEmail = BookingEmailPayload
 
 interface EmailSettings {
   smtpHost: string
@@ -10,194 +27,16 @@ interface EmailSettings {
   fromName: string
 }
 
-// Get email settings from database or environment
-async function getEmailSettings(): Promise<EmailSettings> {
-  // Try to get from Supabase settings table
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    try {
-      const { data: settingsData } = await supabaseAdmin
-        .from('settings')
-        .select('smtp_host, smtp_port, smtp_username, smtp_password, from_email, from_name')
-        .eq('id', 'main')
-        .single()
-      
-      if (settingsData && settingsData.smtp_host && settingsData.smtp_username) {
-        return {
-          smtpHost: settingsData.smtp_host || 'smtp.gmail.com',
-          smtpPort: settingsData.smtp_port || '587',
-          smtpUsername: settingsData.smtp_username,
-          smtpPassword: settingsData.smtp_password || '',
-          fromEmail: settingsData.from_email || settingsData.smtp_username,
-          fromName: settingsData.from_name || 'Isle & Echo Travel'
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching email settings from database:', error)
-    }
-  }
-  
-  // Fallback to environment variables
-  return {
-    smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
-    smtpPort: process.env.SMTP_PORT || '587',
-    smtpUsername: process.env.SMTP_USERNAME || '',
-    smtpPassword: process.env.SMTP_PASSWORD || '',
-    fromEmail: process.env.FROM_EMAIL || process.env.SMTP_USERNAME || 'noreply@isleandecho.com',
-    fromName: process.env.FROM_NAME || 'Isle & Echo Travel'
-  }
-}
-
-// Create email transporter
-async function createTransporter() {
-  const settings = await getEmailSettings()
-  
-  if (!settings.smtpUsername || !settings.smtpPassword) {
-    throw new Error('SMTP credentials not configured. Please configure email settings in admin panel.')
-  }
-  
-  return nodemailer.createTransport({
-    host: settings.smtpHost,
-    port: parseInt(settings.smtpPort, 10),
-    secure: settings.smtpPort === '465', // true for 465, false for other ports
-    auth: {
-      user: settings.smtpUsername,
-      pass: settings.smtpPassword
-    }
-  })
-}
-
-// Get admin email(s) from settings (comma-separated supported)
-export async function getAdminEmails(): Promise<string[]> {
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    try {
-      const { data } = await supabaseAdmin
-        .from('settings')
-        .select('admin_email')
-        .eq('id', 'main')
-        .single()
-      const raw = (data?.admin_email as string) || process.env.ADMIN_EMAIL || ''
-      return raw.split(',').map((e) => e.trim()).filter(Boolean)
-    } catch (error) {
-      console.error('Error fetching admin emails:', error)
-    }
-  }
-  const env = process.env.ADMIN_EMAIL || ''
-  return env ? env.split(',').map((e) => e.trim()).filter(Boolean) : []
-}
-
-// Format booking details as plain text (exact format for both customer and admin)
-function formatBookingDetailsText(booking: BookingForEmail): string {
-  const fmt = (v: unknown) => (v == null || v === '' ? '—' : String(v))
-  return [
-    'BOOKING DETAILS',
-    '----------------',
-    `Booking reference:  ${fmt(booking.id)}`,
-    `Tour package:       ${fmt(booking.tour_package_name)}`,
-    `Status:             ${fmt(booking.status)}`,
-    `Payment status:     ${fmt(booking.payment_status)}`,
-    '',
-    'CUSTOMER',
-    '--------',
-    `Name:               ${fmt(booking.customer_name)}`,
-    `Email:              ${fmt(booking.customer_email)}`,
-    `Phone:              ${fmt(booking.customer_phone)}`,
-    '',
-    'DATES & GUESTS',
-    '--------------',
-    `Start date:         ${fmt(booking.start_date)}`,
-    `End date:           ${fmt(booking.end_date)}`,
-    `Number of guests:   ${fmt(booking.guests)}`,
-    '',
-    'PAYMENT',
-    '-------',
-    `Total price:        ${booking.total_price != null ? `${booking.total_price} LKR` : '—'}`,
-    `Payment method:     ${fmt(booking.payment_method)}`,
-    `Payment ID:         ${fmt(booking.payment_id)}`,
-    '',
-    'SPECIAL REQUESTS',
-    '-----------------',
-    fmt(booking.special_requests),
-    '',
-    `Created:            ${fmt(booking.created_at)}`,
-  ].join('\n')
-}
-
-// Format booking details as HTML (exact same structure for customer and admin)
-function formatBookingDetailsHtml(booking: BookingForEmail): string {
-  const row = (label: string, value: unknown) => {
-    const v = value == null || value === '' ? '—' : String(value)
-    return `<tr><td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:600;width:180px;">${label}</td><td style="padding:8px 12px;border:1px solid #e5e7eb;">${v}</td></tr>`
-  }
-  const section = (title: string, rows: string) =>
-    `<h3 style="margin:16px 0 8px;font-size:14px;color:#374151;">${title}</h3><table style="width:100%;border-collapse:collapse;">${rows}</table>`
-  const body = [
-    section('Booking', [
-      row('Booking reference', booking.id),
-      row('Tour package', booking.tour_package_name),
-      row('Status', booking.status),
-      row('Payment status', booking.payment_status),
-    ].join('')),
-    section('Customer', [
-      row('Name', booking.customer_name),
-      row('Email', booking.customer_email),
-      row('Phone', booking.customer_phone),
-    ].join('')),
-    section('Dates & guests', [
-      row('Start date', booking.start_date),
-      row('End date', booking.end_date),
-      row('Number of guests', booking.guests),
-    ].join('')),
-    section('Payment', [
-      row('Total price', booking.total_price != null ? `${booking.total_price} LKR` : null),
-      row('Payment method', booking.payment_method),
-      row('Payment ID', booking.payment_id),
-    ].join('')),
-    section('Special requests', [row('', booking.special_requests || '—')].join('')),
-    `<p style="margin-top:16px;color:#6b7280;font-size:12px;">Created: ${booking.created_at || '—'}</p>`,
-  ].join('')
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="utf-8"></head>
-    <body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;">
-      <div style="background:#3B82F6;color:white;padding:16px;text-align:center;border-radius:8px 8px 0 0;">
-        <h1 style="margin:0;font-size:20px;">Booking confirmation</h1>
-      </div>
-      <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
-        ${body}
-      </div>
-      <p style="text-align:center;margin-top:24px;color:#6b7280;font-size:12px;">Isle & Echo Travel</p>
-    </body>
-    </html>
-  `
-}
-
-// Booking record shape for confirmation emails
-export interface BookingForEmail {
-  id: string
-  tour_package_id?: string
-  tour_package_name?: string
-  customer_name: string
-  customer_email: string
-  customer_phone?: string
-  start_date: string
-  end_date: string
-  guests?: number
-  total_price?: number | null
-  status?: string
-  special_requests?: string | null
-  payment_status?: string
-  payment_method?: string | null
-  payment_id?: string | null
-  created_at?: string
-  updated_at?: string
-}
-
 interface SendEmailOptions {
-  to: string
+  to: string | string[]
   subject: string
   html: string
   text?: string
+  replyTo?: string
+  /** Override sender, e.g. "Hashantha <hashantha@isleandecho.com>" */
+  from?: string
+  cc?: string[]
+  bcc?: string[]
   attachments?: Array<{
     filename: string
     content: Buffer
@@ -205,164 +44,337 @@ interface SendEmailOptions {
   }>
 }
 
-// Send email
-export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
-  try {
-    const settings = await getEmailSettings()
-    const transporter = await createTransporter()
-    
-    const mailOptions = {
-      from: `"${settings.fromName}" <${settings.fromEmail}>`,
-      to: options.to,
-      subject: options.subject,
-      text: options.text || '',
-      html: options.html,
-      attachments: options.attachments || []
+function isSupabaseConfigured() {
+  return !!(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.SUPABASE_SERVICE_ROLE_KEY &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://placeholder.supabase.co'
+  )
+}
+
+async function getEmailSettings(): Promise<EmailSettings> {
+  if (isSupabaseConfigured()) {
+    try {
+      const { data: settingsData } = await supabaseAdmin
+        .from('settings')
+        .select('smtp_host, smtp_port, smtp_username, smtp_password, from_email, from_name')
+        .eq('id', 'main')
+        .single()
+
+      if (settingsData && settingsData.smtp_host && settingsData.smtp_username) {
+        return {
+          smtpHost: settingsData.smtp_host || 'smtp.gmail.com',
+          smtpPort: settingsData.smtp_port || '587',
+          smtpUsername: settingsData.smtp_username,
+          smtpPassword: settingsData.smtp_password || '',
+          fromEmail: settingsData.from_email || settingsData.smtp_username,
+          fromName: settingsData.from_name || 'Isle & Echo',
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching email settings from database:', error)
     }
-    
-    const info = await transporter.sendMail(mailOptions)
-    console.log('Email sent successfully:', info.messageId)
+  }
+
+  return {
+    smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
+    smtpPort: process.env.SMTP_PORT || '587',
+    smtpUsername: process.env.SMTP_USERNAME || '',
+    smtpPassword: process.env.SMTP_PASSWORD || '',
+    fromEmail: process.env.FROM_EMAIL || process.env.SMTP_USERNAME || 'noreply@isleandecho.com',
+    fromName: process.env.FROM_NAME || 'Isle & Echo',
+  }
+}
+
+export async function getAdminEmails(): Promise<string[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      const { data } = await supabaseAdmin
+        .from('settings')
+        .select('admin_email')
+        .eq('id', 'main')
+        .single()
+      const raw = (data?.admin_email as string) || process.env.ADMIN_EMAIL || process.env.CONTACT_EMAIL || ''
+      return raw.split(',').map((e) => e.trim()).filter(Boolean)
+    } catch (error) {
+      console.error('Error fetching admin emails:', error)
+    }
+  }
+  const env = process.env.ADMIN_EMAIL || process.env.CONTACT_EMAIL || ''
+  return env ? env.split(',').map((e) => e.trim()).filter(Boolean) : []
+}
+
+async function bookingNotificationsEnabled() {
+  if (!isSupabaseConfigured()) return true
+  try {
+    const { data } = await supabaseAdmin
+      .from('settings')
+      .select('booking_notifications')
+      .eq('id', 'main')
+      .single()
+    return (data?.booking_notifications ?? true) as boolean
+  } catch {
     return true
+  }
+}
+
+function resendFromAddress(settings: EmailSettings) {
+  const envFrom = process.env.RESEND_FROM_EMAIL?.trim()
+  if (envFrom) return envFrom
+  return `${settings.fromName} <${settings.fromEmail}>`
+}
+
+function hasResend() {
+  const key = process.env.RESEND_API_KEY || ''
+  return key.length > 10 && key !== 're_xxxxxxxxx'
+}
+
+async function sendViaResend(options: SendEmailOptions, settings: EmailSettings) {
+  const resend = new Resend(process.env.RESEND_API_KEY)
+  const recipients = Array.isArray(options.to) ? options.to : [options.to]
+  const { data, error } = await resend.emails.send({
+    from: options.from || resendFromAddress(settings),
+    to: recipients,
+    cc: options.cc,
+    bcc: options.bcc,
+    subject: options.subject,
+    html: options.html,
+    text: options.text,
+    replyTo: options.replyTo,
+    attachments: options.attachments?.map((file) => ({
+      filename: file.filename,
+      content: file.content,
+      contentType: file.contentType,
+    })),
+  })
+
+  if (error) {
+    throw new Error(error.message || 'Resend failed to send email')
+  }
+  console.log('Email sent via Resend:', data?.id, 'to', recipients.join(', '))
+  return true
+}
+
+async function sendViaSmtp(options: SendEmailOptions, settings: EmailSettings) {
+  if (!settings.smtpUsername || !settings.smtpPassword) {
+    throw new Error('Email is not configured. Set RESEND_API_KEY or SMTP credentials.')
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: settings.smtpHost,
+    port: parseInt(settings.smtpPort, 10),
+    secure: settings.smtpPort === '465',
+    auth: {
+      user: settings.smtpUsername,
+      pass: settings.smtpPassword,
+    },
+  })
+
+  const info = await transporter.sendMail({
+    from: options.from || `"${settings.fromName}" <${settings.fromEmail}>`,
+    to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
+    cc: options.cc?.join(', '),
+    bcc: options.bcc?.join(', '),
+    subject: options.subject,
+    text: options.text || '',
+    html: options.html,
+    replyTo: options.replyTo,
+    attachments: options.attachments || [],
+  })
+  console.log('Email sent via SMTP:', info.messageId)
+  return true
+}
+
+export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
+  const settings = await getEmailSettings()
+  try {
+    if (hasResend()) {
+      return await sendViaResend(options, settings)
+    }
+    return await sendViaSmtp(options, settings)
   } catch (error) {
     console.error('Error sending email:', error)
     throw error
   }
 }
 
-// Send invoice email
+async function sendToAdmins(message: { subject: string; html: string; text: string }, replyTo?: string) {
+  if (!(await bookingNotificationsEnabled())) return
+  const adminEmails = await getAdminEmails()
+  if (adminEmails.length === 0) {
+    console.warn('No admin email configured. Set ADMIN_EMAIL to receive notifications.')
+    return
+  }
+  for (const to of adminEmails) {
+    try {
+      await sendEmail({ to, ...message, replyTo })
+    } catch (err) {
+      console.error('Failed to email admin', to, err)
+    }
+  }
+}
+
 export async function sendInvoiceEmail(
   customerEmail: string,
   customerName: string,
   bookingId: string,
   invoicePdf: Buffer
 ): Promise<boolean> {
-  const emailHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          line-height: 1.6;
-          color: #333;
-        }
-        .container {
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 20px;
-        }
-        .header {
-          background-color: #3B82F6;
-          color: white;
-          padding: 20px;
-          text-align: center;
-          border-radius: 8px 8px 0 0;
-        }
-        .content {
-          background-color: #f9fafb;
-          padding: 30px;
-          border-radius: 0 0 8px 8px;
-        }
-        .button {
-          display: inline-block;
-          padding: 12px 24px;
-          background-color: #3B82F6;
-          color: white;
-          text-decoration: none;
-          border-radius: 6px;
-          margin-top: 20px;
-        }
-        .footer {
-          text-align: center;
-          margin-top: 30px;
-          padding-top: 20px;
-          border-top: 1px solid #e5e7eb;
-          color: #6b7280;
-          font-size: 14px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>Thank You for Your Booking!</h1>
-        </div>
-        <div class="content">
-          <p>Dear ${customerName},</p>
-          <p>Thank you for booking with Isle & Echo Travel! Your payment has been successfully processed.</p>
-          <p>Your booking reference number is: <strong>${bookingId}</strong></p>
-          <p>Please find your invoice attached to this email. You can download it for your records.</p>
-          <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
-          <p>We look forward to providing you with an amazing travel experience!</p>
-          <p>Best regards,<br>The Isle & Echo Travel Team</p>
-        </div>
-        <div class="footer">
-          <p>Isle & Echo Travel<br>Email: info@isleandecho.com | Phone: +94 741 415 812</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `
-  
-  return await sendEmail({
+  const message = invoiceCustomer(customerName, bookingId)
+  return sendEmail({
     to: customerEmail,
-    subject: `Invoice for Booking ${bookingId} - Isle & Echo Travel`,
-    html: emailHtml,
-    text: `Thank you for your booking! Your payment has been successfully processed. Booking reference: ${bookingId}. Please find your invoice attached.`,
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
     attachments: [
       {
         filename: `Invoice-${bookingId}.pdf`,
         content: invoicePdf,
-        contentType: 'application/pdf'
-      }
-    ]
+        contentType: 'application/pdf',
+      },
+    ],
   })
 }
 
-// Send exact-format booking details to the customer (on confirmation)
 export async function sendBookingConfirmationToCustomer(booking: BookingForEmail): Promise<boolean> {
-  const html = formatBookingDetailsHtml(booking)
-  const text = formatBookingDetailsText(booking)
-  return await sendEmail({
+  const message = bookingReceivedCustomer(booking)
+  return sendEmail({
     to: booking.customer_email,
-    subject: `Booking confirmed – ${booking.id} – Isle & Echo Travel`,
-    html,
-    text,
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
   })
 }
 
-// Send exact-format booking details to admin email(s). Respects booking_notifications.
 export async function sendBookingConfirmationToAdmin(booking: BookingForEmail): Promise<void> {
-  let notificationsEnabled = true
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    try {
-      const { data } = await supabaseAdmin
-        .from('settings')
-        .select('booking_notifications')
-        .eq('id', 'main')
-        .single()
-      notificationsEnabled = (data?.booking_notifications ?? true) as boolean
-    } catch {
-      // keep true
-    }
+  const message = bookingReceivedAdmin(booking)
+  await sendToAdmins(message, booking.customer_email)
+}
+
+export async function notifyBookingCreated(booking: BookingForEmail): Promise<void> {
+  if (!booking.customer_email) return
+  try {
+    await sendBookingConfirmationToCustomer(booking)
+  } catch (error) {
+    console.error('Failed to send booking received email to customer:', error)
   }
-  if (!notificationsEnabled) return
+  try {
+    await sendBookingConfirmationToAdmin(booking)
+  } catch (error) {
+    console.error('Failed to send booking received email to admin:', error)
+  }
+}
 
+export async function notifyBookingUpdated(
+  booking: BookingForEmail,
+  previous?: { status?: string; payment_status?: string }
+): Promise<void> {
+  const statusChanged = previous?.status && previous.status !== booking.status
+  const paymentChanged = previous?.payment_status && previous.payment_status !== booking.payment_status
+  if (!statusChanged && !paymentChanged) return
+  if (!booking.customer_email) return
+
+  try {
+    const message = bookingUpdateCustomer(booking, previous)
+    await sendEmail({
+      to: booking.customer_email,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    })
+  } catch (error) {
+    console.error('Failed to send booking update email to customer:', error)
+  }
+
+  try {
+    const message = bookingUpdateAdmin(booking)
+    await sendToAdmins(message, booking.customer_email)
+  } catch (error) {
+    console.error('Failed to send booking update email to admin:', error)
+  }
+}
+
+export async function notifyPayLaterSelected(booking: BookingForEmail): Promise<void> {
+  if (!booking.customer_email) return
+  try {
+    const message = payLaterCustomer(booking)
+    await sendEmail({
+      to: booking.customer_email,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    })
+  } catch (error) {
+    console.error('Failed to send pay-later email to customer:', error)
+  }
+  try {
+    const message = payLaterAdmin(booking)
+    await sendToAdmins(message, booking.customer_email)
+  } catch (error) {
+    console.error('Failed to send pay-later email to admin:', error)
+  }
+}
+
+export async function sendDepositInvoiceEmail(
+  booking: BookingForEmail,
+  invoicePdf: Buffer,
+  amounts: { total: string; deposit: string; balance: string; percent: number },
+  paymentLink?: string
+): Promise<void> {
+  if (!booking.customer_email) {
+    throw new Error('Customer email is missing')
+  }
+  const message = depositInvoiceCustomer(booking, amounts, paymentLink)
+  await sendEmail({
+    to: booking.customer_email,
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+    attachments: [
+      {
+        filename: `Invoice-${booking.id}-deposit.pdf`,
+        content: invoicePdf,
+        contentType: 'application/pdf',
+      },
+    ],
+  })
+  try {
+    await sendToAdmins({
+      subject: `50% invoice + PayHere link sent · ${booking.id} · ${booking.customer_name}`,
+      html: message.html,
+      text: `Deposit invoice and PayHere link sent to ${booking.customer_email} for ${booking.id}. Due now: ${amounts.deposit}. Link: ${paymentLink || 'n/a'}`,
+    }, booking.customer_email)
+  } catch (error) {
+    console.error('Failed to copy deposit invoice to admin:', error)
+  }
+}
+
+export async function notifyContactMessage(payload: ContactEmailPayload): Promise<void> {
+  const adminMessage = contactAdmin(payload)
   const adminEmails = await getAdminEmails()
-  if (adminEmails.length === 0) return
-
-  const html = formatBookingDetailsHtml(booking)
-  const text = formatBookingDetailsText(booking)
-  const subject = `New booking confirmed – ${booking.id} – ${booking.customer_name}`
+  if (adminEmails.length === 0) {
+    throw new Error('Contact email is not configured. Set ADMIN_EMAIL.')
+  }
 
   for (const to of adminEmails) {
-    try {
-      await sendEmail({ to, subject, html, text })
-      console.log('Booking confirmation sent to admin:', to)
-    } catch (err) {
-      console.error('Failed to send booking confirmation to admin', to, err)
-    }
+    await sendEmail({
+      to,
+      subject: adminMessage.subject,
+      html: adminMessage.html,
+      text: adminMessage.text,
+      replyTo: payload.email,
+    })
+  }
+
+  try {
+    const reply = contactAutoReply(payload)
+    await sendEmail({
+      to: payload.email,
+      subject: reply.subject,
+      html: reply.html,
+      text: reply.text,
+    })
+  } catch (error) {
+    console.error('Failed to send contact auto-reply:', error)
   }
 }
-

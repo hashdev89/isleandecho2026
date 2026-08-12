@@ -19,7 +19,10 @@ import {
   LogOut,
   Package,
   MapPin,
-  LayoutTemplate
+  LayoutTemplate,
+  Car,
+  SlidersHorizontal,
+  Mail,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import AdminRoute from '../../components/AdminRoute'
@@ -70,10 +73,13 @@ export default function AdminLayout({
     const allItems = [
       { name: 'Dashboard', href: '/admin', icon: LayoutDashboard, roles: ['admin'] },
       { name: 'Chat', href: '/admin/chat', icon: MessageCircle, roles: ['admin', 'staff'], badge: totalChatCount },
+      { name: 'Email', href: '/admin/email', icon: Mail, roles: ['admin', 'staff'] },
       { name: 'Blog Posts', href: '/admin/blog', icon: FileText, roles: ['admin', 'staff'] },
       { name: 'Bookings', href: '/admin/bookings', icon: Calendar, roles: ['admin', 'staff', 'customer'] },
       { name: 'Images', href: '/admin/images', icon: ImageIcon, roles: ['admin', 'staff'] },
       { name: 'Tours', href: '/admin/tours', icon: Package, roles: ['admin', 'staff'] },
+      { name: 'Vehicles', href: '/admin/vehicles', icon: Car, roles: ['admin', 'staff'] },
+      { name: 'Rental settings', href: '/admin/rental-settings', icon: SlidersHorizontal, roles: ['admin', 'staff'] },
       { name: 'Destinations', href: '/admin/destinations', icon: MapPin, roles: ['admin', 'staff'] },
       { name: 'Users', href: '/admin/users', icon: Users, roles: ['admin'] },
       { name: 'Analytics', href: '/admin/analytics', icon: TrendingUp, roles: ['admin'] },
@@ -222,7 +228,7 @@ export default function AdminLayout({
             </div>
           </div>
 
-          <main className="p-6">
+          <main className="p-4 sm:p-6 max-w-[1600px]">
             {children}
           </main>
         </div>

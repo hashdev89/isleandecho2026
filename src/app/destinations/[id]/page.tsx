@@ -109,7 +109,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Destination Not Found</h1>
-          <Link href="/destinations" className="text-blue-600 hover:text-blue-800">
+          <Link href="/destinations" className="text-[var(--lagoon)] hover:text-[var(--lagoon-deep)]">
             ← Back to Destinations
           </Link>
         </div>
@@ -125,7 +125,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
   const heroImage = destination.image || '/placeholder-image.svg'
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--foam)] lp-section-ink">
       <Header />
       
       {/* Hero Section with Image */}
@@ -138,10 +138,10 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
           priority
           unoptimized={!!destination.image}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/40"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--lagoon-deep)]/90 via-[var(--lagoon-deep)]/50 to-black/30"></div>
         <div className="relative h-full flex items-center justify-center">
           <div className="text-center text-white px-4">
-            <h1 className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-2xl">{destination.name}</h1>
+            <h1 className="lp-section-title text-4xl md:text-6xl text-white mb-4 drop-shadow-2xl">{destination.name}</h1>
             <p className="text-xl md:text-2xl mb-4 drop-shadow-lg">{destination.region}</p>
             <div className="flex items-center justify-center gap-4 text-lg">
               <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
@@ -153,30 +153,30 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
         </div>
         <Link 
           href="/destinations" 
-          className="absolute top-20 left-4 bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/30 transition-colors flex items-center gap-2 z-10"
+          className="absolute top-20 left-4 bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-full hover:bg-white/30 transition-colors flex items-center gap-2 z-10"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Destinations
         </Link>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="w-full max-w-[1920px] mx-auto lp-gutter py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2">
             {/* Description */}
-            <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-6">About {destination.name}</h2>
-              <p className="text-lg text-gray-700 leading-relaxed">{destination.description}</p>
+            <div className="lp-panel p-8 mb-8">
+              <h2 className="lp-section-title text-3xl mb-6">About {destination.name}</h2>
+              <p className="text-lg text-[var(--ink-soft)] leading-relaxed">{destination.description}</p>
             </div>
 
             {/* Things to Do */}
-            <div className="bg-white rounded-xl shadow-lg p-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-6">Things to Do</h2>
+            <div className="lp-panel p-8">
+              <h2 className="lp-section-title text-3xl mb-6">Things to Do</h2>
               {activities.length > 0 ? (
                 <div className="space-y-6">
                   {activities.map((activity, index) => (
-                    <div key={index} className="border-l-4 border-blue-500 pl-6 py-4">
+                    <div key={index} className="border-l-4 border-[var(--lagoon)] pl-6 py-4">
                       <h3 className="text-xl font-semibold text-gray-900 mb-2">{activity.name}</h3>
                       {activity.description && <p className="text-gray-700 mb-3">{activity.description}</p>}
                       <div className="flex gap-4 text-sm text-gray-600">
@@ -230,31 +230,31 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
             </div>
 
             {/* Quick Info */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Quick Info</h3>
+            <div className="lp-panel p-6">
+              <h3 className="lp-section-title text-xl text-[var(--ink)] mb-4">Quick Info</h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Region:</span>
-                  <span className="font-medium">{destination.region}</span>
+                  <span className="text-[var(--ink-soft)]">Region:</span>
+                  <span className="font-medium text-[var(--ink)]">{destination.region}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Status:</span>
-                  <span className="font-medium capitalize">{destination.status}</span>
+                  <span className="text-[var(--ink-soft)]">Status:</span>
+                  <span className="font-medium text-[var(--ink)] capitalize">{destination.status}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Activities:</span>
-                  <span className="font-medium">{activities.length}</span>
+                  <span className="text-[var(--ink-soft)]">Activities:</span>
+                  <span className="font-medium text-[var(--ink)]">{activities.length}</span>
                 </div>
               </div>
             </div>
 
             {/* Book Tour CTA */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-lg p-6 text-white mt-6">
+            <div className="bg-[var(--lagoon-deep)] rounded-2xl shadow-lg p-6 text-white mt-6">
               <h3 className="text-xl font-semibold mb-4">Ready to Visit?</h3>
-              <p className="mb-4">Book a tour to {destination.name} and experience all these amazing activities!</p>
+              <p className="mb-4 text-white/85">Book a tour to {destination.name} and experience all these amazing activities!</p>
               <Link 
                 href="/tours" 
-                className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-block"
+                className="bg-[var(--sun)] text-[var(--lagoon-deep)] px-6 py-3 rounded-full font-bold hover:brightness-105 transition-all inline-block"
               >
                 View Tours
               </Link>

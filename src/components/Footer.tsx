@@ -54,10 +54,10 @@ export default function Footer() {
   ]
 
   return (
-    <footer className="bg-gray-900 text-white">
+    <footer className="bg-[var(--lagoon-deep)] text-white">
       {/* Newsletter Section */}
-      <div className="border-b border-gray-800 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="border-b border-white/10 py-12">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
           <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <div>
@@ -81,7 +81,7 @@ export default function Footer() {
 
       {/* Main Footer */}
       <div className="py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
             {/* Contact Us */}
             <div>
@@ -156,7 +156,7 @@ export default function Footer() {
 
       {/* Bottom Bar */}
       <div className="border-t border-gray-800 py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="text-gray-400 mb-4 md:mb-0 text-sm">
               {f?.copyrightText || '© 2024 by ISLE & ECHO. All rights reserved.'}

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { 
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import Header from '../../components/Header'
 import dynamic from 'next/dynamic'
+import { tourFitsGuestCountFromTour, formatGroupSizeRange, getTourGroupSize } from '@/lib/tourGroupSize'
 
 // Dynamically import MapboxMap to reduce initial bundle size
 const MapboxMap = dynamic(() => import('../../components/MapboxMap'), {
@@ -34,6 +35,10 @@ interface CustomTripData {
   dateRange: string
   guests: number
   interests: string[]
+  specialRequests?: string
+  customerName?: string
+  travelType?: string
+  fromChat?: boolean
 }
 
 interface Destination {
@@ -78,6 +83,21 @@ export default function CustomBookingPage() {
     }
     fetchTours()
   }, [])
+
+  const guestCountForTours = bookingData.guests || tripData?.guests || 1
+
+  const toursForGuestCount = useMemo(
+    () => availableTours.filter((tour) => tourFitsGuestCountFromTour(tour, guestCountForTours)),
+    [availableTours, guestCountForTours]
+  )
+
+  useEffect(() => {
+    if (!bookingData.selectedTour) return
+    const selected = availableTours.find((tour) => tour.id === bookingData.selectedTour)
+    if (selected && !tourFitsGuestCountFromTour(selected, guestCountForTours)) {
+      setBookingData((prev) => ({ ...prev, selectedTour: '' }))
+    }
+  }, [guestCountForTours, bookingData.selectedTour, availableTours])
 
   // Handle tour selection and auto-set dates
   const handleTourSelection = (tourId: string) => {
@@ -224,14 +244,18 @@ export default function CustomBookingPage() {
     // Get trip data from localStorage
     const storedData = localStorage.getItem('customTripData')
     if (storedData) {
-      const parsedData = JSON.parse(storedData)
+      const parsedData = JSON.parse(storedData) as CustomTripData
       setTripData(parsedData)
       // Set initial booking data
       setBookingData(prev => ({
         ...prev,
+        fullName: parsedData.customerName || prev.fullName,
         guests: parsedData.guests || 1,
         startDate: parsedData.dateRange ? parsedData.dateRange.split(' - ')[0] : '',
-        endDate: parsedData.dateRange ? parsedData.dateRange.split(' - ')[1] : ''
+        endDate: parsedData.dateRange && parsedData.dateRange.includes(' - ')
+          ? parsedData.dateRange.split(' - ')[1]
+          : '',
+        specialRequests: parsedData.specialRequests || prev.specialRequests,
       }))
     } else {
       // Redirect to home if no trip data
@@ -251,16 +275,39 @@ export default function CustomBookingPage() {
     
     try {
       const selectedTour = availableTours.find(tour => tour.id === bookingData.selectedTour)
+      const destinationNames = selectedDestinations
+        .map((dest) => dest?.name)
+        .filter((name): name is string => Boolean(name))
+      const interestLabels: Record<string, string> = {
+        culture: 'Culture & History',
+        nature: 'Nature & Wildlife',
+        beach: 'Beaches & Water Sports',
+        adventure: 'Adventure & Hiking',
+        food: 'Food & Cuisine',
+        relaxation: 'Relaxation & Wellness',
+        photography: 'Photography',
+        shopping: 'Shopping & Markets',
+      }
+      const interestNames = (tripData?.interests || []).map((id) => interestLabels[id] || id)
+      const notes = [
+        destinationNames.length ? `Destinations: ${destinationNames.join(', ')}` : '',
+        interestNames.length ? `Interests: ${interestNames.join(', ')}` : '',
+        bookingData.specialRequests?.trim() || '',
+      ].filter(Boolean).join('\n')
+
       const bookingPayload = {
-        tour_package_id: bookingData.selectedTour,
-        tour_package_name: selectedTour?.name || 'Custom Trip',
+        booking_type: 'custom_trip',
+        tour_package_id: bookingData.selectedTour || 'custom-trip',
+        tour_package_name: selectedTour?.name || 'Custom Sri Lanka trip',
         customer_name: bookingData.fullName,
         customer_email: bookingData.email,
         customer_phone: bookingData.phone,
         start_date: bookingData.startDate,
         end_date: bookingData.endDate,
         guests: bookingData.guests,
-        special_requests: bookingData.specialRequests,
+        special_requests: notes,
+        destinations: destinationNames,
+        interests: interestNames,
         status: 'pending',
         payment_status: 'pending'
       }
@@ -323,11 +370,15 @@ export default function CustomBookingPage() {
       
       {/* Hero Section */}
       <section className="relative py-12 sm:py-16 md:py-20 bg-gradient-to-r from-blue-600 to-blue-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 items-center">
             <div>
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-2">Your Custom Trip</h1>
-              <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 opacity-90 px-2">Personalized itinerary based on your preferences and selected destinations</p>
+              <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 opacity-90 px-2">
+                {tripData.fromChat
+                  ? `Personalized from chat${tripData.travelType ? ` · ${tripData.travelType}` : ''} — refine destinations below and complete your booking.`
+                  : 'Personalized itinerary based on your preferences and selected destinations'}
+              </p>
               <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-6 sm:mb-8 px-2">
                 <div className="flex items-center space-x-2">
                   <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -365,7 +416,7 @@ export default function CustomBookingPage() {
 
       {/* Tour Details */}
       <section className="py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-12">
@@ -553,11 +604,18 @@ export default function CustomBookingPage() {
                       required
                     >
                       <option value="">Choose a tour package...</option>
-                      {availableTours.map((tour) => (
+                      {toursForGuestCount.map((tour) => {
+                        const paxLabel = formatGroupSizeRange(getTourGroupSize(tour))
+                        return (
                         <option key={tour.id} value={tour.id}>
-                          {tour.name} - {tour.duration}
+                          {tour.name} - {tour.duration}{paxLabel ? ` (${paxLabel})` : ''}
                         </option>
-                      ))}
+                      )})}
+                      {toursForGuestCount.length === 0 && availableTours.length > 0 && (
+                        <option disabled value="">
+                          No packages for {guestCountForTours} guest{guestCountForTours === 1 ? '' : 's'}
+                        </option>
+                      )}
                     </select>
                     {bookingData.selectedTour && (
                       <div className="mt-2 p-3 bg-blue-50">
@@ -638,12 +696,21 @@ export default function CustomBookingPage() {
                     <input
                       type="number"
                       value={bookingData.guests}
-                      onChange={(e) => setBookingData({...bookingData, guests: parseInt(e.target.value)})}
-                      min="1"
-                      max="10"
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        if (raw === '') {
+                          setBookingData({ ...bookingData, guests: 1 })
+                          return
+                        }
+                        const n = parseInt(raw, 10)
+                        if (!Number.isFinite(n)) return
+                        setBookingData({ ...bookingData, guests: Math.max(1, Math.min(999, n)) })
+                      }}
+                      min={1}
                       className="w-full px-3 py-2 border border-gray-300"
                       required
                     />
+                    <p className="mt-1 text-xs text-gray-500">Enter any number for larger groups</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Special Requests</label>

@@ -67,7 +67,7 @@ function mapSupabaseToFrontend(data: Record<string, unknown>) {
           ? [data.payment_methods as string] 
           : ['payhere', 'credit_card', 'bank_transfer', 'cash']), // Default if empty
     taxRate: data.tax_rate || 15,
-    bookingDeposit: data.booking_deposit || 20,
+    bookingDeposit: data.booking_deposit || 50,
     payhereMerchantId: data.payhere_merchant_id || '',
     payhereMerchantSecret: data.payhere_merchant_secret || '',
     payhereSandbox: data.payhere_sandbox ?? true,
@@ -111,7 +111,7 @@ function mapFrontendToSupabase(data: Record<string, unknown>) {
     currency: data.currency || 'LKR',
     payment_methods: Array.isArray(data.paymentMethods) ? data.paymentMethods : (data.paymentMethods ? [data.paymentMethods] : []),
     tax_rate: data.taxRate || 15,
-    booking_deposit: data.bookingDeposit || 20,
+    booking_deposit: data.bookingDeposit || 50,
     payhere_merchant_id: data.payhereMerchantId || '',
     payhere_merchant_secret: data.payhereMerchantSecret || '',
     payhere_sandbox: data.payhereSandbox ?? true,

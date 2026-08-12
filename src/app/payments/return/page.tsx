@@ -51,7 +51,7 @@ function ReturnContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <div className="max-w-2xl mx-auto px-4 py-16">
+      <div className="max-w-2xl mx-auto lp-gutter py-16">
         <div className="bg-white rounded-xl shadow-lg p-8 text-center">
           {isPaid ? (
             <>

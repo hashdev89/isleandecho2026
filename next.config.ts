@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Keep pdfkit out of the Next bundle so AFM fonts resolve from node_modules
+  serverExternalPackages: ['pdfkit', 'fontkit', 'linebreak', 'png-js', 'unicode-properties'],
+  outputFileTracingIncludes: {
+    '/api/**/*': [
+      './node_modules/pdfkit/js/data/**/*',
+      './node_modules/pdfkit/js/**/*',
+    ],
+  },
   images: {
     // Enable image optimization for better performance
     formats: ['image/avif', 'image/webp'],
@@ -34,7 +42,13 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '*.supabase.co',
+        hostname: 'windows10spotlight.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.windows10spotlight.com',
         port: '',
         pathname: '/**',
       },

@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     description: "Discover the beauty of Sri Lanka with our curated tour packages and travel experiences.",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/srilankabeach.jpg",
         width: 1200,
         height: 630,
         alt: "ISLE & ECHO - Sri Lanka Tours",
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "ISLE & ECHO - Feel the Isle, Hear The Echo",
     description: "Discover the beauty of Sri Lanka with our curated tour packages and travel experiences.",
-    images: ["/twitter-image.jpg"],
+    images: ["/srilankabeach.jpg"],
     creator: "@isleandecho",
   },
   verification: {
@@ -91,7 +91,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
-        <meta name="theme-color" content="#1E3A8A" />
+        <meta name="theme-color" content="#0B3D4A" />
       </head>
       <body
         className="antialiased font-inter"

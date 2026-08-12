@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseClient'
 import fs from 'fs'
 import path from 'path'
+import { notifyBookingUpdated, type BookingForEmail } from '@/lib/emailService'
 
 // Persistent file-based storage for fallback
 const FALLBACK_FILE = path.join(process.cwd(), 'data', 'bookings.json')
@@ -66,24 +67,6 @@ export async function GET(
       })
     }
     
-    // TEMPORARY: Force using fallback data for debugging
-    console.log('TEMPORARY: Using fallback data instead of Supabase')
-    const fallbackBookings = loadFallbackBookings()
-    const booking = fallbackBookings.find(b => b.id === bookingId)
-    
-    if (!booking) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Booking not found' 
-      }, { status: 404 })
-    }
-    
-    return NextResponse.json({ 
-      success: true, 
-      data: booking,
-      message: 'Booking retrieved from fallback storage (forced)' 
-    })
-    
     const { data, error } = await supabaseAdmin
       .from('bookings')
       .select('*')
@@ -92,12 +75,16 @@ export async function GET(
     
     console.log('Supabase booking query result:', { data, error })
     
-    if (error) {
-      console.error('Supabase error:', error)
-      throw error
-    }
-    
-    if (!data) {
+    if (error || !data) {
+      const fallbackBookings = loadFallbackBookings()
+      const booking = fallbackBookings.find(b => b.id === bookingId)
+      if (booking) {
+        return NextResponse.json({
+          success: true,
+          data: booking,
+          message: 'Booking retrieved from fallback storage',
+        })
+      }
       return NextResponse.json({ 
         success: false, 
         error: 'Booking not found' 
@@ -141,6 +128,21 @@ export async function PUT(
       ...body,
       updated_at: new Date().toISOString(),
     }
+
+    const respondUpdated = async (previous: Booking, next: Booking) => {
+      try {
+        await notifyBookingUpdated(next as BookingForEmail, {
+          status: previous.status,
+          payment_status: previous.payment_status,
+        })
+      } catch (emailError) {
+        console.error('Booking updated but follow-up email failed:', emailError)
+      }
+      return NextResponse.json({
+        success: true,
+        data: next,
+      })
+    }
     
     // Check if Supabase is configured
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -154,38 +156,22 @@ export async function PUT(
           error: 'Booking not found' 
         }, { status: 404 })
       }
-      
-      fallbackBookings[bookingIndex] = { ...fallbackBookings[bookingIndex], ...updatedBooking }
+
+      const previous = fallbackBookings[bookingIndex]
+      fallbackBookings[bookingIndex] = { ...previous, ...updatedBooking }
       fs.writeFileSync(FALLBACK_FILE, JSON.stringify(fallbackBookings, null, 2))
       
-      return NextResponse.json({ 
-        success: true, 
-        data: fallbackBookings[bookingIndex],
-        message: 'Booking updated successfully (fallback storage)' 
-      })
+      const response = await respondUpdated(previous, fallbackBookings[bookingIndex])
+      response.headers.set('x-storage', 'fallback')
+      return response
     }
     
-    // TEMPORARY: Force using fallback data for debugging
-    console.log('TEMPORARY: Using fallback data instead of Supabase for update')
-    const fallbackBookings = loadFallbackBookings()
-    const bookingIndex = fallbackBookings.findIndex(b => b.id === bookingId)
-    
-    if (bookingIndex === -1) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Booking not found' 
-      }, { status: 404 })
-    }
-    
-    fallbackBookings[bookingIndex] = { ...fallbackBookings[bookingIndex], ...updatedBooking }
-    fs.writeFileSync(FALLBACK_FILE, JSON.stringify(fallbackBookings, null, 2))
-    
-    return NextResponse.json({ 
-      success: true, 
-      data: fallbackBookings[bookingIndex],
-      message: 'Booking updated successfully (fallback storage forced)' 
-    })
-    
+    const { data: existing } = await supabaseAdmin
+      .from('bookings')
+      .select('*')
+      .eq('id', bookingId)
+      .single()
+
     const { data, error } = await supabaseAdmin
       .from('bookings')
       .update(updatedBooking)
@@ -197,10 +183,16 @@ export async function PUT(
     
     if (error) {
       console.error('Supabase booking update error:', error)
-      throw error
+      const fallbackBookings = loadFallbackBookings()
+      const bookingIndex = fallbackBookings.findIndex(b => b.id === bookingId)
+      if (bookingIndex === -1) throw error
+      const previous = fallbackBookings[bookingIndex]
+      fallbackBookings[bookingIndex] = { ...previous, ...updatedBooking }
+      fs.writeFileSync(FALLBACK_FILE, JSON.stringify(fallbackBookings, null, 2))
+      return respondUpdated(previous, fallbackBookings[bookingIndex])
     }
     
-    return NextResponse.json({ success: true, data })
+    return respondUpdated((existing || data) as Booking, data as Booking)
   } catch (error: unknown) {
     console.error('Update booking error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { formatDistanceKm, getRouteSegments, getTotalRouteKm } from '@/lib/geoDistance'
 
 interface Destination {
   name: string
@@ -20,9 +21,16 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
   const [lng] = useState(80.5) // Sri Lanka center longitude
   const [lat] = useState(7.5)  // Sri Lanka center latitude
   const [zoom] = useState(7)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (map.current || typeof window === 'undefined') return // initialize map only once and ensure we're on client side
+
+    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || ''
+    if (!token) {
+      setError('Mapbox token is missing. Add NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to .env.local and restart the dev server.')
+      return
+    }
 
     // Dynamically import mapbox-gl
     import('mapbox-gl').then((mapboxgl) => {
@@ -34,17 +42,28 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
         document.head.appendChild(link)
       }
       
-      mapboxgl.default.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || ''
+      mapboxgl.default.accessToken = token
 
       if (mapContainer.current) {
-        map.current = new mapboxgl.default.Map({
-          container: mapContainer.current,
-          style: 'mapbox://styles/mapbox/streets-v12', // Standard streets style with 3D support
-          center: [lng, lat],
-          zoom: zoom,
-          pitch: 45, // 3D tilt
-          bearing: 0,
-          antialias: true
+        try {
+          map.current = new mapboxgl.default.Map({
+            container: mapContainer.current,
+            style: 'mapbox://styles/mapbox/streets-v12', // Standard streets style with 3D support
+            center: [lng, lat],
+            zoom: zoom,
+            pitch: 45, // 3D tilt
+            bearing: 0,
+            antialias: true
+          })
+        } catch (err) {
+          console.error('Mapbox init error:', err)
+          setError('Unable to initialize the map.')
+          return
+        }
+
+        map.current.on('error', (e) => {
+          console.error('Mapbox error:', e)
+          setError('Map failed to load. Check your Mapbox token and network connection.')
         })
 
         // Add navigation controls
@@ -123,6 +142,7 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
               }
 
               // Add markers for each destination
+              const markers: mapboxgl.Marker[] = []
               destinations.forEach((destination, index) => {
                 try {
                   // Create custom marker element
@@ -145,9 +165,10 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
 
                   // Add marker to map with error handling
                   if (map.current && mapContainer.current) {
-                    const _marker = new mapboxgl.default.Marker(markerEl)
+                    const destinationMarker = new mapboxgl.default.Marker(markerEl)
                       .setLngLat([destination.lng, destination.lat])
                       .addTo(map.current)
+                    markers.push(destinationMarker)
 
                     // Create popup
                     const popup = new mapboxgl.default.Popup({ offset: 25 })
@@ -164,12 +185,56 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                       }
                     })
                     
-                    _marker.setPopup(popup)
+                    destinationMarker.setPopup(popup)
                   }
                 } catch (error) {
                   console.warn('Error adding marker for destination:', destination.name, error)
                 }
               })
+
+              // Distance labels between consecutive stops
+              const routeSegments = getRouteSegments(destinations)
+              routeSegments.forEach((segment) => {
+                try {
+                  if (!map.current) return
+                  const labelEl = document.createElement('div')
+                  labelEl.className = 'route-distance-label'
+                  labelEl.textContent = formatDistanceKm(segment.distanceKm)
+                  labelEl.style.cssText = [
+                    'background: rgba(11, 61, 74, 0.92)',
+                    'color: #d4f06a',
+                    'padding: 4px 8px',
+                    'border-radius: 9999px',
+                    'font-size: 11px',
+                    'font-weight: 700',
+                    'white-space: nowrap',
+                    'box-shadow: 0 2px 8px rgba(0,0,0,0.25)',
+                    'border: 1px solid rgba(212, 240, 106, 0.35)',
+                    'pointer-events: none',
+                  ].join(';')
+
+                  const distanceMarker = new mapboxgl.default.Marker({
+                    element: labelEl,
+                    anchor: 'center',
+                  })
+                    .setLngLat([segment.midpoint.lng, segment.midpoint.lat])
+                    .addTo(map.current)
+                  markers.push(distanceMarker)
+                } catch (error) {
+                  console.warn('Error adding distance label:', error)
+                }
+              })
+
+              // Fit map to all destinations when available
+              if (destinations.length > 0 && map.current) {
+                try {
+                  const bounds = new mapboxgl.default.LngLatBounds()
+                  destinations.forEach((dest) => bounds.extend([dest.lng, dest.lat]))
+                  map.current.fitBounds(bounds, { padding: 56, maxZoom: 10, duration: 0 })
+                } catch (error) {
+                  console.warn('Error fitting map bounds:', error)
+                }
+              }
 
               // Add route line if multiple destinations
               if (destinations.length > 1 && map.current) {
@@ -255,9 +320,10 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                 }
               }
 
-              // Add tour title overlay (only if it doesn't exist)
+              // Add tour title + total distance overlay
               try {
                 if (mapContainer.current && !mapContainer.current.querySelector('.map-title')) {
+                  const totalKm = getTotalRouteKm(destinations)
                   const titleEl = document.createElement('div')
                   titleEl.className = 'map-title'
                   titleEl.innerHTML = `
@@ -272,8 +338,10 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                       font-weight: bold;
                       z-index: 0;
                       backdrop-filter: blur(10px);
+                      max-width: min(280px, calc(100% - 40px));
                     ">
-                      ${tourName}
+                      <div>${tourName}</div>
+                      ${destinations.length > 1 ? `<div style="margin-top:6px;font-size:12px;font-weight:600;color:#d4f06a;">Total route: ${formatDistanceKm(totalKm)}</div>` : ''}
                     </div>
                   `
                   mapContainer.current.appendChild(titleEl)
@@ -317,15 +385,20 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
   }, [lng, lat, zoom, destinations, tourName])
 
   return (
-    <div className="relative w-full h-96 rounded-lg overflow-hidden shadow-lg">
-      <div ref={mapContainer} className="w-full h-full" />
+    <div className="relative w-full h-96 rounded-2xl overflow-hidden shadow-lg">
+      {error ? (
+        <div className="w-full h-full flex items-center justify-center bg-[var(--foam)] border border-black/10 p-6 text-center">
+          <div>
+            <p className="font-semibold text-[var(--ink)] mb-2">Map unavailable</p>
+            <p className="text-sm text-[var(--ink-soft)] max-w-md">{error}</p>
+          </div>
+        </div>
+      ) : (
+        <div ref={mapContainer} className="w-full h-full" />
+      )}
       <style jsx>{`
         .marker {
-          transition: all 0.3s ease;
-        }
-        .marker:hover {
-          transform: scale(1.2);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+          transition: box-shadow 0.3s ease;
         }
       `}</style>
     </div>

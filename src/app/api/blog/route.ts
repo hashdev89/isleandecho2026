@@ -141,6 +141,10 @@ const isSupabaseConfigured = () =>
 // On Vercel the filesystem is read-only; file fallback would not persist. Only use Supabase.
 const isVercel = process.env.VERCEL === '1'
 
+const CACHE_HEADERS = {
+  'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600',
+}
+
 export async function GET() {
   try {
     if (isSupabaseConfigured()) {
@@ -151,17 +155,17 @@ export async function GET() {
 
       if (!error && data && data.length >= 0) {
         const posts = (data as BlogRow[]).map(rowToPost)
-        return NextResponse.json(posts)
+        return NextResponse.json(posts, { headers: CACHE_HEADERS })
       }
       console.error('Supabase blog_posts fetch error:', error)
     }
 
     const fallbackPosts = loadFallbackBlogPosts()
-    return NextResponse.json(fallbackPosts)
+    return NextResponse.json(fallbackPosts, { headers: CACHE_HEADERS })
   } catch (error: unknown) {
     console.error('Blog posts API error:', error)
     const fallbackPosts = loadFallbackBlogPosts()
-    return NextResponse.json(fallbackPosts)
+    return NextResponse.json(fallbackPosts, { headers: CACHE_HEADERS })
   }
 }
 
