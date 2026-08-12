@@ -1,28 +1,9 @@
 import { NextResponse } from 'next/server'
 import { verifyPayHerePayment, mapPayHereStatusToPaymentStatus, PayHereStatus } from '@/lib/payhere'
-import { supabaseAdmin } from '@/lib/supabaseClient'
 import { generateInvoicePDF } from '@/lib/invoiceGenerator'
 import { sendInvoiceEmail, notifyBookingUpdated } from '@/lib/emailService'
 import { getPayHereCredentials, resolveBookingIdFromOrderId } from '@/lib/payhereCheckout'
-import fs from 'fs'
-import path from 'path'
-
-const FALLBACK_FILE = path.join(process.cwd(), 'data', 'bookings.json')
-
-function updateFallbackBooking(bookingId: string, updates: Record<string, unknown>) {
-  try {
-    if (!fs.existsSync(FALLBACK_FILE)) return null
-    const bookings = JSON.parse(fs.readFileSync(FALLBACK_FILE, 'utf8'))
-    const index = bookings.findIndex((b: { id: string }) => b.id === bookingId)
-    if (index === -1) return null
-    bookings[index] = { ...bookings[index], ...updates }
-    fs.writeFileSync(FALLBACK_FILE, JSON.stringify(bookings, null, 2))
-    return bookings[index]
-  } catch (error) {
-    console.error('Fallback booking update failed:', error)
-    return null
-  }
-}
+import { findBookingById, updateBookingById } from '@/lib/bookingsData'
 
 export async function POST(req: Request) {
   try {
@@ -76,30 +57,15 @@ export async function POST(req: Request) {
 
     if (paymentId) updateData.payment_id = paymentId
 
-    let bookingData = null
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const { data: updatedBooking, error } = await supabaseAdmin
-        .from('bookings')
-        .update(updateData)
-        .eq('id', bookingId)
-        .select('*')
-        .single()
-
-      if (error) {
-        console.error('Error updating booking in Supabase:', error)
-      } else {
-        console.log('Booking updated successfully:', bookingId, paymentStatus)
-        bookingData = updatedBooking
-      }
+    let bookingData = await updateBookingById(bookingId, updateData)
+    if (!bookingData) {
+      bookingData = await findBookingById(bookingId)
     }
-
-    const fallbackBooking = updateFallbackBooking(bookingId, updateData)
-    if (!bookingData && fallbackBooking) bookingData = fallbackBooking
 
     if (statusCode === PayHereStatus.SUCCESS && bookingData) {
       try {
         if (!isDeposit) {
-          const invoicePdf = await generateInvoicePDF(bookingData)
+          const invoicePdf = await generateInvoicePDF(bookingData as Parameters<typeof generateInvoicePDF>[0])
           await sendInvoiceEmail(
             bookingData.customer_email,
             bookingData.customer_name,
@@ -112,7 +78,7 @@ export async function POST(req: Request) {
       }
 
       try {
-        await notifyBookingUpdated(bookingData, {
+        await notifyBookingUpdated(bookingData as import('@/lib/emailService').BookingForEmail, {
           status: 'pending',
           payment_status: 'pending',
         })

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { notifyContactMessage } from '@/lib/emailService'
+import { recordInboundEmail } from '@/lib/emailCenter'
 
 const SUBJECT_LABELS: Record<string, string> = {
   general: 'General Inquiry',
@@ -32,6 +33,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    await recordInboundEmail({
+      fromEmail: email,
+      fromName: name,
+      subject: `${SUBJECT_LABELS[subject] || subject} — ${name}`,
+      bodyText: `Phone: ${phone || '—'}\n\n${message}`,
+      bodyHtml: `<p><strong>Phone:</strong> ${phone || '—'}</p><p>${message.replace(/\n/g, '<br>')}</p>`,
+    }).catch((err) => console.error('Inbox record failed:', err))
+
     await notifyContactMessage({
       name,
       email,
@@ -40,15 +49,6 @@ export async function POST(request: NextRequest) {
       subjectLabel: SUBJECT_LABELS[subject] || subject,
       message,
     })
-
-    const { recordInboundEmail } = await import('@/lib/emailCenter')
-    await recordInboundEmail({
-      fromEmail: email,
-      fromName: name,
-      subject: `${SUBJECT_LABELS[subject] || subject} — ${name}`,
-      bodyText: `Phone: ${phone || '—'}\n\n${message}`,
-      bodyHtml: `<p><strong>Phone:</strong> ${phone || '—'}</p><p>${message.replace(/\n/g, '<br>')}</p>`,
-    }).catch((err) => console.error('Inbox record failed:', err))
 
     return NextResponse.json({
       success: true,
