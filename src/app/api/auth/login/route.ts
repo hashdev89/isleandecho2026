@@ -1,10 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseClient'
 import crypto from 'crypto'
+import fs from 'fs'
+import path from 'path'
 
-// Simple password hashing (in production, use bcrypt)
+const USERS_FILE = path.join(process.cwd(), 'data', 'users.json')
+
 const hashPassword = (password: string): string => {
   return crypto.createHash('sha256').update(password).digest('hex')
+}
+
+const isSupabaseConfigured = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  return !!(
+    supabaseUrl &&
+    supabaseKey &&
+    supabaseUrl !== 'https://placeholder.supabase.co' &&
+    supabaseKey !== 'placeholder-service-key' &&
+    supabaseUrl.includes('supabase.co') &&
+    supabaseKey.length > 50
+  )
+}
+
+type LocalUser = {
+  id: string
+  name: string
+  email: string
+  role?: string
+  status?: string
+  passwordHash?: string
+  password_hash?: string
+}
+
+const readUsers = (): LocalUser[] => {
+  try {
+    const dataDir = path.join(process.cwd(), 'data')
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true })
+    }
+    if (fs.existsSync(USERS_FILE)) {
+      const data = fs.readFileSync(USERS_FILE, 'utf8')
+      return JSON.parse(data)
+    }
+  } catch (error) {
+    console.error('Error reading users file:', error)
+  }
+  return []
+}
+
+const writeUsers = (users: LocalUser[]): boolean => {
+  try {
+    const dataDir = path.join(process.cwd(), 'data')
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true })
+    }
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2))
+    return true
+  } catch (error) {
+    console.error('Error writing users file:', error)
+    return false
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -18,21 +74,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if Supabase is configured
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const normalizedEmail = email.toLowerCase().trim()
+    const hashedPassword = hashPassword(password)
 
-    const isSupabaseConfigured = supabaseUrl && 
-                                  supabaseKey && 
-                                  supabaseUrl.includes('supabase.co') && 
-                                  supabaseKey.length > 50
-
-    if (isSupabaseConfigured) {
-      // Find user by email
+    if (isSupabaseConfigured()) {
       const { data: users, error } = await supabaseAdmin
         .from('users')
         .select('id, name, email, role, status, password_hash')
-        .eq('email', email.toLowerCase().trim())
+        .eq('email', normalizedEmail)
         .limit(1)
 
       if (error) {
@@ -52,7 +101,6 @@ export async function POST(request: NextRequest) {
 
       const user = users[0]
 
-      // Check if user is active
       if (user.status !== 'active') {
         return NextResponse.json(
           { success: false, error: 'Account is inactive. Please contact administrator.' },
@@ -60,36 +108,25 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Check password
-      // If user doesn't have a password_hash set, allow login for existing users (migration period)
-      // This allows existing users added via admin panel to login
       if (!user.password_hash) {
-        // For existing users without passwords, allow login with any password
-        // This is a temporary migration solution - users should set passwords via admin panel
         console.log(`User ${user.email} logging in without password_hash (migration mode)`)
-      } else {
-        // User has password - verify it
-        const hashedPassword = hashPassword(password)
-        if (user.password_hash !== hashedPassword) {
-          return NextResponse.json(
-            { success: false, error: 'Invalid email or password' },
-            { status: 401 }
-          )
-        }
+      } else if (user.password_hash !== hashedPassword) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid email or password' },
+          { status: 401 }
+        )
       }
 
-      // Update last login
       await supabaseAdmin
         .from('users')
         .update({ last_login: new Date().toISOString() })
         .eq('id', user.id)
 
-      // Return user data (without password_hash)
       const userData = {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role || 'customer'
+        role: user.role || 'customer',
       }
 
       const role = (user.role || 'customer') as string
@@ -97,28 +134,81 @@ export async function POST(request: NextRequest) {
 
       const response = NextResponse.json({
         success: true,
-        user: userData
+        user: userData,
       })
 
-      // Set HTTP-only cookie so middleware can protect /admin (server-side)
       if (canAccessAdmin) {
         response.cookies.set('admin_session', '1', {
           httpOnly: true,
           path: '/',
           sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 7, // 7 days
-          secure: process.env.NODE_ENV === 'production'
+          maxAge: 60 * 60 * 24 * 7,
+          secure: process.env.NODE_ENV === 'production',
         })
       }
 
       return response
     }
 
-    // Fallback: Return error if Supabase not configured
-    return NextResponse.json(
-      { success: false, error: 'Authentication service not configured' },
-      { status: 500 }
+    // Local fallback when Supabase is not configured
+    const users = readUsers()
+    const user = users.find((u) => u.email?.toLowerCase() === normalizedEmail)
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid email or password' },
+        { status: 401 }
+      )
+    }
+
+    if (user.status && user.status !== 'active') {
+      return NextResponse.json(
+        { success: false, error: 'Account is inactive. Please contact administrator.' },
+        { status: 403 }
+      )
+    }
+
+    const storedHash = user.passwordHash || user.password_hash
+    if (storedHash && storedHash !== hashedPassword) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid email or password' },
+        { status: 401 }
+      )
+    }
+
+    const updatedUsers = users.map((u) =>
+      u.id === user.id
+        ? { ...u, lastLogin: new Date().toISOString() }
+        : u
     )
+    writeUsers(updatedUsers)
+
+    const userData = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role || 'customer',
+    }
+
+    const role = (user.role || 'customer') as string
+    const canAccessAdmin = ['admin', 'staff', 'customer'].includes(role)
+
+    const response = NextResponse.json({
+      success: true,
+      user: userData,
+    })
+
+    if (canAccessAdmin) {
+      response.cookies.set('admin_session', '1', {
+        httpOnly: true,
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7,
+        secure: process.env.NODE_ENV === 'production',
+      })
+    }
+
+    return response
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(
@@ -127,4 +217,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

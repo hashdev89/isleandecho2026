@@ -35,7 +35,7 @@ interface Booking {
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed'
   specialRequests: string
   bookingDate: string
-  paymentStatus: 'pending' | 'paid' | 'refunded'
+  paymentStatus: 'pending' | 'paid' | 'refunded' | 'deposit_paid' | 'failed'
   accommodation: string
   transportation: string
   dietaryRestrictions: string[]
@@ -97,6 +97,9 @@ export default function BookingDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [editedBooking, setEditedBooking] = useState<Booking | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [sendingInvoice, setSendingInvoice] = useState(false)
+  const [invoiceMessage, setInvoiceMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
     const loadBooking = async () => {
@@ -145,6 +148,7 @@ export default function BookingDetailPage() {
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
       case 'paid': return 'text-green-600 bg-green-100'
+      case 'deposit_paid': return 'text-emerald-700 bg-emerald-100'
       case 'pending': return 'text-yellow-600 bg-yellow-100'
       case 'refunded': return 'text-red-600 bg-red-100'
       default: return 'text-gray-600 bg-gray-100'
@@ -155,15 +159,69 @@ export default function BookingDetailPage() {
     setEditedBooking(prev => prev ? { ...prev, status: newStatus } : prev)
   }
 
-  const handleSave = () => {
-    setBooking(editedBooking)
-    setIsEditing(false)
-    // In a real app, you would save to the backend here
+  const handleSave = async () => {
+    if (!editedBooking) return
+    setSaving(true)
+    try {
+      const response = await fetch(`/api/bookings/${editedBooking.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: editedBooking.status,
+          payment_status: editedBooking.paymentStatus,
+          customer_name: editedBooking.customerName,
+          customer_email: editedBooking.customerEmail,
+          customer_phone: editedBooking.customerPhone,
+          start_date: editedBooking.startDate,
+          end_date: editedBooking.endDate,
+          guests: editedBooking.guests,
+          total_price: editedBooking.totalPrice,
+          special_requests: editedBooking.specialRequests,
+          tour_package_name: editedBooking.tourPackageName,
+        }),
+      })
+      const result = await response.json()
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update booking')
+      }
+      setBooking(editedBooking)
+      setIsEditing(false)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to save booking')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleCancel = () => {
     setEditedBooking(booking)
     setIsEditing(false)
+  }
+
+  const sendDepositInvoice = async (confirmTour: boolean) => {
+    if (!booking) return
+    setSendingInvoice(true)
+    setInvoiceMessage(null)
+    try {
+      const response = await fetch(`/api/invoices/${booking.id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: confirmTour, depositPercent: 50 }),
+      })
+      const result = await response.json()
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to send invoice')
+      }
+      if (confirmTour) {
+        setBooking((prev) => (prev ? { ...prev, status: 'confirmed' } : prev))
+        setEditedBooking((prev) => (prev ? { ...prev, status: 'confirmed' } : prev))
+      }
+      setInvoiceMessage({ type: 'success', text: result.message || 'Invoice emailed to the customer.' })
+    } catch (err) {
+      setInvoiceMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to send invoice' })
+    } finally {
+      setSendingInvoice(false)
+    }
   }
 
   const calculateDuration = () => {
@@ -219,7 +277,7 @@ export default function BookingDetailPage() {
             Back to Bookings
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Booking #{booking.id}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Order #{booking.id}</h1>
             <p className="text-gray-600">{booking.tourPackageName}</p>
           </div>
         </div>
@@ -238,9 +296,44 @@ export default function BookingDetailPage() {
             <Download className="w-4 h-4 mr-2" />
             Download Invoice
           </button>
-          <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <button
+            type="button"
+            onClick={() => sendDepositInvoice(false)}
+            disabled={sendingInvoice}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-70"
+          >
             <Send className="w-4 h-4 mr-2" />
-            Send Email
+            {sendingInvoice ? 'Sending…' : 'Send invoice + PayHere link'}
+          </button>
+        </div>
+      </div>
+
+      {invoiceMessage && (
+        <div className={`rounded-lg px-4 py-3 text-sm border ${
+          invoiceMessage.type === 'success'
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            : 'bg-red-50 border-red-200 text-red-700'
+        }`}>
+          {invoiceMessage.text}
+        </div>
+      )}
+
+      <div className="bg-white p-6 rounded-lg shadow">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Confirm tour & send PayHere link</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Confirms the booking and emails the customer a summary invoice plus a secure PayHere link to pay 50% now. The remaining 50% is due before travel.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => sendDepositInvoice(true)}
+            disabled={sendingInvoice}
+            className="inline-flex items-center justify-center px-5 py-2.5 bg-[var(--lagoon-deep)] text-white rounded-lg hover:bg-[var(--lagoon)] transition-colors disabled:opacity-70 font-semibold"
+          >
+            <CheckCircle className="w-4 h-4 mr-2" />
+            {sendingInvoice ? 'Sending…' : 'Confirm & email PayHere invoice'}
           </button>
         </div>
       </div>
@@ -262,10 +355,11 @@ export default function BookingDetailPage() {
               <>
                 <button
                   onClick={handleSave}
-                  className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  disabled={saving}
+                  className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-70"
                 >
                   <Save className="w-4 h-4 mr-2" />
-                  Save
+                  {saving ? 'Saving…' : 'Save'}
                 </button>
                 <button
                   onClick={handleCancel}
@@ -388,6 +482,24 @@ export default function BookingDetailPage() {
                 >
                   {getStatusIcon(status)}
                   <span className="ml-2 capitalize">{status}</span>
+                </button>
+              ))}
+            </div>
+            <h4 className="text-sm font-semibold text-gray-900 mt-5 mb-2">Payment</h4>
+            <div className="space-y-2">
+              {(['pending', 'deposit_paid', 'paid', 'refunded'] as const).map((payment) => (
+                <button
+                  key={payment}
+                  type="button"
+                  onClick={() => setEditedBooking(prev => prev ? { ...prev, paymentStatus: payment as Booking['paymentStatus'] } : prev)}
+                  disabled={!isEditing}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
+                    editedBooking?.paymentStatus === payment
+                      ? 'bg-blue-100 text-blue-900'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  } ${!isEditing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {payment.replace('_', ' ')}
                 </button>
               ))}
             </div>

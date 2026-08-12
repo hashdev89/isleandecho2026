@@ -74,7 +74,17 @@ export async function GET() {
     
     if (!isSupabaseConfigured) {
       const fallbackTours = loadFallbackTours()
-      const featured = fallbackTours.filter(t => t.featured === true)
+      // Match production: featured+active, then recent active, then any featured/local tours
+      let featured = fallbackTours.filter(t => t.featured === true && t.status === 'active')
+      if (featured.length === 0) {
+        featured = fallbackTours.filter(t => t.status === 'active').slice(0, 8)
+      }
+      if (featured.length === 0) {
+        featured = fallbackTours.filter(t => t.featured === true)
+      }
+      if (featured.length === 0) {
+        featured = fallbackTours.slice(0, 8)
+      }
       if (featured.length > 0) {
         featuredToursCache = featured
         cacheTimestamp = now

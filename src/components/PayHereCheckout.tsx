@@ -14,6 +14,7 @@ interface PayHereCheckoutProps {
   customerCity: string
   customerCountry?: string
   tourName: string
+  purpose?: 'full' | 'deposit'
   onSuccess?: () => void
   onError?: (error: string) => void
 }
@@ -29,6 +30,7 @@ export default function PayHereCheckout({
   customerCity,
   customerCountry = 'Sri Lanka',
   tourName,
+  purpose = 'full',
   onSuccess,
   onError
 }: PayHereCheckoutProps) {
@@ -54,7 +56,8 @@ export default function PayHereCheckout({
           customerAddress,
           customerCity,
           customerCountry,
-          tourName
+          tourName,
+          purpose,
         })
       })
 
@@ -118,7 +121,7 @@ export default function PayHereCheckout({
               target.style.display = 'none'
             }}
           />
-          <span>Pay with PayHere</span>
+          <span>{purpose === 'deposit' ? 'Pay 50% with PayHere' : 'Pay with PayHere'}</span>
         </>
       )}
     </button>

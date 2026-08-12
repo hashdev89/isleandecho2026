@@ -213,25 +213,28 @@ export async function POST(request: NextRequest) {
 
     if (isCustomerMessage && conversation) {
       // Get existing messages to check if this is the first customer message
-      let existingMessages: any[] = []
+      let existingCustomerMessages: any[] = []
+      let existingAllMessages: any[] = []
       
       if (isSupabaseConfigured) {
         const { data: messages } = await supabaseAdmin
           .from('messages')
           .select('*')
           .eq('conversation_id', conversation_id)
-          .eq('sender_role', 'customer')
         
-        if (messages) existingMessages = messages
+        if (messages) {
+          existingAllMessages = messages
+          existingCustomerMessages = messages.filter((msg: any) => msg.sender_role === 'customer')
+        }
       } else {
         const fileMessages = loadMessagesFromFile()
-        existingMessages = fileMessages.filter((msg: any) => 
-          msg.conversation_id === conversation_id && msg.sender_role === 'customer'
-        )
+        existingAllMessages = fileMessages.filter((msg: any) => msg.conversation_id === conversation_id)
+        existingCustomerMessages = existingAllMessages.filter((msg: any) => msg.sender_role === 'customer')
       }
 
-      // If this is the first customer message, send welcome message
-      if (existingMessages.length === 0) {
+      // Only auto-welcome when the conversation has no prior messages at all
+      // (guided chat may already have posted a greeting / mode choice)
+      if (existingCustomerMessages.length === 0 && existingAllMessages.length === 0) {
         shouldSendWelcome = true
         console.log('First customer message detected - will send welcome message')
       }
@@ -356,7 +359,7 @@ export async function POST(request: NextRequest) {
             sender_id: null,
             sender_name: 'ISLE & ECHO',
             sender_role: 'admin',
-            content: 'Thanks for Contacting Isle & Echo for Easy Assistance! Can I know your good name first?',
+            content: 'Thanks for contacting ISLE & ECHO! Would you like our chatbot assistant or a live agent? Please reply or reopen chat options.',
             message_type: 'text',
             created_at: new Date().toISOString()
           }
@@ -409,7 +412,7 @@ export async function POST(request: NextRequest) {
           sender_id: null,
           sender_name: 'ISLE & ECHO',
           sender_role: 'admin',
-          content: 'Thanks for Contacting Isle & Echo for Easy Assistance! Can I know your good name first?',
+          content: 'Thanks for contacting ISLE & ECHO! Would you like our chatbot assistant or a live agent? Please reply or reopen chat options.',
           message_type: 'text',
           created_at: new Date().toISOString()
         }

@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sync:tours": "node scripts/sync-data-from-live.mjs",
+    "sync:data": "node scripts/sync-data-from-live.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",
@@ -20,6 +22,7 @@
     "pdfmake": "^0.2.21",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "resend": "^6.19.0",
     "sharp": "^0.34.4",
     "uuid": "^13.0.0"
   },
@@ -30,7 +33,7 @@
     "@types/pdfkit": "^0.17.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "baseline-browser-mapping": "^2.9.19",
+    "baseline-browser-mapping": "^2.11.13",
     "eslint": "^9",
     "eslint-config-next": "^16.0.10",
     "tailwindcss": "^4",

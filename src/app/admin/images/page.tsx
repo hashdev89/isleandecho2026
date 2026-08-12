@@ -641,7 +641,7 @@ export default function ImagesManagement() {
                         loading="lazy"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
-                          target.src = '/placeholder-image.png'; // Fallback image
+                          target.src = '/placeholder-image.svg';
                           target.alt = 'Image not found';
                         }}
                       />

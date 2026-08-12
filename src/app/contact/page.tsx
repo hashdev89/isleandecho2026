@@ -11,21 +11,26 @@ import {
   Globe
 } from 'lucide-react'
 import Header from '../../components/Header'
+import { CmsPageHero } from '../../components/CmsPageSections'
+import { useCmsPage } from '@/hooks/useSiteContent'
+import { getSection, isSectionEnabled } from '@/lib/siteContent'
 
-// Dynamically import ContactMap to reduce initial bundle size
 const ContactMap = dynamic(() => import('../../components/ContactMap'), {
   ssr: false,
   loading: () => (
-    <div className="bg-gray-200 rounded-lg h-96 flex items-center justify-center">
+    <div className="bg-[var(--foam)] rounded-2xl h-96 flex items-center justify-center border border-black/5">
       <div className="text-center">
-        <Globe className="w-12 h-12 text-gray-400 mx-auto mb-4 animate-pulse" />
-        <p className="text-gray-600">Loading map...</p>
+        <Globe className="w-12 h-12 text-[var(--lagoon)] mx-auto mb-4 animate-pulse" />
+        <p className="text-[var(--ink-soft)]">Loading map...</p>
       </div>
     </div>
   )
 })
 
 export default function ContactPage() {
+  const { page } = useCmsPage('/contact')
+  const info = getSection(page, 'contactInfo') || {}
+  const formIntro = getSection(page, 'contactForm') || {}
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -33,11 +38,33 @@ export default function ContactPage() {
     subject: '',
     message: ''
   })
+  const [submitting, setSubmitting] = useState(false)
+  const [formStatus, setFormStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle form submission here
-    console.log('Form submitted:', formData)
+    setSubmitting(true)
+    setFormStatus(null)
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      const result = await response.json()
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Could not send your message')
+      }
+      setFormStatus({ type: 'success', message: 'Thank you. Your message is on its way — we will reply shortly.' })
+      setFormData({ name: '', email: '', phone: '', subject: '', message: '' })
+    } catch (error) {
+      setFormStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Could not send your message. Please try again or email us directly.',
+      })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -50,99 +77,90 @@ export default function ContactPage() {
   const contactInfo = [
     {
       icon: <MapPin className="w-6 h-6" />,
-      title: 'Visit Us',
-      details: '55/A, Kulupana, Pokunuwita, Sri Lanka',
-     
+      title: String(info.addressTitle || 'Visit Us'),
+      details: String(info.address || '55/A, Kulupana, Pokunuwita, Sri Lanka'),
     },
     {
       icon: <Phone className="w-6 h-6" />,
-      title: 'Call Us',
-      details: '+94 741 415 812',
- 
+      title: String(info.phoneTitle || 'Call Us'),
+      details: String(info.phone || '+94 741 415 812'),
     },
     {
       icon: <Mail className="w-6 h-6" />,
-      title: 'Email Us',
-      details: 'info@isleandecho.com',
-
+      title: String(info.emailTitle || 'Email Us'),
+      details: String(info.email || 'info@isleandecho.com'),
     },
     {
       icon: <Clock className="w-6 h-6" />,
-      title: 'Business Hours',
-      details: 'Mon - Fri: 9:00 AM - 6:00 PM',
-      description: 'Saturday: 9:00 AM - 2:00 PM'
-    }
+      title: String(info.hoursTitle || 'Business Hours'),
+      details: String(info.hours || 'Mon - Fri: 9:00 AM - 6:00 PM'),
+    },
   ]
 
-  const officeLocations = [
-    {
-      city: 'Colombo',
-      address: '123 Travel Street, Colombo 01',
-      phone: '+94 11 234 5678',
-      email: 'colombo@isleandecho.com',
-      hours: 'Mon-Fri: 9AM-6PM'
-    },
-    {
-      city: 'Kandy',
-      address: '456 Hill Street, Kandy',
-      phone: '+94 81 234 5678',
-      email: 'kandy@isleandecho.com',
-      hours: 'Mon-Fri: 9AM-5PM'
-    },
-    {
-      city: 'Galle',
-      address: '789 Fort Road, Galle',
-      phone: '+94 91 234 5678',
-      email: 'galle@isleandecho.com',
-      hours: 'Mon-Fri: 9AM-5PM'
-    }
-  ]
+  const inputClass =
+    'w-full px-4 py-3 border border-black/10 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent bg-[var(--foam)] text-[var(--ink)] placeholder-[var(--ink-soft)]'
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--foam)] lp-section-ink">
       <Header />
       
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-12 sm:py-16 md:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-2">Get in Touch</h1>
-          <p className="text-base sm:text-lg md:text-xl max-w-3xl mx-auto opacity-90 px-2">
-            Have questions about your Sri Lanka adventure? We&apos;re here to help you plan the perfect trip.
-          </p>
-        </div>
-      </section>
+      <CmsPageHero
+        page={page}
+        fallback={{
+          kicker: 'Say hello',
+          title: 'Get in touch',
+          subtitle: "Have questions about your Sri Lanka adventure? We're here to help you plan the perfect trip.",
+        }}
+      />
 
-      {/* Contact Information */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {contactInfo.map((info, index) => (
-              <div key={index} className="text-center">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <div className="text-blue-600">
-                    {info.icon}
+      {isSectionEnabled(page, 'contactInfo') !== false && (
+      <section className="py-12 sm:py-16 bg-white/70">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {contactInfo.map((item, index) => (
+              <div key={index} className="lp-panel p-6 text-center">
+                <div className="w-14 h-14 bg-[var(--lagoon)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="text-[var(--lagoon)]">
+                    {item.icon}
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold mb-2 text-gray-900">{info.title}</h3>
-                <p className="text-blue-600 font-medium mb-2">{info.details}</p>
-                <p className="text-gray-600 text-sm">{info.description}</p>
+                <h3 className="text-lg font-semibold mb-2 text-[var(--ink)]">{item.title}</h3>
+                <p className="text-[var(--lagoon)] font-semibold mb-2">{item.details}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
+      )}
 
-      {/* Contact Form and Map */}
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Contact Form */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Send us a Message</h2>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <section className="lp-section-ink py-12 sm:py-16">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+            <div className="lp-panel p-6 sm:p-8">
+              <p className="lp-kicker mb-2">Message</p>
+              <h2 className="lp-section-title text-2xl sm:text-3xl mb-2">
+                {String(formIntro.title || 'Send us a message')}
+              </h2>
+              {formIntro.subtitle ? (
+                <p className="mb-6 text-sm text-[var(--ink-soft)]">{String(formIntro.subtitle)}</p>
+              ) : (
+                <div className="mb-6" />
+              )}
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {formStatus && (
+                  <div
+                    className={`rounded-xl px-4 py-3 text-sm ${
+                      formStatus.type === 'success'
+                        ? 'bg-[var(--sun)]/40 text-[var(--lagoon-deep)]'
+                        : 'bg-red-50 text-red-700'
+                    }`}
+                  >
+                    {formStatus.message}
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="name" className="block text-sm font-semibold text-[var(--ink)] mb-2">
                       Full Name *
                     </label>
                     <input
@@ -152,12 +170,12 @@ export default function ContactPage() {
                       value={formData.name}
                       onChange={handleChange}
                       required
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                      className={inputClass}
                       placeholder="Your full name"
                     />
                   </div>
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="email" className="block text-sm font-semibold text-[var(--ink)] mb-2">
                       Email Address *
                     </label>
                     <input
@@ -167,15 +185,15 @@ export default function ContactPage() {
                       value={formData.email}
                       onChange={handleChange}
                       required
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                      className={inputClass}
                       placeholder="Your email"
                     />
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="phone" className="block text-sm font-semibold text-[var(--ink)] mb-2">
                       Phone Number
                     </label>
                     <input
@@ -184,12 +202,12 @@ export default function ContactPage() {
                       name="phone"
                       value={formData.phone}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                      className={inputClass}
                       placeholder="Your phone number"
                     />
                   </div>
                   <div>
-                    <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="subject" className="block text-sm font-semibold text-[var(--ink)] mb-2">
                       Subject *
                     </label>
                     <select
@@ -198,7 +216,7 @@ export default function ContactPage() {
                       value={formData.subject}
                       onChange={handleChange}
                       required
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      className={inputClass}
                     >
                       <option value="">Select a subject</option>
                       <option value="general">General Inquiry</option>
@@ -211,7 +229,7 @@ export default function ContactPage() {
                 </div>
                 
                 <div>
-                  <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="message" className="block text-sm font-semibold text-[var(--ink)] mb-2">
                     Message *
                   </label>
                   <textarea
@@ -221,34 +239,35 @@ export default function ContactPage() {
                     onChange={handleChange}
                     required
                     rows={6}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                    className={inputClass}
                     placeholder="Tell us about your travel plans or any questions you have..."
                   />
                 </div>
                 
                 <button
                   type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2"
+                  disabled={submitting}
+                  className="w-full bg-[var(--lagoon-deep)] hover:bg-[var(--lagoon)] disabled:opacity-70 text-white py-3.5 px-6 rounded-full font-bold transition-colors flex items-center justify-center space-x-2 min-h-[44px]"
                 >
                   <Send className="w-5 h-5" />
-                  <span>Send Message</span>
+                  <span>{submitting ? 'Sending…' : String(formIntro.buttonText || 'Send Message')}</span>
                 </button>
               </form>
             </div>
 
-            {/* Map and Office Locations */}
             <div className="space-y-8">
-              {/* Mapbox Map */}
-              <div className="bg-white rounded-xl shadow-lg p-8">
-                <h2 className="text-2xl font-bold mb-6 text-gray-900">Our Location</h2>
+              <div className="lp-panel p-6 sm:p-8">
+                <p className="lp-kicker mb-2">Find us</p>
+                <h2 className="lp-section-title text-2xl sm:text-3xl mb-6">Our location</h2>
                 <ContactMap
                   lat={6.72603}
                   lng={80.03396}
-                  address="55/A, Kulupana, Pokunuwita, Sri Lanka"
+                  address={String(info.address || '55/A, Kulupana, Pokunuwita, Sri Lanka')}
                 />
                 <div className="mt-4 text-center">
-                  <p className="text-gray-600 font-medium">55/A, Kulupana, Pokunuwita, Sri Lanka</p>
-              
+                  <p className="text-[var(--ink-soft)] font-medium">
+                    {String(info.address || '55/A, Kulupana, Pokunuwita, Sri Lanka')}
+                  </p>
                 </div>
               </div>
             </div>
@@ -256,11 +275,13 @@ export default function ContactPage() {
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="py-16 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold mb-8 text-center text-gray-900">Frequently Asked Questions</h2>
-          <div className="space-y-6">
+      <section className="py-12 sm:py-16 bg-white/70">
+        <div className="max-w-4xl mx-auto lp-gutter">
+          <div className="text-center mb-8">
+            <p className="lp-kicker mb-2">Help</p>
+            <h2 className="lp-section-title text-3xl">Frequently asked questions</h2>
+          </div>
+          <div className="space-y-4">
             {[
               {
                 question: "How far in advance should I book my tour?",
@@ -279,9 +300,9 @@ export default function ContactPage() {
                 answer: "Pack lightweight, breathable clothing, comfortable walking shoes, sunscreen, insect repellent, and a hat. For temple visits, bring modest clothing that covers shoulders and knees."
               }
             ].map((faq, index) => (
-              <div key={index} className="bg-gray-50 rounded-lg p-6">
-                <h3 className="font-semibold text-lg text-gray-900 mb-2">{faq.question}</h3>
-                <p className="text-gray-600">{faq.answer}</p>
+              <div key={index} className="lp-panel p-5 sm:p-6">
+                <h3 className="font-semibold text-lg text-[var(--ink)] mb-2">{faq.question}</h3>
+                <p className="text-[var(--ink-soft)] leading-relaxed">{faq.answer}</p>
               </div>
             ))}
           </div>

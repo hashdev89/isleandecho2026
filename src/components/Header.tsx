@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Menu,
   X,
@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useMobileMenu } from '../contexts/MobileMenuContext'
 import AuthModal from './AuthModal'
 import { getGoogleTranslateLanguage, setGoogleTranslateLanguage } from './GoogleTranslate'
+import { useClickOutside } from '../hooks/useClickOutside'
 
 
 export default function Header() {
@@ -25,6 +26,7 @@ export default function Header() {
   const [activeDropdown, setActiveDropdown] = useState('')
   const [selectedLanguage, setSelectedLanguage] = useState('EN')
   const [selectedCurrency, setSelectedCurrency] = useState('USD')
+  const headerRef = useRef<HTMLElement>(null)
 
   // Sync language with Google Translate cookie on load
   useEffect(() => {
@@ -35,8 +37,15 @@ export default function Header() {
   
   const { user, logout } = useAuth()
 
+  const closeMenus = useCallback(() => {
+    setActiveDropdown('')
+    setIsMenuOpen(false)
+  }, [setIsMenuOpen])
+
+  useClickOutside(headerRef, Boolean(activeDropdown) || isMenuOpen, closeMenus)
+
   const toggleDropdown = (dropdown: string) => {
-    setActiveDropdown(activeDropdown === dropdown ? '' : dropdown)
+    setActiveDropdown((current) => (current === dropdown ? '' : dropdown))
   }
 
   const handleLogout = () => {
@@ -87,7 +96,7 @@ export default function Header() {
       try {
         // Use featured endpoint instead of fetching all tours
         const res = await fetch('/api/tours/featured', {
-          next: { revalidate: 300 } // Cache for 5 minutes
+          cache: 'force-cache',
         })
         const json = await res.json()
         if (json.success && json.data) {
@@ -116,12 +125,15 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-[100] transition-all duration-500 bg-white/80 dark:bg-gray-900/80 backdrop-blur-2xl shadow-lg border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
+      <header
+        ref={headerRef}
+        className="sticky top-0 z-[100] transition-all duration-500 lp-nav-glass shadow-[0_8px_30px_rgba(11,61,74,0.08)] border-b border-white/40 dark:border-white/10"
+      >
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
+          <div className="flex justify-between items-center h-[4.5rem]">
             {/* Logo Section */}
             <div className="flex items-center space-x-4">
-              <Link href="/" className="flex items-center space-x-4">
+              <Link href="/" className="flex items-center space-x-3 group">
                 {/* Logo Image */}
                 <div className="relative">
                   <Image
@@ -129,42 +141,47 @@ export default function Header() {
                     alt="ISLE & ECHO"
                     width={48}
                     height={48}
-                    className="w-12 h-12 object-contain"
+                    className="w-11 h-11 object-contain transition-transform duration-500 group-hover:scale-105"
                   />
                 </div>
                 {/* Logo Text */}
                 <div className="hidden md:block">
-                  <div className="text-[#1E3A8A] dark:text-blue-400 font-bold text-xl tracking-wide">ISLE & ECHO</div>
-                  <div className="text-gray-600 dark:text-white text-xs font-light">Feel the Isle, Hear The Echo</div>
+                  <div className="font-display text-[1.35rem] font-semibold tracking-tight text-[var(--lagoon-deep)] dark:text-[var(--lagoon)] leading-none">ISLE & ECHO</div>
+                  <div className="text-[var(--ink-soft)] text-[0.65rem] font-medium tracking-[0.12em] uppercase mt-1">Feel the Isle, Hear The Echo</div>
                 </div>
               </Link>
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden lg:flex items-center space-x-8">
+            <nav className="hidden min-[1400px]:flex items-center space-x-1">
               {navigation.map((item) => (
                 item.name !== 'Tour Package' ? (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 transition-all duration-300 font-medium relative group"
+                    className="px-3 py-2 text-[0.92rem] font-medium text-[var(--ink)] dark:text-gray-100 hover:text-[var(--lagoon)] transition-colors relative after:absolute after:left-3 after:right-3 after:-bottom-0.5 after:h-0.5 after:origin-left after:scale-x-0 after:bg-[var(--sun)] after:transition-transform hover:after:scale-x-100"
                   >
                     {item.name}
                   </Link>
                 ) : (
                   <div key={item.name} className="relative">
                     <button
-                      onClick={() => toggleDropdown('tours')}
-                      className="flex items-center space-x-1 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 transition-all duration-300 font-medium"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleDropdown('tours')
+                      }}
+                      className="flex items-center space-x-1 px-3 py-2 text-[0.92rem] font-medium text-[var(--ink)] dark:text-gray-100 hover:text-[var(--lagoon)] transition-colors"
+                      aria-expanded={activeDropdown === 'tours'}
                     >
                       <span>Tour Package</span>
                       <ChevronDown className="w-4 h-4" />
                     </button>
                     {activeDropdown === 'tours' && (
-                      <div className="absolute left-0 mt-2 w-64 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl py-2 z-10 border border-white/20 dark:border-gray-700/20">
+                      <div className="absolute left-0 mt-3 w-72 lp-nav-glass rounded-2xl shadow-2xl py-2 z-10">
                         <Link
                           href="/tours"
-                          className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-white transition-all duration-200 rounded-lg mx-2 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
+                          className="block px-4 py-2.5 text-sm text-[var(--ink)] dark:text-gray-200 hover:bg-[var(--lagoon)] hover:text-white transition-all duration-200 rounded-xl mx-2"
                           onClick={() => setActiveDropdown('')}
                         >
                           All Tour Packages
@@ -173,7 +190,7 @@ export default function Header() {
                           <Link
                             key={t.id}
                             href={`/tours/${t.id}`}
-                            className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-white transition-all duration-200 rounded-lg mx-2 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
+                            className="block px-4 py-2.5 text-sm text-[var(--ink-soft)] dark:text-gray-300 hover:bg-[var(--lagoon)] hover:text-white transition-all duration-200 rounded-xl mx-2"
                             onClick={() => setActiveDropdown('')}
                           >
                             {t.name} {t.duration ? `– ${t.duration}` : ''}
@@ -187,12 +204,17 @@ export default function Header() {
             </nav>
 
                                {/* Desktop Utility Buttons */}
-                   <div className="hidden lg:flex items-center space-x-4">
+                   <div className="hidden min-[1400px]:flex items-center space-x-4">
               {/* Language Selector */}
               <div className="relative">
                 <button
-                  onClick={() => toggleDropdown('language')}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleDropdown('language')
+                  }}
                   className="flex items-center space-x-2 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 transition-all duration-300 rounded-full px-3 py-2 hover:bg-blue-50 dark:hover:bg-gray-700 backdrop-blur-sm font-medium"
+                  aria-expanded={activeDropdown === 'language'}
                 >
                   <Globe className="w-4 h-4" />
                   <span className="text-sm font-medium">{selectedLanguage}</span>
@@ -205,6 +227,7 @@ export default function Header() {
                         key={language.code}
                         onClick={() => {
                           setActiveDropdown('')
+                          setSelectedLanguage(language.code)
                           setGoogleTranslateLanguage(language.code)
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-white transition-all duration-200 rounded-lg mx-1 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
@@ -219,8 +242,13 @@ export default function Header() {
               {/* Currency Selector */}
               <div className="relative">
                 <button
-                  onClick={() => toggleDropdown('currency')}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleDropdown('currency')
+                  }}
                   className="flex items-center space-x-2 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 transition-all duration-300 rounded-full px-3 py-2 hover:bg-blue-50 dark:hover:bg-gray-700 backdrop-blur-sm font-medium"
+                  aria-expanded={activeDropdown === 'currency'}
                 >
                   <DollarSign className="w-4 h-4" />
                   <span className="text-sm font-medium">{selectedCurrency}</span>
@@ -248,8 +276,13 @@ export default function Header() {
               {user ? (
                 <div className="relative">
                   <button
-                    onClick={() => toggleDropdown('user')}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleDropdown('user')
+                    }}
                     className="flex items-center space-x-2 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 transition-all duration-300 rounded-full px-3 py-2 hover:bg-blue-50 dark:hover:bg-gray-700 backdrop-blur-sm font-medium"
+                    aria-expanded={activeDropdown === 'user'}
                   >
                     <User className="w-4 h-4" />
                     <span className="text-sm font-medium">{user.name}</span>
@@ -285,7 +318,7 @@ export default function Header() {
                       setAuthModalTab('register')
                       setIsAuthModalOpen(true)
                     }}
-                    className="bg-[#1E3A8A] hover:bg-[#1E3A8A]/90 text-white px-6 py-2 rounded-full font-medium transition-all duration-300 shadow-lg hover:shadow-xl backdrop-blur-sm min-h-[44px] touch-manipulation"
+                    className="bg-[var(--lagoon-deep)] hover:bg-[var(--lagoon)] text-white px-6 py-2.5 rounded-full font-semibold transition-all duration-300 shadow-lg hover:shadow-xl backdrop-blur-sm min-h-[44px] touch-manipulation"
                   >
                     Register
                   </button>
@@ -294,11 +327,17 @@ export default function Header() {
             </div>
 
             {/* Mobile menu button */}
-            <div className="lg:hidden">
+            <div className="min-[1400px]:hidden">
               <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActiveDropdown('')
+                  setIsMenuOpen(!isMenuOpen)
+                }}
                 className="text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 active:text-[#1E3A8A] transition-all duration-300 rounded-full p-2.5 hover:bg-blue-50 dark:hover:bg-gray-700 backdrop-blur-sm font-medium min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation"
                 aria-label="Toggle menu"
+                aria-expanded={isMenuOpen}
               >
                 {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
@@ -307,7 +346,7 @@ export default function Header() {
 
           {/* Mobile Navigation */}
           {isMenuOpen && (
-            <div className="lg:hidden bg-white/90 dark:bg-gray-900/90 backdrop-blur-2xl border-t border-gray-200 dark:border-gray-700 shadow-lg">
+            <div className="min-[1400px]:hidden lp-nav-glass border-t border-gray-200 dark:border-gray-700 shadow-lg">
               <div className="px-2 pt-2 pb-3 space-y-1">
                 {navigation.map((item) => (
                   <Link

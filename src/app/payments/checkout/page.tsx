@@ -2,7 +2,8 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import Link from 'next/link'
+import { CheckCircle2, Clock, Loader2 } from 'lucide-react'
 import Header from '../../../components/Header'
 import PayHereCheckout from '../../../components/PayHereCheckout'
 
@@ -12,6 +13,9 @@ function CheckoutContent() {
   const [booking, setBooking] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [payLaterLoading, setPayLaterLoading] = useState(false)
+  const [payLaterDone, setPayLaterDone] = useState(false)
+  const [payLaterError, setPayLaterError] = useState<string | null>(null)
 
   useEffect(() => {
     if (bookingId) {
@@ -29,6 +33,9 @@ function CheckoutContent() {
       
       if (result.success) {
         setBooking(result.data)
+        if (result.data?.payment_method === 'pay_later') {
+          setPayLaterDone(true)
+        }
       } else {
         setError('Booking not found')
       }
@@ -55,7 +62,7 @@ function CheckoutContent() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="max-w-2xl mx-auto px-4 py-16">
+        <div className="max-w-2xl mx-auto lp-gutter py-16">
           <div className="bg-white rounded-xl shadow-lg p-8 text-center">
             <p className="text-red-600">{error || 'Booking not found'}</p>
           </div>
@@ -64,15 +71,65 @@ function CheckoutContent() {
     )
   }
 
-  // Parse customer name for first/last name
-  const nameParts = booking.customer_name.split(' ')
-  const firstName = nameParts[0] || booking.customer_name
-  const lastName = nameParts.slice(1).join(' ') || ''
+  const handlePayLater = async () => {
+    setPayLaterLoading(true)
+    setPayLaterError(null)
+    try {
+      const response = await fetch('/api/payments/pay-later', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: booking.id }),
+      })
+      const result = await response.json()
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Could not save pay later option')
+      }
+      setBooking(result.data)
+      setPayLaterDone(true)
+    } catch (err) {
+      setPayLaterError(err instanceof Error ? err.message : 'Could not save pay later option')
+    } finally {
+      setPayLaterLoading(false)
+    }
+  }
+
+  const depositDue = Math.round((Number(booking.total_price) || 0) * 0.5 * 100) / 100
+  const formatLkr = (amount: number) =>
+    `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+  if (payLaterDone) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="max-w-2xl mx-auto lp-gutter py-16">
+          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+            <CheckCircle2 className="w-14 h-14 text-[var(--lagoon)] mx-auto mb-4" />
+            <h1 className="text-3xl font-bold text-gray-900 mb-3">Pay after selected</h1>
+            <p className="text-gray-600 mb-6">
+              Thank you, {booking.customer_name}. We have emailed you and our team. When your tour is confirmed, you will receive an invoice to pay <strong>50%</strong> ({formatLkr(depositDue)}) to secure the booking.
+            </p>
+            <div className="bg-gray-50 rounded-lg p-4 text-sm text-left mb-6">
+              <p><strong>Booking:</strong> {booking.id}</p>
+              <p><strong>Package:</strong> {booking.tour_package_name}</p>
+              <p><strong>Total:</strong> {formatLkr(Number(booking.total_price) || 0)}</p>
+              <p><strong>Due on confirmation:</strong> {formatLkr(depositDue)}</p>
+            </div>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-[var(--lagoon-deep)] text-white font-semibold hover:bg-[var(--lagoon)]"
+            >
+              Back to home
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <div className="max-w-3xl mx-auto px-4 py-16">
+      <div className="max-w-3xl mx-auto lp-gutter py-16">
         <div className="bg-white rounded-xl shadow-lg p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-6">Complete Your Payment</h1>
           
@@ -113,7 +170,11 @@ function CheckoutContent() {
               </div>
               <div className="flex justify-between text-lg font-bold pt-2 border-t">
                 <span className="text-gray-900">Total Amount:</span>
-                <span className="text-blue-600">LKR {booking.total_price?.toFixed(2)}</span>
+                <span className="text-blue-600">{formatLkr(Number(booking.total_price) || 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm pt-1">
+                <span className="text-gray-600">50% to confirm later:</span>
+                <span className="font-semibold text-[var(--lagoon-deep)]">{formatLkr(depositDue)}</span>
               </div>
             </div>
           </div>
@@ -179,9 +240,30 @@ function CheckoutContent() {
               />
             </div>
             
-            <p className="text-xs text-gray-500 text-center">
+            <p className="text-xs text-gray-500 text-center mb-6">
               You will be redirected to PayHere secure payment gateway to complete your payment.
             </p>
+
+            <div className="border-2 border-dashed border-[var(--lagoon)]/30 rounded-lg p-6 bg-[var(--foam)]">
+              <div className="flex items-start gap-3 mb-4">
+                <Clock className="w-6 h-6 text-[var(--lagoon)] shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Pay after</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Confirm the request now and pay later. We will email you and our team. When the tour is confirmed, you will receive an invoice to pay <strong>50%</strong> ({formatLkr(depositDue)}) to secure the booking. The balance is due before travel.
+                  </p>
+                </div>
+              </div>
+              {payLaterError && <p className="text-sm text-red-600 mb-3">{payLaterError}</p>}
+              <button
+                type="button"
+                onClick={handlePayLater}
+                disabled={payLaterLoading}
+                className="w-full min-h-[48px] rounded-full bg-white border-2 border-[var(--lagoon-deep)] text-[var(--lagoon-deep)] font-bold hover:bg-[var(--lagoon-deep)] hover:text-white transition-colors disabled:opacity-70"
+              >
+                {payLaterLoading ? 'Saving…' : 'Pay after — email me the next steps'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

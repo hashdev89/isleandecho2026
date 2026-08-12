@@ -118,7 +118,7 @@ export default function AdminSettingsPage() {
     currency: 'LKR',
     paymentMethods: ['payhere', 'credit_card', 'bank_transfer', 'cash'],
     taxRate: 15,
-    bookingDeposit: 20,
+    bookingDeposit: 50,
     // PayHere Settings
     payhereMerchantId: '',
     payhereMerchantSecret: '',

@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
-import { use, useState, useEffect, useCallback } from 'react'
+import { use, useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Header from '../../../components/Header'
 import { Calendar, Clock, User, ArrowLeft, Share2, Bookmark, Check, Copy } from 'lucide-react'
+import { useClickOutside } from '../../../hooks/useClickOutside'
 
 const SAVED_POSTS_KEY = 'isleandecho_saved_blog_posts'
 
@@ -33,6 +34,9 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
   const [saved, setSaved] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [copyDone, setCopyDone] = useState(false)
+  const shareMenuRef = useRef<HTMLDivElement>(null)
+  const closeShareMenu = useCallback(() => setShareOpen(false), [])
+  useClickOutside(shareMenuRef, shareOpen, closeShareMenu)
 
   useEffect(() => {
     const fetchBlogPost = async () => {
@@ -121,11 +125,11 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[var(--foam)] lp-section-ink">
         <Header />
-        <div className="container mx-auto px-4 py-12">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter py-12">
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--lagoon)]"></div>
             <span className="ml-2 text-gray-600">Loading blog post...</span>
           </div>
         </div>
@@ -135,15 +139,15 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
 
   if (error || !post) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[var(--foam)] lp-section-ink">
         <Header />
-        <div className="container mx-auto px-4 py-12">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter py-12">
           <div className="text-center">
             <h1 className="text-3xl font-bold text-gray-900 mb-4">Blog Post Not Found</h1>
             <p className="text-gray-600 mb-8">{error || "The blog post you're looking for doesn't exist."}</p>
             <button
               onClick={() => router.push('/blog')}
-              className="flex items-center mx-auto text-blue-600 font-medium hover:text-blue-700 transition-colors"
+              className="flex items-center mx-auto text-[var(--lagoon)] font-medium hover:text-[var(--lagoon-deep)] transition-colors"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Blog
@@ -155,7 +159,7 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--foam)] lp-section-ink">
       <Header />
       
       {/* Hero Section - image background with 90% black overlay */}
@@ -166,12 +170,12 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
               className="absolute inset-0 bg-cover bg-center bg-no-repeat"
               style={{ backgroundImage: `url(${post.image})` }}
             />
-            <div className="absolute inset-0 bg-black/90" aria-hidden />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--lagoon-deep)]/95 via-black/80 to-black/70" aria-hidden />
           </>
         ) : (
-          <div className="absolute inset-0 bg-gray-900" />
+          <div className="absolute inset-0 bg-[var(--lagoon-deep)]" />
         )}
-        <div className="relative container mx-auto px-4 py-16">
+        <div className="relative w-full max-w-[1920px] mx-auto lp-gutter py-16">
           <button
             onClick={() => router.push('/blog')}
             className="flex items-center text-white hover:text-gray-300 transition-colors mb-6"
@@ -182,7 +186,7 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
           
           <div className="max-w-6xl">
             <div className="flex items-center text-sm text-gray-300 mb-4">
-              <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium mr-4">
+              <span className="bg-[var(--lagoon-deep)] text-white px-3 py-1 rounded-full text-xs font-medium mr-4">
                 {post.category}
               </span>
               <User className="w-4 h-4 mr-1" />
@@ -193,7 +197,7 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
               <span>{post.readTime}</span>
             </div>
             
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
+            <h1 className="lp-section-title text-4xl md:text-5xl text-white mb-6 leading-tight">
               {post.title}
             </h1>
             
@@ -206,7 +210,7 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
               {post.tags.map((tag: string) => (
                 <span
                   key={tag}
-                  className="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-medium"
+                  className="bg-[var(--lagoon-deep)] text-white px-3 py-1 rounded-full text-sm font-medium"
                 >
                   #{tag}
                 </span>
@@ -215,18 +219,19 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
             
             {/* Action Buttons - Share (social + copy) & Save in browser */}
             <div className="flex items-center gap-4 relative">
-              <div className="relative">
+              <div className="relative" ref={shareMenuRef}>
                 <button
                   type="button"
                   onClick={() => (shareOpen ? setShareOpen(false) : handleShare())}
-                  className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="flex items-center bg-[var(--lagoon-deep)] text-white px-4 py-2 rounded-full hover:bg-[var(--lagoon)] transition-colors"
+                  aria-expanded={shareOpen}
                 >
                   <Share2 className="w-4 h-4 mr-2" />
                   Share
                 </button>
                 {shareOpen && (
                   <>
-                    <div className="absolute left-0 top-full mt-1 py-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-20">
+                    <div className="absolute left-0 top-full mt-1 py-2 w-56 lp-panel-xl border border-gray-200 z-20">
                       <button
                         type="button"
                         onClick={copyLink}
@@ -275,7 +280,7 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
               <button
                 type="button"
                 onClick={handleSave}
-                className={`flex items-center px-4 py-2 rounded-lg transition-colors ${saved ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                className={`flex items-center px-4 py-2 rounded-lg transition-colors ${saved ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-[var(--lagoon-deep)] text-white hover:bg-[var(--lagoon)]'}`}
               >
                 {saved ? <Check className="w-4 h-4 mr-2" /> : <Bookmark className="w-4 h-4 mr-2" />}
                 {saved ? 'Saved' : 'Save'}
@@ -287,7 +292,7 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
 
       {/* Content Section */}
       <section className="py-12">
-        <div className="container mx-auto px-4">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
           <div className="mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Main Content - no image in body */}
@@ -329,7 +334,7 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
                 {/* Author Bio */}
                 <div className="bg-gray-100 rounded-lg p-6 mt-8">
                   <div className="flex items-center">
-                    <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold mr-4">
+                    <div className="w-12 h-12 bg-[var(--lagoon-deep)] rounded-full flex items-center justify-center text-white font-bold mr-4">
                       {post.author.split(' ').map((n: string) => n[0]).join('')}
                     </div>
                     <div>
@@ -344,7 +349,7 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
               <div className="lg:col-span-1">
                 <div className="sticky top-6 space-y-6">
                   {/* Related Posts */}
-                  <div className="bg-white rounded-lg shadow-lg p-6">
+                  <div className="lp-panel-lg p-6">
                     <h3 className="text-xl font-bold text-gray-900 mb-4">Related Posts</h3>
                     <div className="space-y-4">
                       {allPosts
@@ -373,14 +378,14 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
                   </div>
 
                   {/* Categories */}
-                  <div className="bg-white rounded-lg shadow-lg p-6">
+                  <div className="lp-panel-lg p-6">
                     <h3 className="text-xl font-bold text-gray-900 mb-4">Categories</h3>
                     <div className="space-y-2">
                       {Array.from(new Set(allPosts.filter(p => p.status === 'Published').map(p => p.category))).map(category => (
                         <button
                           key={category}
                           onClick={() => router.push(`/blog?category=${category}`)}
-                          className="block w-full text-left text-gray-600 hover:text-blue-600 transition-colors"
+                          className="block w-full text-left text-gray-600 hover:text-[var(--lagoon)] transition-colors"
                         >
                           {category}
                         </button>

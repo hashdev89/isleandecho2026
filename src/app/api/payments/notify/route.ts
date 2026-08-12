@@ -2,13 +2,32 @@ import { NextResponse } from 'next/server'
 import { verifyPayHerePayment, mapPayHereStatusToPaymentStatus, PayHereStatus } from '@/lib/payhere'
 import { supabaseAdmin } from '@/lib/supabaseClient'
 import { generateInvoicePDF } from '@/lib/invoiceGenerator'
-import { sendInvoiceEmail, sendBookingConfirmationToCustomer, sendBookingConfirmationToAdmin } from '@/lib/emailService'
+import { sendInvoiceEmail, notifyBookingUpdated } from '@/lib/emailService'
+import { getPayHereCredentials, resolveBookingIdFromOrderId } from '@/lib/payhereCheckout'
+import fs from 'fs'
+import path from 'path'
+
+const FALLBACK_FILE = path.join(process.cwd(), 'data', 'bookings.json')
+
+function updateFallbackBooking(bookingId: string, updates: Record<string, unknown>) {
+  try {
+    if (!fs.existsSync(FALLBACK_FILE)) return null
+    const bookings = JSON.parse(fs.readFileSync(FALLBACK_FILE, 'utf8'))
+    const index = bookings.findIndex((b: { id: string }) => b.id === bookingId)
+    if (index === -1) return null
+    bookings[index] = { ...bookings[index], ...updates }
+    fs.writeFileSync(FALLBACK_FILE, JSON.stringify(bookings, null, 2))
+    return bookings[index]
+  } catch (error) {
+    console.error('Fallback booking update failed:', error)
+    return null
+  }
+}
 
 export async function POST(req: Request) {
   try {
-    // Parse form data (PayHere sends application/x-www-form-urlencoded)
     const formData = await req.formData()
-    
+
     const merchantId = formData.get('merchant_id') as string
     const orderId = formData.get('order_id') as string
     const paymentId = formData.get('payment_id') as string
@@ -18,16 +37,14 @@ export async function POST(req: Request) {
     const md5sig = formData.get('md5sig') as string
     const method = formData.get('method') as string
     const statusMessage = formData.get('status_message') as string
-    
-    // Get merchant secret from environment
-    const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET
-    
+
+    const { merchantSecret } = await getPayHereCredentials()
+
     if (!merchantSecret) {
       console.error('PayHere merchant secret not configured')
       return NextResponse.json({ success: false, error: 'Configuration error' }, { status: 500 })
     }
-    
-    // Verify the payment notification
+
     const isValid = verifyPayHerePayment(
       merchantId,
       orderId,
@@ -37,100 +54,86 @@ export async function POST(req: Request) {
       merchantSecret,
       md5sig
     )
-    
+
     if (!isValid) {
       console.error('Invalid PayHere payment notification:', { orderId, md5sig })
       return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 })
     }
-    
-    // Map payment status
-    const paymentStatus = mapPayHereStatusToPaymentStatus(statusCode)
+
+    const isDeposit = /-DEP$/i.test(orderId)
+    const bookingId = resolveBookingIdFromOrderId(orderId)
+    const mappedStatus = mapPayHereStatusToPaymentStatus(statusCode)
+    const paymentStatus =
+      statusCode === PayHereStatus.SUCCESS && isDeposit ? 'deposit_paid' : mappedStatus
     const bookingStatus = statusCode === PayHereStatus.SUCCESS ? 'confirmed' : 'pending'
-    
-    // Update booking in database
-    const updateData: any = {
+
+    const updateData: Record<string, unknown> = {
       payment_status: paymentStatus,
       status: bookingStatus,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      payment_method: isDeposit ? 'payhere_deposit' : method || 'payhere',
     }
-    
-    // Add payment_id if available
-    if (paymentId) {
-      updateData.payment_id = paymentId
-    }
-    
-    // Add payment_method if available
-    if (method) {
-      updateData.payment_method = method
-    }
-    
-    // Try to update in Supabase
+
+    if (paymentId) updateData.payment_id = paymentId
+
     let bookingData = null
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       const { data: updatedBooking, error } = await supabaseAdmin
         .from('bookings')
         .update(updateData)
-        .eq('id', orderId)
+        .eq('id', bookingId)
         .select('*')
         .single()
-      
+
       if (error) {
         console.error('Error updating booking in Supabase:', error)
-        // Continue to return success to PayHere even if DB update fails
-        // You can implement fallback storage here if needed
       } else {
-        console.log('Booking updated successfully:', orderId, paymentStatus)
+        console.log('Booking updated successfully:', bookingId, paymentStatus)
         bookingData = updatedBooking
       }
     }
-    
-    // Generate and send emails if payment is successful
+
+    const fallbackBooking = updateFallbackBooking(bookingId, updateData)
+    if (!bookingData && fallbackBooking) bookingData = fallbackBooking
+
     if (statusCode === PayHereStatus.SUCCESS && bookingData) {
       try {
-        console.log('Generating invoice for booking:', orderId)
-        const invoicePdf = await generateInvoicePDF(bookingData)
-        
-        console.log('Sending invoice email to:', bookingData.customer_email)
-        await sendInvoiceEmail(
-          bookingData.customer_email,
-          bookingData.customer_name,
-          orderId,
-          invoicePdf
-        )
-        console.log('Invoice sent successfully to customer')
+        if (!isDeposit) {
+          const invoicePdf = await generateInvoicePDF(bookingData)
+          await sendInvoiceEmail(
+            bookingData.customer_email,
+            bookingData.customer_name,
+            bookingId,
+            invoicePdf
+          )
+        }
       } catch (invoiceError) {
         console.error('Error generating/sending invoice:', invoiceError)
       }
 
-      // Send exact-format booking details to customer
       try {
-        await sendBookingConfirmationToCustomer(bookingData)
-        console.log('Booking confirmation (details) sent to customer')
+        await notifyBookingUpdated(bookingData, {
+          status: 'pending',
+          payment_status: 'pending',
+        })
       } catch (confirmationError) {
-        console.error('Error sending booking confirmation to customer:', confirmationError)
-      }
-
-      // Send same format to admin email(s)
-      try {
-        await sendBookingConfirmationToAdmin(bookingData)
-      } catch (adminError) {
-        console.error('Error sending booking confirmation to admin:', adminError)
+        console.error('Error sending payment update emails:', confirmationError)
       }
     }
-    
-    // Log payment notification for debugging
+
     console.log('PayHere payment notification received:', {
       orderId,
+      bookingId,
+      isDeposit,
       paymentId,
       amount: payhereAmount,
       currency: payhereCurrency,
       statusCode,
       paymentStatus,
       method,
-      statusMessage
+      statusMessage,
     })
-    
-    // Return success to PayHere (important: PayHere expects a response)
+
     return NextResponse.json({ success: true, message: 'Payment notification processed' })
   } catch (error: unknown) {
     console.error('Payment notification error:', error)
@@ -140,4 +143,3 @@ export async function POST(req: Request) {
     )
   }
 }
-
