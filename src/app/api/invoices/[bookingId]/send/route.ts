@@ -1,29 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseClient'
-import fs from 'fs'
-import path from 'path'
 import { generateInvoicePDF, getDepositBreakdown } from '@/lib/invoiceGenerator'
 import { sendDepositInvoiceEmail, type BookingForEmail } from '@/lib/emailService'
 import { buildDepositPaymentLink } from '@/lib/payhereCheckout'
-
-const FALLBACK_FILE = path.join(process.cwd(), 'data', 'bookings.json')
-
-const loadFallbackBookings = () => {
-  try {
-    if (fs.existsSync(FALLBACK_FILE)) {
-      return JSON.parse(fs.readFileSync(FALLBACK_FILE, 'utf8'))
-    }
-  } catch (error) {
-    console.error('Error loading fallback bookings:', error)
-  }
-  return []
-}
-
-const saveFallbackBookings = (bookings: unknown[]) => {
-  const dataDir = path.join(process.cwd(), 'data')
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
-  fs.writeFileSync(FALLBACK_FILE, JSON.stringify(bookings, null, 2))
-}
+import { findBookingById, loadFallbackBookings, saveFallbackBookings } from '@/lib/bookingsData'
 
 async function getDepositPercent() {
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -55,16 +35,8 @@ export async function POST(
     const confirm = Boolean(body.confirm)
     const depositPercent = Number(body.depositPercent) || (await getDepositPercent()) || 50
 
-    let booking: Record<string, unknown> | null = null
-
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const { data } = await supabaseAdmin.from('bookings').select('*').eq('id', bookingId).single()
-      if (data) booking = data
-    }
-
-    if (!booking) {
-      booking = loadFallbackBookings().find((b: { id: string }) => b.id === bookingId) || null
-    }
+    const found = await findBookingById(bookingId)
+    let booking: Record<string, unknown> | null = found ? (found as Record<string, unknown>) : null
 
     if (!booking) {
       return NextResponse.json({ success: false, error: 'Booking not found' }, { status: 404 })

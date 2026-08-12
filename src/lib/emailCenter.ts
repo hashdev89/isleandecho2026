@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { randomUUID } from 'crypto'
 import { supabaseAdmin } from './supabaseClient'
-import { sendEmail } from './emailService'
+import { sendEmail, formatEmailFrom } from './emailService'
 
 export type EmailFolder = 'inbox' | 'sent' | 'trash' | 'starred'
 
@@ -669,7 +669,7 @@ export async function sendStaffEmail(input: {
     html: input.bodyHtml,
     text: bodyText,
     replyTo: fromEmail,
-    from: `${fromName} <${fromEmail}>`,
+    from: formatEmailFrom(fromName, fromEmail),
     cc: cc.length ? cc : undefined,
     bcc: bcc.length ? bcc : undefined,
     attachments: input.attachments,

@@ -52,7 +52,66 @@ function isSupabaseConfigured() {
   )
 }
 
+function stripEnvQuotes(value: string | undefined): string {
+  if (!value) return ''
+  let v = value.trim()
+  while (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1).trim()
+  }
+  return v
+}
+
+/** Resend-safe From header: quotes display names with special characters. */
+export function formatEmailFrom(name: string, email: string): string {
+  const cleanEmail = stripEnvQuotes(email).replace(/^<|>$/g, '').trim().toLowerCase()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    throw new Error(`Invalid sender email address: ${cleanEmail || '(empty)'}`)
+  }
+
+  const cleanName = stripEnvQuotes(name).trim()
+  if (!cleanName) return cleanEmail
+
+  const needsQuotes = /[,;<>@"&]/.test(cleanName)
+  const safeName = needsQuotes ? `"${cleanName.replace(/"/g, '\\"')}"` : cleanName
+  return `${safeName} <${cleanEmail}>`
+}
+
+function normalizeFromAddress(raw: string | undefined): string {
+  const value = stripEnvQuotes(raw)
+  if (!value) return ''
+
+  const angle = value.match(/^(?:"?([^"]*)"?\s)?<([^>]+@[^>]+)>$/)
+  if (angle) {
+    return formatEmailFrom(angle[1]?.trim() || '', angle[2].trim())
+  }
+
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    return value.toLowerCase()
+  }
+
+  return formatEmailFrom('Isle & Echo', value)
+}
+
+function envEmailDefaults(): EmailSettings {
+  return {
+    smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
+    smtpPort: process.env.SMTP_PORT || '587',
+    smtpUsername: process.env.SMTP_USERNAME || '',
+    smtpPassword: process.env.SMTP_PASSWORD || '',
+    fromEmail:
+      stripEnvQuotes(process.env.FROM_EMAIL) ||
+      stripEnvQuotes(process.env.SMTP_USERNAME) ||
+      'noreply@isleandecho.com',
+    fromName: stripEnvQuotes(process.env.FROM_NAME) || 'Isle & Echo',
+  }
+}
+
 async function getEmailSettings(): Promise<EmailSettings> {
+  const defaults = envEmailDefaults()
+
   if (isSupabaseConfigured()) {
     try {
       const { data: settingsData } = await supabaseAdmin
@@ -61,29 +120,31 @@ async function getEmailSettings(): Promise<EmailSettings> {
         .eq('id', 'main')
         .single()
 
-      if (settingsData && settingsData.smtp_host && settingsData.smtp_username) {
-        return {
-          smtpHost: settingsData.smtp_host || 'smtp.gmail.com',
-          smtpPort: settingsData.smtp_port || '587',
-          smtpUsername: settingsData.smtp_username,
-          smtpPassword: settingsData.smtp_password || '',
-          fromEmail: settingsData.from_email || settingsData.smtp_username,
-          fromName: settingsData.from_name || 'Isle & Echo',
+      if (settingsData) {
+        const fromEmail =
+          stripEnvQuotes(settingsData.from_email as string) || defaults.fromEmail
+        const fromName =
+          stripEnvQuotes(settingsData.from_name as string) || defaults.fromName
+
+        if (settingsData.smtp_host && settingsData.smtp_username) {
+          return {
+            smtpHost: settingsData.smtp_host || 'smtp.gmail.com',
+            smtpPort: settingsData.smtp_port || '587',
+            smtpUsername: settingsData.smtp_username,
+            smtpPassword: settingsData.smtp_password || '',
+            fromEmail,
+            fromName,
+          }
         }
+
+        return { ...defaults, fromEmail, fromName }
       }
     } catch (error) {
       console.error('Error fetching email settings from database:', error)
     }
   }
 
-  return {
-    smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
-    smtpPort: process.env.SMTP_PORT || '587',
-    smtpUsername: process.env.SMTP_USERNAME || '',
-    smtpPassword: process.env.SMTP_PASSWORD || '',
-    fromEmail: process.env.FROM_EMAIL || process.env.SMTP_USERNAME || 'noreply@isleandecho.com',
-    fromName: process.env.FROM_NAME || 'Isle & Echo',
-  }
+  return defaults
 }
 
 export async function getAdminEmails(): Promise<string[]> {
@@ -119,21 +180,27 @@ async function bookingNotificationsEnabled() {
 }
 
 function resendFromAddress(settings: EmailSettings) {
-  const envFrom = process.env.RESEND_FROM_EMAIL?.trim()
+  const envFrom = normalizeFromAddress(process.env.RESEND_FROM_EMAIL)
   if (envFrom) return envFrom
-  return `${settings.fromName} <${settings.fromEmail}>`
+  return formatEmailFrom(settings.fromName, settings.fromEmail)
 }
 
 function hasResend() {
-  const key = process.env.RESEND_API_KEY || ''
-  return key.length > 10 && key !== 're_xxxxxxxxx'
+  const key = (process.env.RESEND_API_KEY || '').trim()
+  return key.length > 10 && key !== 're_xxxxxxxxx' && !key.includes('xxxx')
+}
+
+function resolveFromAddress(options: SendEmailOptions, settings: EmailSettings) {
+  if (options.from) return normalizeFromAddress(options.from)
+  return resendFromAddress(settings)
 }
 
 async function sendViaResend(options: SendEmailOptions, settings: EmailSettings) {
   const resend = new Resend(process.env.RESEND_API_KEY)
   const recipients = Array.isArray(options.to) ? options.to : [options.to]
+  const from = resolveFromAddress(options, settings)
   const { data, error } = await resend.emails.send({
-    from: options.from || resendFromAddress(settings),
+    from,
     to: recipients,
     cc: options.cc,
     bcc: options.bcc,
@@ -157,7 +224,9 @@ async function sendViaResend(options: SendEmailOptions, settings: EmailSettings)
 
 async function sendViaSmtp(options: SendEmailOptions, settings: EmailSettings) {
   if (!settings.smtpUsername || !settings.smtpPassword) {
-    throw new Error('Email is not configured. Set RESEND_API_KEY or SMTP credentials.')
+    throw new Error(
+      'Email is not configured on the server. Add RESEND_API_KEY in your hosting dashboard (Vercel → Environment Variables), or set SMTP username and password in Admin → Settings.'
+    )
   }
 
   const transporter = nodemailer.createTransport({
@@ -171,7 +240,7 @@ async function sendViaSmtp(options: SendEmailOptions, settings: EmailSettings) {
   })
 
   const info = await transporter.sendMail({
-    from: options.from || `"${settings.fromName}" <${settings.fromEmail}>`,
+    from: options.from ? normalizeFromAddress(options.from) : formatEmailFrom(settings.fromName, settings.fromEmail),
     to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
     cc: options.cc?.join(', '),
     bcc: options.bcc?.join(', '),
@@ -194,6 +263,11 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
     return await sendViaSmtp(options, settings)
   } catch (error) {
     console.error('Error sending email:', error)
+    if (error instanceof Error && error.message.includes('Invalid `from` field')) {
+      throw new Error(
+        `Invalid sender address. Set RESEND_FROM_EMAIL in Vercel to a verified address, e.g. Isle & Echo <noreply@isleandecho.com> (current from: ${resolveFromAddress(options, settings)})`
+      )
+    }
     throw error
   }
 }
