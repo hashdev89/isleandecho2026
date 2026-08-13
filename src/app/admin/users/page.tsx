@@ -17,13 +17,16 @@ import {
   AlertCircle
 } from 'lucide-react'
 
+import { useAuth } from '../../../contexts/AuthContext'
+import { hasAdminAccess, isSuperAdmin, roleLabel } from '@/lib/roles'
+
 interface User {
   id: string
   name: string
   email: string
   phone: string
   password?: string
-  role: 'admin' | 'staff' | 'customer'
+  role: 'super_admin' | 'admin' | 'staff' | 'customer'
   status: 'active' | 'inactive' | 'suspended'
   lastLogin: string
   createdAt: string
@@ -35,6 +38,7 @@ interface User {
 
 
 export default function UsersPage() {
+  const { user: currentAuthUser } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -137,6 +141,7 @@ export default function UsersPage() {
 
   const getRoleColor = (role: string) => {
     switch (role) {
+      case 'super_admin': return 'text-purple-700 bg-purple-100'
       case 'admin': return 'text-red-600 bg-red-100'
       case 'staff': return 'text-blue-600 bg-blue-100'
       case 'customer': return 'text-green-600 bg-green-100'
@@ -155,6 +160,7 @@ export default function UsersPage() {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
+      case 'super_admin': return <Shield className="w-4 h-4" />
       case 'admin': return <Shield className="w-4 h-4" />
       case 'staff': return <UserCheck className="w-4 h-4" />
       case 'customer': return <Users className="w-4 h-4" />
@@ -175,6 +181,9 @@ export default function UsersPage() {
   const activeUsers = users.filter(u => u.status === 'active').length
   const customerUsers = users.filter(u => u.role === 'customer').length
   const staffUsers = users.filter(u => u.role === 'staff').length
+  const canManageSuperAdmin =
+    isSuperAdmin(currentAuthUser?.role) ||
+    (hasAdminAccess(currentAuthUser?.role) && !users.some((u) => u.role === 'super_admin'))
 
   const handleAddUser = async () => {
     if (newUser.name && newUser.email && newUser.phone && newUser.password) {
@@ -365,9 +374,20 @@ export default function UsersPage() {
         if (response.ok) {
           const updatedUser = await response.json()
           setUsers(users.map(user => user.id === userToEdit.id ? updatedUser : user))
-          // Also update localStorage
-          const updatedUsers = users.map(user => user.id === userToEdit.id ? updatedUser : user)
-          localStorage.setItem('admin-users', JSON.stringify(updatedUsers))
+          localStorage.setItem('admin-users', JSON.stringify(users.map(user => user.id === userToEdit.id ? updatedUser : user)))
+
+          try {
+            const savedAuth = localStorage.getItem('user')
+            if (savedAuth) {
+              const authUser = JSON.parse(savedAuth)
+              if (authUser?.id === userToEdit.id) {
+                const nextAuth = { ...authUser, role: updatedUser.role, name: updatedUser.name, email: updatedUser.email }
+                localStorage.setItem('user', JSON.stringify(nextAuth))
+              }
+            }
+          } catch {
+            /* ignore auth cache update */
+          }
           
           setShowEditModal(false)
           setUserToEdit(null)
@@ -382,41 +402,14 @@ export default function UsersPage() {
             notes: ''
           })
         } else {
-          console.error('Failed to update user via API')
-          // Fallback to local state update
-          const updatedUser = { ...userToEdit, ...updateData }
-          setUsers(users.map(user => user.id === userToEdit.id ? updatedUser : user))
-          localStorage.setItem('admin-users', JSON.stringify(users.map(user => user.id === userToEdit.id ? updatedUser : user)))
-          setShowEditModal(false)
-          setUserToEdit(null)
-          setEditUser({
-            name: '',
-            email: '',
-            phone: '',
-            password: '',
-            role: 'customer',
-            status: 'active',
-            address: '',
-            notes: ''
-          })
+          const data = await response.json().catch(() => ({}))
+          const message = data.error || 'Failed to update user'
+          console.error('Failed to update user via API:', message)
+          alert(message)
         }
       } catch (error) {
         console.error('Error updating user:', error)
-        // Fallback to local state update
-        const updatedUser = { ...userToEdit, ...updateData }
-        setUsers(users.map(user => user.id === userToEdit.id ? updatedUser : user))
-        localStorage.setItem('admin-users', JSON.stringify(users.map(user => user.id === userToEdit.id ? updatedUser : user)))
-        setShowEditModal(false)
-        setUserToEdit(null)
-        setEditUser({
-          name: '',
-          email: '',
-          phone: '',
-          role: 'customer',
-          status: 'active',
-          address: '',
-          notes: ''
-        })
+        alert(error instanceof Error ? error.message : 'Failed to update user')
       } finally {
         setLoading(false)
       }
@@ -561,6 +554,7 @@ export default function UsersPage() {
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">All Roles</option>
+              <option value="super_admin">Super Admin</option>
               <option value="admin">Admin</option>
               <option value="staff">Staff</option>
               <option value="customer">Customer</option>
@@ -637,7 +631,7 @@ export default function UsersPage() {
                     <div className="space-y-2">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
                         {getRoleIcon(user.role)}
-                        <span className="ml-1 capitalize">{user.role}</span>
+                        <span className="ml-1">{roleLabel(user.role)}</span>
                       </span>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(user.status)}`}>
                         {getStatusIcon(user.status)}
@@ -790,6 +784,7 @@ export default function UsersPage() {
                       <option value="customer">Customer</option>
                       <option value="staff">Staff</option>
                       <option value="admin">Admin</option>
+                      {canManageSuperAdmin && <option value="super_admin">Super Admin</option>}
                     </select>
                   </div>
                   
@@ -952,6 +947,7 @@ export default function UsersPage() {
                       <option value="customer">Customer</option>
                       <option value="staff">Staff</option>
                       <option value="admin">Admin</option>
+                      {canManageSuperAdmin && <option value="super_admin">Super Admin</option>}
                     </select>
                   </div>
                   
@@ -1058,7 +1054,7 @@ export default function UsersPage() {
                   <div className="mt-2">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(userToDelete.role)}`}>
                       {getRoleIcon(userToDelete.role)}
-                      <span className="ml-1 capitalize">{userToDelete.role}</span>
+                      <span className="ml-1">{roleLabel(userToDelete.role)}</span>
                     </span>
                   </div>
                 </div>

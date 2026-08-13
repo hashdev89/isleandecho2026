@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Plus, Save, Trash2, Users } from 'lucide-react'
 import { useAuth } from '../../../../contexts/AuthContext'
 import type { EmailAccount } from '@/lib/emailCenter'
+import { canAccessEmailCenter } from '@/lib/roles'
 
 const EMAIL_DOMAIN = 'isleandecho.com'
 
@@ -38,7 +39,7 @@ export default function EmailSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = canAccessEmailCenter(user?.role)
 
   useEffect(() => {
     if (!isAdmin) {
@@ -59,7 +60,9 @@ export default function EmailSettingsPage() {
           ? usersRaw
           : usersRaw?.users || usersRaw?.data || []
         setStaffUsers(
-          users.filter((u) => (u.role === 'admin' || u.role === 'staff') && u.status !== 'inactive')
+          users.filter(
+            (u) => (u.role === 'super_admin' || u.role === 'admin' || u.role === 'staff') && u.status !== 'inactive'
+          )
         )
       })
       .finally(() => setLoading(false))
@@ -115,7 +118,7 @@ export default function EmailSettingsPage() {
   if (!isAdmin) {
     return (
       <div className="mx-auto max-w-lg p-8 text-center">
-        <p className="text-gray-600">Only administrators can manage email accounts and staff access.</p>
+        <p className="text-gray-600">Only the Super Admin can manage email accounts and staff access.</p>
         <Link href="/admin/email" className="mt-4 inline-block text-teal-700 underline">
           Back to Email Center
         </Link>

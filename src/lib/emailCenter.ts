@@ -4,6 +4,8 @@ import { randomUUID } from 'crypto'
 import { supabaseAdmin } from './supabaseClient'
 import { loadAppJson, saveAppJson } from './supabaseJsonStore'
 import { sendEmail, formatEmailFrom } from './emailService'
+import { storeEmailAttachment } from './emailAttachments'
+import { canAccessEmailCenter } from './roles'
 
 export type EmailFolder = 'inbox' | 'sent' | 'trash' | 'starred'
 
@@ -23,6 +25,7 @@ export type EmailAttachment = {
   contentType?: string
   size?: number
   url?: string
+  resendAttachmentId?: string
 }
 
 export type EmailMessage = {
@@ -407,7 +410,7 @@ export function getAccessibleAccounts(
   userRole: string
 ): EmailAccount[] {
   const active = accounts.filter((a) => a.isActive !== false && a.email?.trim())
-  if (userRole === 'admin') return active
+  if (canAccessEmailCenter(userRole) || userRole === 'admin') return active
   return active.filter((a) => (a.assignedUserIds || []).includes(userId))
 }
 
@@ -417,7 +420,7 @@ export function canAccessAccount(
   userId: string,
   userRole: string
 ): boolean {
-  if (userRole === 'admin') return true
+  if (canAccessEmailCenter(userRole) || userRole === 'admin') return true
   const account = accounts.find((a) => a.id === accountId)
   if (!account) return false
   return (account.assignedUserIds || []).includes(userId)
@@ -429,7 +432,7 @@ export function canAccessThread(
   userId: string,
   userRole: string
 ): boolean {
-  if (userRole === 'admin') return true
+  if (canAccessEmailCenter(userRole) || userRole === 'admin') return true
   const accessible = getAccessibleAccounts(accounts, userId, userRole)
   return accessible.some((a) => normalizeEmail(a.email) === normalizeEmail(thread.accountEmail))
 }
@@ -493,12 +496,37 @@ export async function getThreadWithMessages(threadId: string) {
   const messages = await loadMessages()
   const thread = threads.find((t) => t.id === threadId)
   if (!thread) return null
-  return {
-    thread,
-    messages: messages.filter((m) => m.threadId === threadId).sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    ),
+
+  const threadMessages = messages
+    .filter((m) => m.threadId === threadId)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+
+  let changed = false
+  const hydrated: EmailMessage[] = []
+  for (const msg of threadMessages) {
+    const needsHydrate =
+      msg.direction === 'inbound' &&
+      !!msg.resendEmailId &&
+      (!msg.attachments?.length || msg.attachments.some((a) => !a.url))
+    if (!needsHydrate) {
+      hydrated.push(msg)
+      continue
+    }
+    const imported = await importResendAttachments(msg.resendEmailId as string)
+    if (imported.length) {
+      changed = true
+      hydrated.push({ ...msg, attachments: imported })
+    } else {
+      hydrated.push(msg)
+    }
   }
+
+  if (changed) {
+    const byId = new Map(hydrated.map((m) => [m.id, m]))
+    await saveMessages(messages.map((m) => byId.get(m.id) || m))
+  }
+
+  return { thread, messages: hydrated }
 }
 
 export async function markThreadRead(threadId: string) {
@@ -587,6 +615,10 @@ export async function recordInboundEmail(input: {
 
   const bodyText = input.bodyText || input.bodyHtml?.replace(/<[^>]+>/g, ' ') || ''
   const messageId = input.messageId || `<${randomUUID()}@isleandecho.local>`
+  let attachments = input.attachments
+  if ((!attachments || attachments.length === 0) && input.resendEmailId) {
+    attachments = await importResendAttachments(input.resendEmailId)
+  }
 
   if (!thread) {
     thread = {
@@ -636,7 +668,7 @@ export async function recordInboundEmail(input: {
     direction: 'inbound',
     inReplyTo: input.inReplyTo,
     references: input.references,
-    attachments: input.attachments,
+    attachments: attachments?.length ? attachments : undefined,
     createdAt: now,
   }
   messages.push(message)
@@ -673,6 +705,58 @@ async function resendApiGet<T>(path: string): Promise<T> {
     throw new Error(`Resend API ${path} failed (${res.status}): ${body}`)
   }
   return res.json() as Promise<T>
+}
+
+type ResendInboundAttachment = {
+  id: string
+  filename?: string
+  size?: number
+  content_type?: string
+  download_url?: string
+}
+
+export async function importResendAttachments(resendEmailId: string): Promise<EmailAttachment[]> {
+  try {
+    const list = await resendApiGet<{ data?: ResendInboundAttachment[] }>(
+      `/emails/receiving/${encodeURIComponent(resendEmailId)}/attachments`
+    )
+    const items = list.data || []
+    const stored: EmailAttachment[] = []
+
+    for (const item of items) {
+      if (!item.download_url) continue
+      try {
+        const res = await fetch(item.download_url)
+        if (!res.ok) throw new Error(`download failed ${res.status}`)
+        const buf = Buffer.from(await res.arrayBuffer())
+        const saved = await storeEmailAttachment(
+          item.filename || 'attachment',
+          buf,
+          item.content_type || res.headers.get('content-type') || undefined
+        )
+        stored.push({
+          ...saved,
+          resendAttachmentId: item.id,
+          size: item.size || saved.size,
+        })
+      } catch (error) {
+        console.error('importResendAttachments item:', item.id, error)
+        stored.push({
+          id: item.id,
+          filename: item.filename || 'attachment',
+          contentType: item.content_type,
+          size: item.size,
+          url: item.download_url,
+          resendAttachmentId: item.id,
+        })
+      }
+    }
+
+    return stored
+  } catch (error) {
+    console.error('importResendAttachments:', error)
+    return []
+  }
 }
 
 /** Pull received emails from Resend into the inbox (webhook fallback / manual sync). */
@@ -723,7 +807,7 @@ export async function sendStaffEmail(input: {
   references?: string[]
   sentByUserId?: string
   sentByUserName?: string
-  attachments?: Array<{ filename: string; content: Buffer; contentType?: string }>
+  attachments?: EmailAttachment[]
   userId?: string
   userRole?: string
 }) {
@@ -761,7 +845,11 @@ export async function sendStaffEmail(input: {
     from: formatEmailFrom(fromName, fromEmail),
     cc: cc.length ? cc : undefined,
     bcc: bcc.length ? bcc : undefined,
-    attachments: input.attachments,
+    attachments: input.attachments?.map((file) => ({
+      filename: file.filename,
+      contentType: file.contentType,
+      url: file.url,
+    })),
   })
 
   const threads = await loadThreads()
@@ -820,6 +908,7 @@ export async function sendStaffEmail(input: {
     sentByUserName: input.sentByUserName,
     inReplyTo: input.inReplyTo,
     references: input.references,
+    attachments: input.attachments?.length ? input.attachments : undefined,
     createdAt: now,
   }
   messages.push(message)

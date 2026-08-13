@@ -6,7 +6,7 @@ interface User {
   id: string
   email: string
   name: string
-  role: 'admin' | 'user' | 'staff' | 'customer'
+  role: 'super_admin' | 'admin' | 'user' | 'staff' | 'customer'
   phone?: string
 }
 

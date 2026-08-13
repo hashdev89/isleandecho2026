@@ -290,7 +290,7 @@ export default function Header() {
                   </button>
                   {activeDropdown === 'user' && (
                     <div className="absolute right-0 mt-2 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl py-2 z-10 border border-white/20 dark:border-gray-700/20">
-                      {user.role === 'admin' && (
+                      {(user.role === 'super_admin' || user.role === 'admin' || user.role === 'staff') && (
                         <Link
                           href="/admin"
                           className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-white transition-all duration-200 rounded-lg mx-1 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
@@ -402,7 +402,7 @@ export default function Header() {
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 px-3 space-y-2">
                   {user ? (
                     <>
-                      {user.role === 'admin' && (
+                      {(user.role === 'super_admin' || user.role === 'admin' || user.role === 'staff') && (
                       <Link
                         href="/admin"
                         className="w-full flex items-center justify-center space-x-2 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 transition-all duration-300 py-3 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 font-medium min-h-[44px] touch-manipulation"

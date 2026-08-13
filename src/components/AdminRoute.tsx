@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
+import { hasDashboardAccess } from '@/lib/roles'
 
 interface AdminRouteProps {
   children: React.ReactNode
@@ -13,11 +14,7 @@ export default function AdminRoute({ children }: AdminRouteProps) {
   const { user, isLoading } = useAuth()
   const router = useRouter()
 
-  // Require logged-in user with admin, staff, or customer role (no bypass in development)
-  const isAdmin = user?.role === 'admin'
-  const isStaff = user?.role === 'staff'
-  const isCustomer = user?.role === 'customer'
-  const hasAccess = !!(user && (isAdmin || isStaff || isCustomer))
+  const hasAccess = !!(user && hasDashboardAccess(user.role))
 
   useEffect(() => {
     if (!isLoading && !hasAccess) {
@@ -41,7 +38,7 @@ export default function AdminRoute({ children }: AdminRouteProps) {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
-          <p className="text-gray-600 mb-6">You need admin or staff privileges to access this page.</p>
+          <p className="text-gray-600 mb-6">You need dashboard privileges to access this page.</p>
           <button
             onClick={() => router.push('/')}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"

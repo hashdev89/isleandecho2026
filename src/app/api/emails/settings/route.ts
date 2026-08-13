@@ -4,10 +4,10 @@ import {
   saveEmailCenterSettings,
   type EmailCenterSettings,
 } from '@/lib/emailCenter'
-import { requireAdminSession, requireStaffSession } from '@/lib/adminAuth'
+import { requireSuperAdminSession } from '@/lib/adminAuth'
 
-export async function GET() {
-  const denied = await requireStaffSession()
+export async function GET(request: NextRequest) {
+  const denied = await requireSuperAdminSession(request)
   if (denied) return denied
 
   try {
@@ -22,7 +22,7 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
-  const denied = await requireAdminSession(request)
+  const denied = await requireSuperAdminSession(request)
   if (denied) return denied
 
   try {

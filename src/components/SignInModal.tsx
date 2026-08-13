@@ -35,7 +35,7 @@ export default function SignInModal({ isOpen, onClose, onSwitchToRegister }: Sig
         if (savedUser) {
           try {
             const user = JSON.parse(savedUser)
-            if (user.role === 'admin' || user.role === 'staff') {
+            if (user.role === 'super_admin' || user.role === 'admin' || user.role === 'staff') {
               router.push('/admin')
             }
           } catch {

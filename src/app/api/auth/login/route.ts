@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       }
 
       const role = (user.role || 'customer') as string
-      const canAccessAdmin = ['admin', 'staff', 'customer'].includes(role)
+      const canAccessAdmin = ['super_admin', 'admin', 'staff', 'customer'].includes(role)
 
       const response = NextResponse.json({
         success: true,
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
     }
 
     const role = (user.role || 'customer') as string
-    const canAccessAdmin = ['admin', 'staff', 'customer'].includes(role)
+    const canAccessAdmin = ['super_admin', 'admin', 'staff', 'customer'].includes(role)
 
     const response = NextResponse.json({
       success: true,

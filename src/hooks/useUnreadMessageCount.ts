@@ -8,7 +8,7 @@ export function useUnreadMessageCount() {
   const [count, setCount] = useState(0)
 
   useEffect(() => {
-    if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
+    if (!user || (user.role !== 'super_admin' && user.role !== 'admin' && user.role !== 'staff')) {
       setCount(0)
       return
     }

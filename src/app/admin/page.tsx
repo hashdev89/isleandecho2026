@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatRentalCurrency } from '@/lib/rentalPricing'
+import { canAccessEmailCenter, hasAdminAccess } from '@/lib/roles'
 
 interface BookingRow {
   id: string
@@ -78,7 +79,8 @@ export default function AdminDashboard() {
     revenue: 0,
   })
 
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = hasAdminAccess(user?.role)
+  const showEmailCenter = canAccessEmailCenter(user?.role)
 
   const loadDashboard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -248,13 +250,17 @@ export default function AdminDashboard() {
       icon: Car,
       color: 'bg-amber-600',
     },
-    {
-      name: 'Email center',
-      description: 'Inbox, compose & reply',
-      href: '/admin/email',
-      icon: Mail,
-      color: 'bg-indigo-600',
-    },
+    ...(showEmailCenter
+      ? [
+          {
+            name: 'Email center',
+            description: 'Inbox, compose & reply',
+            href: '/admin/email',
+            icon: Mail,
+            color: 'bg-indigo-600',
+          },
+        ]
+      : []),
     {
       name: 'Upload images',
       description: 'Photos for tours & site',
