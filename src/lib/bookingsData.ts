@@ -179,24 +179,43 @@ function coreBookingFields(booking: Record<string, unknown>) {
   })
 }
 
+function isTourBookingType(booking: Record<string, unknown>) {
+  return String(booking.booking_type || 'tour') === 'tour'
+}
+
+function realTourId(booking: Record<string, unknown>): string | null {
+  if (!isTourBookingType(booking)) return null
+  const id = String(booking.tour_package_id || booking.tour_id || '').trim()
+  if (!id || id === 'custom-trip') return null
+  return id
+}
+
 /** Map app fields to Supabase rows (supports legacy tour_id / tour_name columns). */
 function toSupabaseBookingPayload(booking: Record<string, unknown>) {
-  const tourId = String(
-    booking.tour_package_id || booking.tour_id || booking.vehicle_id || 'custom-trip'
-  )
   const tourName = String(
     booking.tour_package_name || booking.tour_name || booking.vehicle_name || 'Custom trip'
   )
+  const tourId = realTourId(booking)
 
   return stripUndefined({
     ...booking,
     tour_id: tourId,
     tour_name: tourName,
-    tour_package_id: booking.tour_package_id || tourId,
+    tour_package_id: booking.tour_package_id || tourId || booking.vehicle_id || 'custom-trip',
     tour_package_name: booking.tour_package_name || tourName,
     destinations: undefined,
     interests: undefined,
   })
+}
+
+function isForeignKeyError(error: { code?: string; message?: string }) {
+  const msg = (error.message || '').toLowerCase()
+  return error.code === '23503' || msg.includes('foreign key constraint') || msg.includes('violates foreign key')
+}
+
+function fkColumnFromError(message: string): string | null {
+  const named = message.match(/bookings_([a-z0-9_]+)_fkey/i)
+  return named?.[1] || null
 }
 
 function nullColumnFromNotNullError(message: string): string | null {
@@ -207,7 +226,7 @@ function nullColumnFromNotNullError(message: string): string | null {
 function defaultForNotNullColumn(column: string, payload: Record<string, unknown>): unknown {
   switch (column) {
     case 'tour_id':
-      return payload.tour_package_id || payload.tour_id || payload.vehicle_id || 'custom-trip'
+      return realTourId(payload) || payload.tour_id || null
     case 'tour_name':
       return payload.tour_package_name || payload.tour_name || payload.vehicle_name || 'Custom trip'
     case 'customer_name':
@@ -231,6 +250,7 @@ async function insertBookingRow(payload: Record<string, unknown>) {
 
 async function insertBookingToSupabase(booking: Record<string, unknown>) {
   let payload = toSupabaseBookingPayload(booking)
+  const nulledFkColumns = new Set<string>()
 
   const maxAttempts = 25
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -245,6 +265,12 @@ async function insertBookingToSupabase(booking: Record<string, unknown>) {
       continue
     }
 
+    if (result.error && isInvalidIdError(result.error) && payload.tour_id && !isUuid(String(payload.tour_id))) {
+      console.warn('tour_id is not a valid uuid for this schema, omitting it')
+      payload = { ...payload, tour_id: null }
+      continue
+    }
+
     if (result.error && (result.error.code === '23505' || result.error.message?.includes('duplicate'))) {
       const retryRef = nextOrderNumber(await loadAllBookings())
       payload = {
@@ -255,8 +281,23 @@ async function insertBookingToSupabase(booking: Record<string, unknown>) {
       continue
     }
 
+    if (result.error && isForeignKeyError(result.error)) {
+      const col = fkColumnFromError(result.error.message || '') || 'tour_id'
+      if (!nulledFkColumns.has(col)) {
+        console.warn(`Bookings FK ${col} rejected value, retrying without it:`, result.error.message)
+        nulledFkColumns.add(col)
+        payload = { ...payload, [col]: null }
+        continue
+      }
+    }
+
     const notNullCol = nullColumnFromNotNullError(result.error.message || '')
     if (notNullCol && result.error.code === '23502') {
+      if (nulledFkColumns.has(notNullCol) || notNullCol === 'tour_id') {
+        throw new Error(
+          `${result.error.message}. Run scripts/supabase-bookings-migration.sql in the Supabase SQL Editor to drop bookings_tour_id_fkey, then try again.`
+        )
+      }
       const fallback = defaultForNotNullColumn(notNullCol, payload)
       if (fallback !== undefined && payload[notNullCol] == null) {
         console.warn(`Bookings table requires "${notNullCol}", applying default for insert`)
@@ -346,14 +387,21 @@ export async function createBooking(body: Record<string, unknown>): Promise<Book
   const existingBookings = await loadAllBookings()
   const orderNumber = String(body.booking_ref || body.id || nextOrderNumber(existingBookings))
 
-  const tourId = String(body.tour_package_id || body.tour_id || body.vehicle_id || 'custom-trip')
+  const bookingType = (body.booking_type as BookingRecord['booking_type']) || 'tour'
   const tourName = String(body.tour_package_name || body.tour_name || body.vehicle_name || 'Custom trip')
+  const packageId = String(
+    body.tour_package_id ||
+      body.tour_id ||
+      body.vehicle_id ||
+      (bookingType === 'custom_trip' ? 'custom-trip' : '')
+  )
+  const dbTourId = bookingType === 'tour' && packageId && packageId !== 'custom-trip' ? packageId : null
 
   const newBooking: BookingRecord = {
     id: orderNumber,
     booking_ref: orderNumber,
-    booking_type: (body.booking_type as BookingRecord['booking_type']) || 'tour',
-    tour_package_id: tourId,
+    booking_type: bookingType,
+    tour_package_id: packageId,
     tour_package_name: tourName,
     vehicle_id: body.vehicle_id as string | undefined,
     vehicle_name: body.vehicle_name as string | undefined,
@@ -391,16 +439,18 @@ export async function createBooking(body: Record<string, unknown>): Promise<Book
 
   const { data, error } = await insertBookingToSupabase({
     ...newBooking,
-    tour_id: tourId,
+    tour_id: dbTourId,
     tour_name: tourName,
   } as unknown as Record<string, unknown>)
   if (error || !data) {
     console.error('Supabase booking insert failed:', error)
+    const message = error?.message || ''
     throw new Error(
-      error?.message?.includes('schema cache') || error?.code === 'PGRST204'
-        ? `${error.message} Run scripts/supabase-bookings-migration.sql in the Supabase SQL Editor, then try again.`
-        : error?.message ||
-            'Could not save booking to the database. Please check the bookings table in Supabase.'
+      message.includes('foreign key') || error?.code === '23503'
+        ? `${message} Run scripts/supabase-bookings-migration.sql in the Supabase SQL Editor to drop bookings_tour_id_fkey, then try again.`
+        : message.includes('schema cache') || error?.code === 'PGRST204'
+          ? `${message} Run scripts/supabase-bookings-migration.sql in the Supabase SQL Editor, then try again.`
+          : message || 'Could not save booking to the database. Please check the bookings table in Supabase.'
     )
   }
 

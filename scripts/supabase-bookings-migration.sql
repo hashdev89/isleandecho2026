@@ -71,9 +71,28 @@ alter table bookings add column if not exists updated_at timestamptz default now
 alter table bookings add column if not exists tour_id text;
 alter table bookings add column if not exists tour_name text;
 
--- Relax NOT NULL on tour_id so custom trips without a package still save
+-- Drop tour FKs so car rentals + custom trips can save without a tours row
+do $$
+declare
+  r record;
+begin
+  for r in
+    select con.conname
+    from pg_constraint con
+    where con.conrelid = 'public.bookings'::regclass
+      and con.contype = 'f'
+      and pg_get_constraintdef(con.oid) ~* '(tour_id|tour_package_id)'
+  loop
+    execute format('alter table bookings drop constraint if exists %I', r.conname);
+  end loop;
+end $$;
+
+alter table bookings drop constraint if exists bookings_tour_id_fkey;
+alter table bookings drop constraint if exists bookings_tour_package_id_fkey;
+
+-- Relax NOT NULL on tour_id so custom trips / rentals without a tour still save
 alter table bookings alter column tour_id drop not null;
-alter table bookings alter column tour_id set default 'custom-trip';
+alter table bookings alter column tour_id drop default;
 
 update bookings
 set tour_id = coalesce(nullif(tour_id, ''), nullif(tour_package_id, ''), 'custom-trip')
