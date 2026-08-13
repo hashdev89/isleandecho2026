@@ -24,7 +24,6 @@ import {
   Quote
 } from 'lucide-react'
 import Header from '../components/Header'
-import StructuredData, { organizationSchema, websiteSchema } from '../components/StructuredData'
 import { useClickOutside } from '../hooks/useClickOutside'
 import { tourFitsGuestCountFromTour, getTourGroupSize, formatGroupSizeRange } from '@/lib/tourGroupSize'
 import { useCurrency } from '@/contexts/CurrencyContext'
@@ -36,6 +35,12 @@ import {
   normalizeSiteContent,
   type SiteContentDoc,
 } from '@/lib/siteContent'
+import {
+  destinationSearchMatches,
+  isPublicDestination,
+  regionMatches,
+  uniqueRegions,
+} from '@/lib/destinationFilters'
 
 interface Tour {
   id: string
@@ -547,15 +552,24 @@ export default function HomePage() {
     return () => { isMounted = false }
   }, [])
 
+  const publicDestinations = useMemo(
+    () => (destinations || []).filter(isPublicDestination),
+    [destinations]
+  )
+
+  const destinationRegions = useMemo(
+    () => uniqueRegions(publicDestinations),
+    [publicDestinations]
+  )
+
   // Filter destinations with useMemo for performance
   const filteredDestinations = useMemo(() => {
-    return (destinations || []).filter(destination => {
-      const regionMatch = selectedRegion === 'all' || destination.region === selectedRegion
-      const searchMatch = destination.name.toLowerCase().includes(destinationSearchQuery.toLowerCase()) ||
-                         (destination.description || '').toLowerCase().includes(destinationSearchQuery.toLowerCase())
+    return publicDestinations.filter((destination) => {
+      const regionMatch = regionMatches(destination.region, selectedRegion)
+      const searchMatch = destinationSearchMatches(destination, destinationSearchQuery)
       return regionMatch && searchMatch
     })
-  }, [destinations, selectedRegion, destinationSearchQuery])
+  }, [publicDestinations, selectedRegion, destinationSearchQuery])
 
   const displayedDestinations = useMemo(
     () => filteredDestinations.slice(0, destinationsDisplayLimit),
@@ -2385,12 +2399,11 @@ export default function HomePage() {
                 className="px-4 py-2.5 border border-black/10 dark:border-white/15 rounded-full focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent text-base bg-[var(--foam)] text-[var(--ink)] min-h-[44px] touch-manipulation"
               >
                 <option value="all">All Regions</option>
-                <option value="Cultural Triangle">Cultural Triangle</option>
-                <option value="Hill Country">Hill Country</option>
-                <option value="Southern Coast">Beach Destinations</option>
-                <option value="Wildlife">Wildlife & Nature</option>
-                <option value="Northern">Northern Region</option>
-                <option value="Customize">Customize</option>
+                {destinationRegions.map((region) => (
+                  <option key={region} value={region}>
+                    {region}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -2412,9 +2425,7 @@ export default function HomePage() {
             <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {displayedDestinations.map((destination) => {
-                const badge = destination.region === 'Cultural Triangle' ? 'Heritage' : 
-                             destination.region === 'Wildlife' ? 'Nature' :
-                             destination.region.includes('Province') ? 'Cultural' : 'Explore'
+                const badge = String(destination.region || 'Explore').trim() || 'Explore'
 
                 return (
                   <Link
@@ -2644,10 +2655,6 @@ export default function HomePage() {
           </div>
       </section>
       )}
-
-      {/* Structured Data */}
-      <StructuredData data={organizationSchema} />
-      <StructuredData data={websiteSchema} />
 
       <style jsx>{`
         .youtube-container {

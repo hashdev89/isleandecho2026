@@ -14,13 +14,15 @@ export interface AnalyticsSettings {
 }
 
 interface GoogleAnalyticsProps {
-  /** Optional overrides from env (e.g. NEXT_PUBLIC_GA_ID); API from dashboard takes precedence when both exist */
+  /** Server-rendered IDs from Settings / env. Client fetch only fills gaps. */
   googleAnalyticsId?: string
   googleTagManagerId?: string
+  facebookPixelId?: string
+  googleAdsId?: string
 }
 
 export default function GoogleAnalytics(props?: GoogleAnalyticsProps) {
-  const [settings, setSettings] = useState<AnalyticsSettings | null>(null)
+  const [settings, setSettings] = useState<AnalyticsSettings | null>(props || null)
 
   useEffect(() => {
     let cancelled = false
@@ -29,85 +31,41 @@ export default function GoogleAnalytics(props?: GoogleAnalyticsProps) {
         const res = await fetch('/api/seo/analytics')
         const json = await res.json()
         if (!cancelled && json?.success && json?.data) {
-          setSettings(json.data as AnalyticsSettings)
-        } else if (!cancelled && (props?.googleAnalyticsId || props?.googleTagManagerId)) {
           setSettings({
-            googleAnalyticsId: props.googleAnalyticsId,
-            googleTagManagerId: props.googleTagManagerId
+            googleAnalyticsId: json.data.googleAnalyticsId || props?.googleAnalyticsId,
+            googleTagManagerId: json.data.googleTagManagerId || props?.googleTagManagerId,
+            facebookPixelId: json.data.facebookPixelId || props?.facebookPixelId,
+            googleAdsId: json.data.googleAdsId || props?.googleAdsId,
           })
         }
       } catch {
-        if (!cancelled && (props?.googleAnalyticsId || props?.googleTagManagerId)) {
-          setSettings({
-            googleAnalyticsId: props.googleAnalyticsId,
-            googleTagManagerId: props.googleTagManagerId
-          })
-        }
+        if (!cancelled) setSettings(props || null)
       }
     }
     load()
     return () => { cancelled = true }
-  }, [props?.googleAnalyticsId, props?.googleTagManagerId])
-
-  // Inject verification meta tags (Google Search Console, Bing, Yandex)
-  useEffect(() => {
-    if (!settings) return
-    const tags: { id: string; name: string; content: string }[] = []
-    if (settings.googleSearchConsoleId?.trim()) {
-      tags.push({ id: 'meta-google-site-verification', name: 'google-site-verification', content: settings.googleSearchConsoleId.trim() })
-    }
-    if (settings.bingWebmasterId?.trim()) {
-      tags.push({ id: 'meta-msvalidate-01', name: 'msvalidate.01', content: settings.bingWebmasterId.trim() })
-    }
-    if (settings.yandexWebmasterId?.trim()) {
-      tags.push({ id: 'meta-yandex-verification', name: 'yandex-verification', content: settings.yandexWebmasterId.trim() })
-    }
-    tags.forEach(({ id, name, content }) => {
-      let el = document.getElementById(id) as HTMLMetaElement | null
-      if (!el) {
-        el = document.createElement('meta')
-        el.id = id
-        el.setAttribute('name', name)
-        document.head.appendChild(el)
-      }
-      el.setAttribute('content', content)
-    })
-    return () => {
-      tags.forEach(({ id }) => document.getElementById(id)?.remove())
-    }
-  }, [settings?.googleSearchConsoleId, settings?.bingWebmasterId, settings?.yandexWebmasterId])
+  }, [props?.googleAnalyticsId, props?.googleTagManagerId, props?.facebookPixelId, props?.googleAdsId])
 
   const gaId = (settings?.googleAnalyticsId || props?.googleAnalyticsId || '').trim()
   const gtmId = (settings?.googleTagManagerId || props?.googleTagManagerId || '').trim()
-  const fbId = (settings?.facebookPixelId || '').trim()
-  const awId = (settings?.googleAdsId || '').trim()
+  const fbId = (settings?.facebookPixelId || props?.facebookPixelId || '').trim()
+  const awId = (settings?.googleAdsId || props?.googleAdsId || '').trim()
 
   return (
     <>
       {/* Google Tag Manager */}
       {gtmId && (
-        <>
-          <Script
-            id="gtm-script"
-            strategy="afterInteractive"
-            dangerouslySetInnerHTML={{
-              __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        <Script
+          id="gtm-script"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,'script','dataLayer','${gtmId.replace(/'/g, "\\'")}');`
-            }}
-          />
-          <noscript>
-            <iframe
-              src={`https://www.googletagmanager.com/ns.html?id=${encodeURIComponent(gtmId)}`}
-              height="0"
-              width="0"
-              style={{ display: 'none', visibility: 'hidden' }}
-              title="GTM"
-            />
-          </noscript>
-        </>
+          }}
+        />
       )}
 
       {/* Google Analytics (gtag) + Google Ads — load gtag.js for first available id */}

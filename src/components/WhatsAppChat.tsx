@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { MessageCircle, X, Send, Phone, Calendar, Users, MapPin, Bot, Headphones } from 'lucide-react'
+import SiteDatePicker from './SiteDatePicker'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { useClickOutside } from '../hooks/useClickOutside'
@@ -21,6 +22,7 @@ import {
   createInitialIntake,
   intakeStorageKey,
   isGenericCustomerName,
+  extractCustomerName,
   parseGuestCount,
   parseLikelyDate,
   recommendTours,
@@ -105,6 +107,8 @@ export default function WhatsAppChat() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const desktopScrollRef = useRef<HTMLDivElement>(null)
+  const mobileScrollRef = useRef<HTMLDivElement>(null)
   const [whatsappPhone, setWhatsappPhone] = useState('94741415812')
   const [intake, setIntake] = useState<ChatBookingIntake>(createInitialIntake())
   const [recommendedTours, setRecommendedTours] = useState<RecommendableTour[]>([])
@@ -115,6 +119,22 @@ export default function WhatsAppChat() {
   useEffect(() => {
     intakeRef.current = intake
   }, [intake])
+
+  const scrollChatToBottom = useCallback((instant = false) => {
+    const run = () => {
+      const behavior: ScrollBehavior = instant ? 'auto' : 'smooth'
+      for (const el of [desktopScrollRef.current, mobileScrollRef.current]) {
+        if (!el) continue
+        el.scrollTo({ top: el.scrollHeight, behavior })
+      }
+      messagesEndRef.current?.scrollIntoView({ block: 'end', inline: 'nearest', behavior })
+    }
+    requestAnimationFrame(() => {
+      run()
+      window.setTimeout(run, 80)
+      window.setTimeout(run, 280)
+    })
+  }, [])
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -131,6 +151,16 @@ export default function WhatsAppChat() {
     loadSettings()
   }, [])
 
+  const GUEST_CONV_KEY = 'isle-chat-conversation'
+
+  const saveGuestConversation = (conv: Conversation) => {
+    try {
+      sessionStorage.setItem(GUEST_CONV_KEY, JSON.stringify(conv))
+    } catch {
+      // ignore
+    }
+  }
+
   const loadMessages = async (conversationId: string) => {
     try {
       const response = await fetch(`/api/chat/messages?conversation_id=${conversationId}`)
@@ -141,6 +171,7 @@ export default function WhatsAppChat() {
           return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         })
         setMessages(loadedMessages)
+        scrollChatToBottom()
       }
     } catch (err) {
       console.error('Error loading messages:', err)
@@ -218,11 +249,38 @@ export default function WhatsAppChat() {
           )
           if (userConversation) {
             setConversation(userConversation)
+            saveGuestConversation(userConversation)
             loadPersistedIntake(userConversation.id, userConversation.customer_name)
             await loadMessages(userConversation.id)
             setLoading(false)
+            scrollChatToBottom(true)
             return
           }
+        }
+      } else {
+        try {
+          const saved = sessionStorage.getItem(GUEST_CONV_KEY)
+          if (saved) {
+            const parsed = JSON.parse(saved) as Conversation
+            if (parsed?.id) {
+              const msgRes = await fetch(`/api/chat/messages?conversation_id=${parsed.id}`)
+              const msgJson = await msgRes.json()
+              if (msgRes.ok && msgJson.success) {
+                setConversation(parsed)
+                loadPersistedIntake(parsed.id, parsed.customer_name)
+                const loadedMessages = Array.isArray(msgJson.data) ? msgJson.data : []
+                loadedMessages.sort((a: Message, b: Message) => {
+                  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                })
+                setMessages(loadedMessages)
+                setLoading(false)
+                scrollChatToBottom(true)
+                return
+              }
+            }
+          }
+        } catch {
+          // start a new guest conversation
         }
       }
 
@@ -248,8 +306,10 @@ export default function WhatsAppChat() {
       const result = await response.json()
       if (result.success && result.data) {
         setConversation(result.data)
+        saveGuestConversation(result.data)
         loadPersistedIntake(result.data.id, result.data.customer_name)
         await loadMessages(result.data.id)
+        scrollChatToBottom(true)
       } else {
         setError(result.error || 'Failed to create conversation')
       }
@@ -268,7 +328,7 @@ export default function WhatsAppChat() {
       await_name: `Thanks! Can I know your good name first?`,
       choose_path: `Nice to meet you, ${displayName}! What are you looking for today?\n\n1) Tour Packages – ready-made trips\n2) Plan Your Trip – a custom itinerary\n\nTap a button below or reply with “tours” or “plan”.`,
       travel_type: `Great choice, ${displayName}. What kind of travel are you looking for?\n\nYou can tap an option below or type your own (e.g. adventure, beach, wildlife).`,
-      travel_dates: `When would you like to travel? Please share your preferred start date (YYYY-MM-DD or e.g. 15/08/2026).`,
+      travel_dates: `When would you like to travel? Pick a start date from the calendar below.`,
       guests: `How many guests will be traveling?`,
       special_requests: `Any special requests? (dietary needs, accessibility, celebrations, hotel preferences, etc.)\n\nYou can type them here, or reply “none”.`,
       live_agent: LIVE_AGENT_MESSAGE,
@@ -351,30 +411,6 @@ export default function WhatsAppChat() {
     }
   }, [askForStep, persistIntake])
 
-  // When conversation has a real name and we're waiting, continue the guided flow
-  useEffect(() => {
-    if (!conversation?.id) return
-    if (intake.mode !== 'bot') return
-    if (intake.step !== 'await_name') return
-    if (isGenericCustomerName(conversation.customer_name) && isGenericCustomerName(user?.name)) return
-
-    const name = !isGenericCustomerName(conversation.customer_name)
-      ? conversation.customer_name
-      : user?.name || ''
-    if (!name) return
-
-    if (messages.length === 0) return
-    const hasNameAsk = messages.some(
-      (m) => m.sender_role !== 'customer' && m.content.toLowerCase().includes('good name')
-    )
-    const customerReplies = messages.filter((m) => m.sender_role === 'customer')
-    if (hasNameAsk && customerReplies.length >= 1) {
-      advanceAfterName(conversation.id, name)
-    } else if (!isGenericCustomerName(user?.name) && customerReplies.length >= 1) {
-      advanceAfterName(conversation.id, name)
-    }
-  }, [conversation, intake.step, intake.mode, messages, user?.name, advanceAfterName])
-
   const startBotFlow = async () => {
     if (!conversation || sending) return
     await sendCustomerText('Chatbot assistant', async () => {
@@ -451,6 +487,20 @@ export default function WhatsAppChat() {
 
     try {
       setSending(true)
+      const optimistic: Message = {
+        id: `local-${Date.now()}`,
+        conversation_id: conversation.id,
+        sender_id: user?.id || null,
+        sender_name: user?.name || intake.customerName || 'Guest',
+        sender_role: 'customer',
+        content: content.trim(),
+        message_type: 'text',
+        read_at: null,
+        created_at: new Date().toISOString(),
+      }
+      setMessages((prev) => [...prev, optimistic])
+      scrollChatToBottom(true)
+
       const response = await fetch('/api/chat/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -458,7 +508,7 @@ export default function WhatsAppChat() {
           conversation_id: conversation.id,
           sender_id: user?.id || null,
           sender_name: user?.name || intake.customerName || 'Guest',
-          sender_role: user?.role || 'customer',
+          sender_role: 'customer',
           content: content.trim(),
           message_type: 'text',
         }),
@@ -466,6 +516,7 @@ export default function WhatsAppChat() {
 
       const result = await response.json()
       if (!result.success) {
+        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
         alert('Failed to send message: ' + result.error)
         return
       }
@@ -473,23 +524,10 @@ export default function WhatsAppChat() {
       setNewMessage('')
       await loadMessages(conversation.id)
 
-      if (result.name_updated) {
-        const convResponse = await fetch(`/api/chat/conversations?status=active`)
-        const convResult = await convResponse.json()
-        if (convResult.success && convResult.data) {
-          const updatedConv = convResult.data.find((c: Conversation) => c.id === conversation.id)
-          if (updatedConv) {
-            setConversation(updatedConv)
-            const extracted = updatedConv.customer_name
-            if (
-              !isGenericCustomerName(extracted) &&
-              intakeRef.current.step === 'await_name' &&
-              intakeRef.current.mode === 'bot'
-            ) {
-              await advanceAfterName(conversation.id, extracted)
-            }
-          }
-        }
+      if (result.name_updated && result.data) {
+        setConversation((prev) =>
+          prev ? { ...prev, customer_name: extractCustomerName(content) || prev.customer_name } : prev
+        )
       }
 
       if (afterSend) {
@@ -502,9 +540,7 @@ export default function WhatsAppChat() {
       alert('Failed to send message')
     } finally {
       setSending(false)
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-      }, 100)
+      scrollChatToBottom()
     }
   }
 
@@ -559,7 +595,15 @@ export default function WhatsAppChat() {
     if (current.mode !== 'bot') return
 
     if (current.step === 'await_name') {
-      // Name extraction is handled by API; advanceAfterName effect / name_updated handles next step
+      const name = extractCustomerName(content)
+      if (!name) {
+        await postBotMessage(
+          conversation.id,
+          'Please share your name so I can continue (for example: Sam).'
+        )
+        return
+      }
+      await advanceAfterName(conversation.id, name)
       return
     }
 
@@ -746,12 +790,9 @@ export default function WhatsAppChat() {
   }, [isOpen])
 
   useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-      }, 100)
-    }
-  }, [messages.length, recommendedTours, intake.step])
+    if (!isOpen) return
+    scrollChatToBottom()
+  }, [isOpen, messages, recommendedTours, intake.step, loadingRecommendations, sending, scrollChatToBottom])
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
@@ -839,6 +880,22 @@ export default function WhatsAppChat() {
           >
             Prefer a live agent?
           </button>
+        </div>
+      )
+    }
+
+    if (intake.step === 'travel_dates') {
+      return (
+        <div className="mt-2">
+          <SiteDatePicker
+            inline
+            value={intake.startDate}
+            onChange={(date) => {
+              if (sending) return
+              void sendCustomerText(date)
+            }}
+            placeholder="Select travel date"
+          />
         </div>
       )
     }
@@ -1015,7 +1072,7 @@ export default function WhatsAppChat() {
       : intake.step === 'live_agent'
         ? 'Message our live team…'
         : intake.step === 'travel_dates'
-          ? 'e.g. 2026-08-20'
+          ? 'Or type a date…'
           : intake.step === 'guests'
             ? 'e.g. 2'
             : intake.step === 'special_requests'
@@ -1025,7 +1082,7 @@ export default function WhatsAppChat() {
                 : 'Setting up chat...'
 
   const inputType =
-    intake.step === 'guests' ? 'number' : intake.step === 'travel_dates' ? 'date' : 'text'
+    intake.step === 'guests' ? 'number' : 'text'
 
   const renderComposer = (compact = false) => (
     <div className={`border-t border-gray-200 bg-white ${compact ? 'p-3 safe-area-inset-bottom' : 'p-4'}`}>
@@ -1096,7 +1153,7 @@ export default function WhatsAppChat() {
 
         {isOpen && (
           <div
-            className="absolute bottom-20 right-0 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            className="absolute bottom-20 right-0 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-0"
             style={{ height: '600px', maxHeight: '80vh' }}
           >
             <div className="bg-[#25D366] p-4 text-white">
@@ -1125,7 +1182,7 @@ export default function WhatsAppChat() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+            <div ref={desktopScrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-gray-50">
               {loading ? (
                 <div className="text-center text-gray-500 py-8">
                   <p>Setting up your chat...</p>
@@ -1150,7 +1207,7 @@ export default function WhatsAppChat() {
       </div>
 
       {isOpen && (
-        <div className="sm:hidden fixed inset-0 z-[100] bg-white flex flex-col">
+        <div className="sm:hidden fixed inset-0 z-[100] bg-white flex flex-col min-h-0">
           <div className="bg-[#25D366] p-4 text-white flex items-center justify-between">
             <div className="flex items-center space-x-3 flex-1">
               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center p-2">
@@ -1184,7 +1241,7 @@ export default function WhatsAppChat() {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+          <div ref={mobileScrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-gray-50">
             {loading ? (
               <div className="text-center text-gray-500 py-8">
                 <p>Setting up your chat...</p>

@@ -19,6 +19,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import Header from '../../../components/Header'
+import SiteDatePicker from '../../../components/SiteDatePicker'
 import { formatDistanceKm, getRouteSegments, getTotalRouteKm } from '@/lib/geoDistance'
 import { formatRentalCurrency } from '@/lib/rentalPricing'
 import type { RentalQuote, Vehicle } from '@/lib/vehicleTypes'
@@ -486,12 +487,21 @@ export default function VehicleDetailClient({ params }: { params: Promise<{ vehi
               <h3 className="text-xl font-bold text-[var(--ink)] mb-4">Book this vehicle</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Pickup date</label>
-                  <input type="date" value={rentalData.pickupDate} onChange={(e) => setRentalData({ ...rentalData, pickupDate: e.target.value })} className="w-full px-4 py-3 border border-black/10 rounded-xl bg-[var(--foam)]" />
+                  <SiteDatePicker
+                    label="Pickup date"
+                    value={rentalData.pickupDate}
+                    placeholder="Select pickup date"
+                    onChange={(pickupDate) => setRentalData({ ...rentalData, pickupDate })}
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Return date</label>
-                  <input type="date" value={rentalData.returnDate} onChange={(e) => setRentalData({ ...rentalData, returnDate: e.target.value })} className="w-full px-4 py-3 border border-black/10 rounded-xl bg-[var(--foam)]" />
+                  <SiteDatePicker
+                    label="Return date"
+                    value={rentalData.returnDate}
+                    placeholder="Select return date"
+                    minDate={rentalData.pickupDate}
+                    onChange={(returnDate) => setRentalData({ ...rentalData, returnDate })}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-2">Full name</label>
