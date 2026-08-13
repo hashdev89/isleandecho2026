@@ -21,9 +21,11 @@ import {
   Users,
   AlertCircle,
   Mail,
+  Star,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { formatRentalCurrency } from '@/lib/rentalPricing'
+import { useCurrency } from '../../contexts/CurrencyContext'
+import { getTourReviews } from '@/lib/currency'
 import { canAccessEmailCenter, hasAdminAccess } from '@/lib/roles'
 
 interface BookingRow {
@@ -64,6 +66,7 @@ function mapBooking(b: Record<string, unknown>): BookingRow {
 
 export default function AdminDashboard() {
   const { user } = useAuth()
+  const { formatPrice } = useCurrency()
   const [recentBookings, setRecentBookings] = useState<BookingRow[]>([])
   const [allBookings, setAllBookings] = useState<BookingRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -77,6 +80,7 @@ export default function AdminDashboard() {
     pendingBookings: 0,
     confirmedBookings: 0,
     revenue: 0,
+    reviews: 0,
   })
 
   const isAdmin = hasAdminAccess(user?.role)
@@ -119,9 +123,11 @@ export default function AdminDashboard() {
       const revenue = bookings
         .filter((b) => b.status === 'confirmed' || b.status === 'completed' || b.paymentStatus === 'paid')
         .reduce((sum, b) => sum + (b.totalPrice || 0), 0)
+      const toursList = toursJson.success && Array.isArray(toursJson.data) ? toursJson.data : []
+      const reviews = toursList.reduce((sum: number, tour: Record<string, unknown>) => sum + getTourReviews(tour), 0)
 
       setCounts({
-        tours: toursJson.success && Array.isArray(toursJson.data) ? toursJson.data.length : 0,
+        tours: toursList.length,
         destinations: destJson.success && Array.isArray(destJson.data) ? destJson.data.length : 0,
         vehicles: vehiclesJson.success && Array.isArray(vehiclesJson.data) ? vehiclesJson.data.length : 0,
         images: imagesJson.success && Array.isArray(imagesJson.data) ? imagesJson.data.length : 0,
@@ -129,6 +135,7 @@ export default function AdminDashboard() {
         pendingBookings: bookings.filter((b) => b.status === 'pending').length,
         confirmedBookings: bookings.filter((b) => b.status === 'confirmed').length,
         revenue,
+        reviews,
       })
     } catch (error) {
       console.error('Dashboard load error:', error)
@@ -155,7 +162,7 @@ export default function AdminDashboard() {
       },
       {
         name: 'Revenue',
-        value: loading ? '—' : formatRentalCurrency(counts.revenue),
+        value: loading ? '—' : formatPrice(counts.revenue),
         change: loading ? undefined : 'paid & confirmed',
         changeType: 'neutral',
         icon: DollarSign,
@@ -168,6 +175,14 @@ export default function AdminDashboard() {
         icon: Package,
         href: '/admin/tours',
         accent: 'bg-blue-500',
+        changeType: 'positive',
+      },
+      {
+        name: 'Tour reviews',
+        value: loading ? '—' : String(counts.reviews),
+        icon: Star,
+        href: '/admin/tours',
+        accent: 'bg-yellow-500',
         changeType: 'positive',
       },
       {
@@ -403,7 +418,7 @@ export default function AdminDashboard() {
                       {booking.status}
                     </span>
                     <span className="text-sm font-semibold text-gray-900">
-                      {formatRentalCurrency(booking.totalPrice || 0)}
+                      {formatPrice(booking.totalPrice || 0)}
                     </span>
                     <Link
                       href={`/admin/bookings/${booking.id}`}
@@ -452,7 +467,7 @@ export default function AdminDashboard() {
             <div>
               <p className="text-sm text-gray-500">Total revenue</p>
               <p className="text-2xl font-bold text-gray-900">
-                {loading ? '…' : formatRentalCurrency(counts.revenue)}
+                {loading ? '…' : formatPrice(counts.revenue)}
               </p>
             </div>
           </div>

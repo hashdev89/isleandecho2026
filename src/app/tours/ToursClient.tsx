@@ -14,10 +14,13 @@ import {
 import Header from '../../components/Header'
 import StructuredData, { breadcrumbSchema } from '../../components/StructuredData'
 import { tourFitsGuestCountFromTour, formatGroupSizeRange, getTourGroupSize } from '@/lib/tourGroupSize'
+import { useCurrency } from '@/contexts/CurrencyContext'
+import { getTourRating, getTourReviews } from '@/lib/currency'
 import { CmsPageHero } from '../../components/CmsPageSections'
 import { useCmsPage } from '@/hooks/useSiteContent'
 
 export default function ToursClient() {
+  const { formatPrice } = useCurrency()
   const { page } = useCmsPage('/tours')
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -237,11 +240,12 @@ export default function ToursClient() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center space-x-1 text-white/90 text-sm">
                         <Star className="w-4 h-4 text-[var(--sun)] fill-current" />
-                        <span className="font-semibold">{tour.rating ?? '4.8'}</span>
-                        <span className="opacity-70">({tour.reviews ?? 120})</span>
+                        <span className="font-semibold">{getTourRating(tour) || '—'}</span>
+                        <span className="opacity-70">({getTourReviews(tour)})</span>
                       </div>
                       <span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--sun)]">
-                        Book <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                        {parseFloat(String(tour.price || '').replace(/[^0-9.]/g, '')) > 0 ? formatPrice(tour.price) : 'Book'}
+                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                       </span>
                     </div>
                   </div>

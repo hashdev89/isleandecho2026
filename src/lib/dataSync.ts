@@ -39,6 +39,8 @@ export interface TourData {
   bestTime: string
   images: string[]
   featured?: boolean
+  rating?: number
+  reviews?: number
   status: 'active' | 'draft' | 'archived'
 }
 

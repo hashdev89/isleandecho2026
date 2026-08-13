@@ -493,6 +493,83 @@ function SectionEditor({
           />
         </div>
       )
+    case 'testimonials': {
+      const items =
+        (d.items as Array<{ name?: string; location?: string; quote?: string; rating?: number; image?: string }>) || []
+      return (
+        <div className="space-y-4">
+          <Field label="Kicker" value={String(d.kicker || '')} onChange={(v) => set('kicker', v)} />
+          <Field label="Title" value={String(d.title || '')} onChange={(v) => set('title', v)} />
+          <Field label="Subtitle" value={String(d.subtitle || '')} onChange={(v) => set('subtitle', v)} multiline />
+          {items.map((item, i) => (
+            <div key={i} className="space-y-2 rounded-xl border p-3">
+              <div className="flex justify-between">
+                <span className="text-xs font-semibold text-slate-500">Testimonial {i + 1}</span>
+                <button
+                  type="button"
+                  className="text-red-600"
+                  onClick={() => set('items', items.filter((_, idx) => idx !== i))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+              <input
+                value={item.name || ''}
+                onChange={(e) => {
+                  const next = [...items]
+                  next[i] = { ...next[i], name: e.target.value }
+                  set('items', next)
+                }}
+                className="w-full rounded-lg border px-2 py-1.5 text-sm"
+                placeholder="Guest name"
+              />
+              <input
+                value={item.location || ''}
+                onChange={(e) => {
+                  const next = [...items]
+                  next[i] = { ...next[i], location: e.target.value }
+                  set('items', next)
+                }}
+                className="w-full rounded-lg border px-2 py-1.5 text-sm"
+                placeholder="Location / country"
+              />
+              <textarea
+                value={item.quote || ''}
+                onChange={(e) => {
+                  const next = [...items]
+                  next[i] = { ...next[i], quote: e.target.value }
+                  set('items', next)
+                }}
+                className="w-full rounded-lg border px-2 py-1.5 text-sm"
+                rows={3}
+                placeholder="Testimonial quote"
+              />
+              <input
+                type="number"
+                min={1}
+                max={5}
+                step={1}
+                value={item.rating ?? 5}
+                onChange={(e) => {
+                  const next = [...items]
+                  next[i] = { ...next[i], rating: Math.max(1, Math.min(5, Number(e.target.value) || 5)) }
+                  set('items', next)
+                }}
+                className="w-full rounded-lg border px-2 py-1.5 text-sm"
+                placeholder="Rating 1–5"
+              />
+            </div>
+          ))}
+          <button
+            type="button"
+            className="text-sm font-semibold text-teal-700"
+            onClick={() => set('items', [...items, { name: '', location: '', quote: '', rating: 5, image: '' }])}
+          >
+            Add testimonial
+          </button>
+        </div>
+      )
+    }
     case 'team': {
       const members = (d.members as Array<{ name?: string; position?: string; bio?: string; image?: string }>) || []
       return (

@@ -20,12 +20,15 @@ import {
 
   ArrowRight,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Quote
 } from 'lucide-react'
 import Header from '../components/Header'
 import StructuredData, { organizationSchema, websiteSchema } from '../components/StructuredData'
 import { useClickOutside } from '../hooks/useClickOutside'
 import { tourFitsGuestCountFromTour, getTourGroupSize, formatGroupSizeRange } from '@/lib/tourGroupSize'
+import { useCurrency } from '@/contexts/CurrencyContext'
+import { getTourRating, getTourReviews } from '@/lib/currency'
 import {
   getPageBySlug,
   getSection,
@@ -46,12 +49,38 @@ interface Tour {
   destinations?: string[]
   style?: string
   featured?: boolean
+  status?: string
   groupSize?: string
   group_size?: string
   status?: string
 }
 
+const DEFAULT_TESTIMONIALS = [
+  {
+    name: 'Emma Thompson',
+    location: 'United Kingdom',
+    quote:
+      'Every day felt effortless — the guides, the hotels, and the little details made our Sri Lanka trip unforgettable.',
+    rating: 5,
+  },
+  {
+    name: 'Arjun Patel',
+    location: 'India',
+    quote:
+      'From Sigiriya to the south coast, the itinerary was perfectly paced. We felt looked after without losing the adventure.',
+    rating: 5,
+  },
+  {
+    name: 'Sophie Müller',
+    location: 'Germany',
+    quote:
+      'Beautiful stays, kind drivers, and wildlife we will never forget. I would book with ISLE & ECHO again in a heartbeat.',
+    rating: 5,
+  },
+]
+
 export default function HomePage() {
+  const { formatPrice } = useCurrency()
   const [searchTab, setSearchTab] = useState('tours')
   const [searchData, setSearchData] = useState({
     tourPackage: '',
@@ -77,6 +106,7 @@ export default function HomePage() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [showToursDatePicker, setShowToursDatePicker] = useState(false)
   const [showPackageDropdown, setShowPackageDropdown] = useState(false)
+  const [packageSearch, setPackageSearch] = useState('')
   const [showDestDropdown, setShowDestDropdown] = useState(false)
   const [showPickupDropdown, setShowPickupDropdown] = useState(false)
   const [showDropoffDropdown, setShowDropoffDropdown] = useState(false)
@@ -89,6 +119,7 @@ export default function HomePage() {
   const toursDatePickerRef = useRef<HTMLDivElement>(null)
   const customDatePickerRef = useRef<HTMLDivElement>(null)
   const packageDropdownRef = useRef<HTMLDivElement>(null)
+  const packageSearchRef = useRef<HTMLInputElement>(null)
   const destDropdownRef = useRef<HTMLDivElement>(null)
   const pickupDropdownRef = useRef<HTMLDivElement>(null)
   const dropoffDropdownRef = useRef<HTMLDivElement>(null)
@@ -96,7 +127,10 @@ export default function HomePage() {
   const rentReturnDatePickerRef = useRef<HTMLDivElement>(null)
   const closeToursDatePicker = useCallback(() => setShowToursDatePicker(false), [])
   const closeCustomDatePicker = useCallback(() => setShowDatePicker(false), [])
-  const closePackageDropdown = useCallback(() => setShowPackageDropdown(false), [])
+  const closePackageDropdown = useCallback(() => {
+    setShowPackageDropdown(false)
+    setPackageSearch('')
+  }, [])
   const closeDestDropdown = useCallback(() => setShowDestDropdown(false), [])
   const closePickupDropdown = useCallback(() => setShowPickupDropdown(false), [])
   const closeDropoffDropdown = useCallback(() => setShowDropoffDropdown(false), [])
@@ -105,6 +139,14 @@ export default function HomePage() {
   useClickOutside(toursDatePickerRef, showToursDatePicker, closeToursDatePicker)
   useClickOutside(customDatePickerRef, showDatePicker, closeCustomDatePicker)
   useClickOutside(packageDropdownRef, showPackageDropdown, closePackageDropdown)
+
+  useEffect(() => {
+    if (showPackageDropdown) {
+      packageSearchRef.current?.focus()
+    } else {
+      setPackageSearch('')
+    }
+  }, [showPackageDropdown])
   useClickOutside(destDropdownRef, showDestDropdown, closeDestDropdown)
   useClickOutside(pickupDropdownRef, showPickupDropdown, closePickupDropdown)
   useClickOutside(dropoffDropdownRef, showDropoffDropdown, closeDropoffDropdown)
@@ -165,19 +207,24 @@ export default function HomePage() {
   const [heroReady, setHeroReady] = useState(false)
   const [failedHeroImageIndices, setFailedHeroImageIndices] = useState<Set<number>>(new Set())
 
-  const toursForGuestCount = useMemo(
-    () => allTours.filter((tour) => tourFitsGuestCountFromTour(tour, searchData.guests)),
-    [allTours, searchData.guests]
+  const publicTours = useMemo(
+    () =>
+      allTours
+        .filter((tour) => tour?.id && tour?.name && tour.status !== 'inactive')
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [allTours]
   )
 
-  useEffect(() => {
-    if (!searchData.tourPackage) return
-    const selected = allTours.find((t) => t.id === searchData.tourPackage)
-    if (selected && !tourFitsGuestCountFromTour(selected, searchData.guests)) {
-      setSearchData((prev) => ({ ...prev, tourPackage: '' }))
-      setShowPackageDropdown(false)
-    }
-  }, [searchData.guests, searchData.tourPackage, allTours])
+  const searchableTours = useMemo(() => {
+    const q = packageSearch.trim().toLowerCase()
+    if (!q) return publicTours
+    return publicTours.filter(
+      (tour) =>
+        tour.name.toLowerCase().includes(q) ||
+        String(tour.duration || '').toLowerCase().includes(q)
+    )
+  }, [publicTours, packageSearch])
 
   const rentCityOptions = useMemo(() => {
     if (destinations.length > 0) {
@@ -211,6 +258,7 @@ export default function HomePage() {
     (siteContent?.sriLankaBanner as Record<string, unknown> | undefined)
   const featuresCms = getSection(homePage, 'features')
   const destinationsCms = getSection(homePage, 'destinations')
+  const testimonialsCms = getSection(homePage, 'testimonials')
   const blogCms = getSection(homePage, 'blogPreview')
   const ctaCms = getSection(homePage, 'cta')
   const showFeatured = !homePage || isSectionEnabled(homePage, 'featuredTours')
@@ -218,6 +266,7 @@ export default function HomePage() {
   const showBanner = !homePage || isSectionEnabled(homePage, 'sriLankaBanner')
   const showFeatures = !homePage || isSectionEnabled(homePage, 'features')
   const showDestinations = !homePage || isSectionEnabled(homePage, 'destinations')
+  const showTestimonials = !homePage || isSectionEnabled(homePage, 'testimonials')
   const showBlog = !homePage || isSectionEnabled(homePage, 'blogPreview')
   const showCta = !homePage || isSectionEnabled(homePage, 'cta')
 
@@ -383,6 +432,7 @@ export default function HomePage() {
                       return isValid
                     })
                     setFeaturedTours(featured)
+                    setAllTours((prev) => (prev.length ? prev : featured))
                   } else {
                     setFeaturedTours([])
                   }
@@ -435,8 +485,6 @@ export default function HomePage() {
           }
         }
         
-        // Fetch all tours in the background (for search functionality) - lower priority
-        // This doesn't block the initial render
         if (isMounted) {
           fetchWithTimeout('/api/tours', 25000)
             .then(async (res) => {
@@ -446,7 +494,6 @@ export default function HomePage() {
                   const json = await res.json()
                   if (json.success && json.data) {
                     const tours = json.data || []
-                    // Remove duplicates based on id
                     const uniqueTours = tours.filter((tour: Tour, index: number, self: Tour[]) => 
                       index === self.findIndex((t: Tour) => t.id === tour.id)
                     )
@@ -1178,7 +1225,7 @@ export default function HomePage() {
                            <span className="block truncate">
                              {(() => {
                                if (!searchData.tourPackage) return 'Select Your Package'
-                               const selected = toursForGuestCount.find((t) => t.id === searchData.tourPackage)
+                               const selected = publicTours.find((t) => t.id === searchData.tourPackage)
                                  || allTours.find((t) => t.id === searchData.tourPackage)
                                if (!selected) return 'Select Your Package'
                                const paxLabel = formatGroupSizeRange(getTourGroupSize(selected))
@@ -1189,56 +1236,72 @@ export default function HomePage() {
                          <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-600 dark:text-gray-400 transition-transform ${showPackageDropdown ? 'rotate-180' : ''}`} />
 
                          {showPackageDropdown && (
-                           <ul
-                             role="listbox"
-                             className="absolute left-0 right-0 top-full mt-1 z-[110] max-h-[min(280px,50vh)] sm:max-h-[min(320px,45vh)] overflow-y-auto overscroll-contain rounded-xl border border-black/10 bg-white dark:bg-gray-800 shadow-2xl py-1 w-full min-w-0"
-                           >
-                             <li>
-                               <button
-                                 type="button"
-                                 role="option"
-                                 aria-selected={!searchData.tourPackage}
-                                 onClick={() => {
-                                   setSearchData({ ...searchData, tourPackage: '' })
-                                   setShowPackageDropdown(false)
-                                 }}
-                                 className="w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-700 dark:text-gray-200 hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)] transition-colors"
-                               >
-                                 Select Your Package
-                               </button>
-                             </li>
-                             {toursForGuestCount.map((tourPackage: Tour, index: number) => {
-                               const paxLabel = formatGroupSizeRange(getTourGroupSize(tourPackage))
-                               const label = `${tourPackage.name}${paxLabel ? ` (${paxLabel})` : ''}`
-                               const isSelected = searchData.tourPackage === tourPackage.id
-                               return (
-                                 <li key={`${tourPackage.id}-${index}`}>
-                                   <button
-                                     type="button"
-                                     role="option"
-                                     aria-selected={isSelected}
-                                     title={label}
-                                     onClick={() => {
-                                       setSearchData({ ...searchData, tourPackage: tourPackage.id })
-                                       setShowPackageDropdown(false)
-                                     }}
-                                     className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base transition-colors break-words ${
-                                       isSelected
-                                         ? 'bg-[var(--lagoon-deep)] text-[var(--sun)]'
-                                         : 'text-gray-900 dark:text-white hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
-                                     }`}
-                                   >
-                                     {label}
-                                   </button>
-                                 </li>
-                               )
-                             })}
-                             {toursForGuestCount.length === 0 && allTours.length > 0 && (
-                               <li className="px-3 sm:px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400">
-                                 No packages for {searchData.guests} guest{searchData.guests === 1 ? '' : 's'}
+                           <div className="absolute left-0 right-0 top-full mt-1 z-[110] overflow-hidden rounded-xl border border-black/10 bg-white dark:bg-gray-800 shadow-2xl w-full min-w-0">
+                             <div className="relative border-b border-gray-100 p-2">
+                               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                               <input
+                                 ref={packageSearchRef}
+                                 type="search"
+                                 value={packageSearch}
+                                 onChange={(e) => setPackageSearch(e.target.value)}
+                                 onClick={(e) => e.stopPropagation()}
+                                 placeholder="Search tour name..."
+                                 className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-900 outline-none focus:border-[var(--lagoon)] focus:ring-2 focus:ring-[var(--lagoon)]/20"
+                               />
+                             </div>
+                             <ul
+                               role="listbox"
+                               className="max-h-[min(280px,50vh)] sm:max-h-[min(360px,45vh)] overflow-y-auto overscroll-contain py-1"
+                             >
+                               <li>
+                                 <button
+                                   type="button"
+                                   role="option"
+                                   aria-selected={!searchData.tourPackage}
+                                   onClick={() => {
+                                     setSearchData({ ...searchData, tourPackage: '' })
+                                     closePackageDropdown()
+                                   }}
+                                   className="w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-700 dark:text-gray-200 hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)] transition-colors"
+                                 >
+                                   Select Your Package
+                                 </button>
                                </li>
-                             )}
-                           </ul>
+                               {searchableTours.map((tourPackage: Tour, index: number) => {
+                                 const paxLabel = formatGroupSizeRange(getTourGroupSize(tourPackage))
+                                 const label = `${tourPackage.name}${paxLabel ? ` (${paxLabel})` : ''}`
+                                 const isSelected = searchData.tourPackage === tourPackage.id
+                                 return (
+                                   <li key={`${tourPackage.id}-${index}`}>
+                                     <button
+                                       type="button"
+                                       role="option"
+                                       aria-selected={isSelected}
+                                       title={label}
+                                       onClick={() => {
+                                         setSearchData({ ...searchData, tourPackage: tourPackage.id })
+                                         closePackageDropdown()
+                                       }}
+                                       className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base transition-colors break-words ${
+                                         isSelected
+                                           ? 'bg-[var(--lagoon-deep)] text-[var(--sun)]'
+                                           : 'text-gray-900 dark:text-white hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
+                                       }`}
+                                     >
+                                       {label}
+                                     </button>
+                                   </li>
+                                 )
+                               })}
+                               {searchableTours.length === 0 && (
+                                 <li className="px-3 sm:px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400">
+                                   {publicTours.length === 0
+                                     ? 'No tour packages available'
+                                     : `No tours match “${packageSearch}”`}
+                                 </li>
+                               )}
+                             </ul>
+                           </div>
                          )}
                        </div>
                      </div>
@@ -1405,9 +1468,12 @@ export default function HomePage() {
                                <div className="text-right shrink-0">
                                  <div className="flex items-center justify-end space-x-1">
                                    <Star className="w-4 h-4 text-[var(--sun)] fill-current" />
-                                   <span className="text-sm font-semibold text-[var(--lagoon-deep)] dark:text-white">{selectedTour.rating}</span>
+                                   <span className="text-sm font-semibold text-[var(--lagoon-deep)] dark:text-white">{getTourRating(selectedTour) || '—'}</span>
                                  </div>
-                                 <p className="text-xs text-[var(--lagoon-deep)]/70 dark:text-white/70">({selectedTour.reviews} reviews)</p>
+                                 <p className="text-xs text-[var(--lagoon-deep)]/70 dark:text-white/70">({getTourReviews(selectedTour)} reviews)</p>
+                                 {parseFloat(String(selectedTour.price || '').replace(/[^0-9.]/g, '')) > 0 && (
+                                   <p className="mt-1 text-sm font-bold text-[var(--lagoon-deep)] dark:text-[var(--sun)]">{formatPrice(selectedTour.price)}</p>
+                                 )}
                                </div>
                              </div>
                              
@@ -2145,11 +2211,12 @@ export default function HomePage() {
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center space-x-1 text-white/90 text-sm">
                           <Star className="w-4 h-4 text-[var(--sun)] fill-current" />
-                          <span className="font-semibold">{tour.rating}</span>
-                          <span className="opacity-70">({tour.reviews})</span>
+                          <span className="font-semibold">{getTourRating(tour) || '—'}</span>
+                          <span className="opacity-70">({getTourReviews(tour)})</span>
                         </div>
                         <span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--sun)]">
-                          Explore <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                          {parseFloat(String(tour.price || '').replace(/[^0-9.]/g, '')) > 0 ? formatPrice(tour.price) : 'Explore'}
+                          <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                         </span>
                       </div>
                     </div>
@@ -2403,9 +2470,63 @@ export default function HomePage() {
       </section>
       )}
 
+      {showTestimonials && (
+      <section className="lp-section-ink py-14 sm:py-20 bg-[var(--foam)]">
+        <div className="w-full max-w-[1920px] mx-auto lp-gutter">
+          <div className="max-w-2xl mb-8 sm:mb-12">
+            <p className="lp-kicker mb-2">{String(testimonialsCms?.kicker || 'Guest stories')}</p>
+            <h2 className="lp-section-title text-3xl sm:text-4xl md:text-5xl mb-3">
+              {String(testimonialsCms?.title || 'What travelers say')}
+            </h2>
+            <p className="text-[var(--ink-soft)] text-base sm:text-lg leading-relaxed">
+              {String(
+                testimonialsCms?.subtitle ||
+                  'Real experiences from guests who explored Sri Lanka with ISLE & ECHO.'
+              )}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            {((testimonialsCms?.items as Array<{ name?: string; location?: string; quote?: string; rating?: number }>)?.length
+              ? (testimonialsCms!.items as Array<{ name?: string; location?: string; quote?: string; rating?: number }>)
+              : DEFAULT_TESTIMONIALS
+            ).map(
+              (item, index) => {
+                const rating = Math.max(0, Math.min(5, Number(item.rating || 5)))
+                return (
+                  <article
+                    key={`${item.name || 'guest'}-${index}`}
+                    className="lp-panel p-6 sm:p-8 h-full flex flex-col"
+                  >
+                    <Quote className="w-8 h-8 text-[var(--lagoon)] mb-4" />
+                    <div className="flex items-center gap-1 mb-4">
+                      {Array.from({ length: 5 }).map((_, star) => (
+                        <Star
+                          key={star}
+                          className={`w-4 h-4 ${star < rating ? 'text-[var(--sun)] fill-current' : 'text-black/15'}`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-[var(--ink)] text-base leading-relaxed flex-1">
+                      “{item.quote || 'A wonderful journey with ISLE & ECHO.'}”
+                    </p>
+                    <div className="mt-6 pt-4 border-t border-black/5">
+                      <p className="font-semibold text-[var(--lagoon-deep)]">{item.name || 'Guest'}</p>
+                      {item.location ? (
+                        <p className="text-sm text-[var(--ink-soft)]">{item.location}</p>
+                      ) : null}
+                    </div>
+                  </article>
+                )
+              }
+            )}
+          </div>
+        </div>
+      </section>
+      )}
+
       {/* Inspiration — blog */}
       {showBlog && (
-      <section className="lp-section-ink py-14 sm:py-20 bg-[var(--foam)]">
+      <section className="lp-section-ink py-14 sm:py-20 bg-white dark:bg-[var(--foam)]">
         <div className="w-full max-w-[1920px] mx-auto lp-gutter">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8 sm:mb-12">
             <div>

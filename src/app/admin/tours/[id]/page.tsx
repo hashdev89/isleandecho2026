@@ -18,6 +18,7 @@ import DestinationSelector from '../../../../components/DestinationSelector'
 import DestinationManager from '../../../../components/DestinationManager'
 import ImageSelector from '../../../../components/ImageSelector'
 import { dataSync, TourData } from '../../../../lib/dataSync'
+import { useCurrency } from '../../../../contexts/CurrencyContext'
 
 interface Day {
   day: number
@@ -59,6 +60,8 @@ interface TourPackage {
   images: string[]
   status: 'active' | 'draft' | 'archived'
   featured?: boolean
+  rating?: number
+  reviews?: number
 }
 
 interface Destination {
@@ -74,6 +77,7 @@ export default function TourEditor() {
   const tourId = params.id as string
   const isNew = tourId === 'new'
   const [isLoading, setIsLoading] = useState(true)
+  const { baseCurrency, baseSymbol } = useCurrency()
 
   const [tour, setTour] = useState<TourPackage>({
     id: '',
@@ -94,7 +98,9 @@ export default function TourEditor() {
     bestTime: '',
     images: [],
     status: 'draft',
-    featured: false
+    featured: false,
+    rating: 0,
+    reviews: 0,
   })
 
   const [availableDestinations, setAvailableDestinations] = useState<Destination[]>([])
@@ -268,7 +274,9 @@ export default function TourEditor() {
               ...found,
               name: found.name || '',
               duration: found.duration || '',
-              price: found.price || '',
+              price: String(found.price || '').replace(/[^0-9.]/g, ''),
+              rating: Number((found as { rating?: number }).rating || (found.importantInfo as { rating?: number } | undefined)?.rating || 0) || 0,
+              reviews: Number((found as { reviews?: number }).reviews || (found.importantInfo as { reviews?: number } | undefined)?.reviews || 0) || 0,
               style: found.style || '',
               description: found.description || '',
               transportation: found.transportation || '',
@@ -299,6 +307,8 @@ export default function TourEditor() {
               name: 'New Tour',
               duration: '',
               price: '',
+              rating: 0,
+              reviews: 0,
               style: '',
               destinations: [],
               highlights: [],
@@ -329,6 +339,8 @@ export default function TourEditor() {
             name: 'New Tour',
             duration: '',
             price: '',
+            rating: 0,
+            reviews: 0,
             style: '',
             destinations: [],
             highlights: [],
@@ -561,7 +573,9 @@ export default function TourEditor() {
               ...updated,
               name: updated.name || '',
               duration: updated.duration || '',
-              price: updated.price || '',
+              price: String(updated.price || '').replace(/[^0-9.]/g, ''),
+              rating: Number((updated as { rating?: number }).rating || 0) || 0,
+              reviews: Number((updated as { reviews?: number }).reviews || 0) || 0,
               style: updated.style || '',
               description: updated.description || '',
               transportation: updated.transportation || '',
@@ -1100,14 +1114,45 @@ export default function TourEditor() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Price <span className="text-gray-400 text-xs">(optional)</span>
+                  Price <span className="text-gray-400 text-xs">(optional, {baseCurrency})</span>
                 </label>
+                <div className="flex overflow-hidden rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500">
+                  <span className="flex items-center bg-gray-50 px-3 text-sm font-semibold text-gray-700">
+                    {baseSymbol} {baseCurrency}
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={tour.price || ''}
+                    onChange={(e) => setTour({ ...tour, price: e.target.value.replace(/[^0-9.]/g, '') })}
+                    className="w-full border-0 px-3 py-2 focus:ring-0"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Rating</label>
                 <input
-                  type="text"
-                  value={tour.price || ''}
-                  onChange={(e) => setTour({ ...tour, price: e.target.value })}
+                  type="number"
+                  min={0}
+                  max={5}
+                  step={0.1}
+                  value={tour.rating ?? 0}
+                  onChange={(e) => setTour({ ...tour, rating: Number(e.target.value) || 0 })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., $899"
+                  placeholder="e.g., 4.8"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Reviews count</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={tour.reviews ?? 0}
+                  onChange={(e) => setTour({ ...tour, reviews: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 127"
                 />
               </div>
               <div>

@@ -163,15 +163,20 @@ export async function GET() {
     }
     
     // Transform database field names to frontend format
-    const featured = (data || []).map((tour: Tour) => ({
+    const featured = (data || []).map((tour: Tour) => {
+      const important = ((tour as any).important_info || (tour as any).importantInfo || {}) as Record<string, unknown>
+      return {
       ...tour,
       keyExperiences: (tour as any).key_experiences || [],
       createdAt: (tour as any).created_at || (tour as any).createdat || new Date().toISOString(),
       updatedAt: (tour as any).updated_at || (tour as any).updatedat || new Date().toISOString(),
-      importantInfo: (tour as any).important_info || (tour as any).importantInfo || {},
-      groupSize: (tour as any).group_size ?? (tour as any).groupsize ?? (tour as any).groupSize ?? ((tour as any).important_info as Record<string, unknown>)?.groupSize ?? '',
-      bestTime: (tour as any).best_time ?? (tour as any).besttime ?? (tour as any).bestTime ?? ((tour as any).important_info as Record<string, unknown>)?.bestTime ?? ''
-    }))
+      importantInfo: important,
+      rating: Number((tour as any).rating ?? important.rating ?? 0) || 0,
+      reviews: Number((tour as any).reviews ?? important.reviews ?? 0) || 0,
+      groupSize: (tour as any).group_size ?? (tour as any).groupsize ?? (tour as any).groupSize ?? important.groupSize ?? '',
+      bestTime: (tour as any).best_time ?? (tour as any).besttime ?? (tour as any).bestTime ?? important.bestTime ?? ''
+    }
+    })
     if (featured.length > 0) {
       featuredToursCache = featured
       cacheTimestamp = now
