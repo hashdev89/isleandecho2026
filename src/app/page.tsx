@@ -52,7 +52,6 @@ interface Tour {
   status?: string
   groupSize?: string
   group_size?: string
-  status?: string
 }
 
 const DEFAULT_TESTIMONIALS = [
