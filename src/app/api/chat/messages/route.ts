@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '../../../../lib/supabaseClient'
+import { extractCustomerName } from '../../../../lib/chatBookingAssistant'
 import fs from 'fs'
 import path from 'path'
 
@@ -273,51 +274,7 @@ export async function POST(request: NextRequest) {
                                 lastMessage.content.toLowerCase().includes('good name'))
 
       if (isGenericName || wasAskingForName) {
-        // Try multiple patterns to extract name from various formats
-        const patterns = [
-          // Pattern 1: "my name is Sam", "I'm Sam", "it's Sam", etc.
-          /(?:my name is|i'm|i am|call me|name is|this is|it's|its|i go by|you can call me)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
-          // Pattern 2: At the start of message
-          /^(?:my name is|i'm|i am|call me|name is|this is|it's|its|i go by|you can call me)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
-          // Pattern 3: With optional punctuation at end
-          /(?:my name is|i'm|i am|call me|name is|this is|it's|its|i go by|you can call me)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*[.,!?]*$/i,
-        ]
-
-        let extractedName: string | null = null
-        
-        // Try each pattern
-        for (const pattern of patterns) {
-          const match = content.match(pattern)
-          if (match && match[1]) {
-            const name = match[1].trim()
-            // Validate it looks like a name (2-30 chars, letters and spaces only, starts with capital)
-            if (name.length >= 2 && 
-                name.length <= 30 && 
-                /^[A-Za-z\s]+$/.test(name) && 
-                /^[A-Z]/.test(name) &&
-                name.split(/\s+/).length <= 4) { // Max 4 words for full names
-              extractedName = name
-              break
-            }
-          }
-        }
-
-        // If no pattern matched but previous message asked for name, treat simple text as name
-        if (!extractedName && wasAskingForName) {
-          const trimmedContent = content.trim()
-          // Remove common trailing punctuation
-          const cleanContent = trimmedContent.replace(/[.,!?]+$/, '').trim()
-          
-          // Check if it's a simple name (2-30 chars, letters only, starts with capital, max 4 words)
-          if (cleanContent.length >= 2 && 
-              cleanContent.length <= 30 && 
-              /^[A-Za-z\s]+$/.test(cleanContent) && 
-              /^[A-Z]/.test(cleanContent) &&
-              cleanContent.split(/\s+/).length <= 4) {
-            extractedName = cleanContent
-          }
-        }
-
+        const extractedName = extractCustomerName(String(content || ''))
         if (extractedName) {
           customerNameToUpdate = extractedName
           console.log('Extracted customer name from message:', customerNameToUpdate, 'from:', content)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseClient'
 import fs from 'fs'
 import path from 'path'
+import { loadSeoStore, saveSeoStore, type SeoStore } from '@/lib/siteSeo'
 
 const SETTINGS_FILE = path.join(process.cwd(), 'data', 'settings.json')
 
@@ -33,8 +34,48 @@ function saveSettings(settings: unknown) {
   }
 }
 
+function seoFromRecord(data: Record<string, unknown> = {}, extra: SeoStore = {}): SeoStore {
+  const nested = (data.seo && typeof data.seo === 'object' ? data.seo : {}) as SeoStore
+  return {
+    seoTitle: extra.seoTitle || nested.seoTitle || '',
+    seoDescription: extra.seoDescription || nested.seoDescription || '',
+    seoKeywords: extra.seoKeywords || nested.seoKeywords || '',
+    ogImageUrl: extra.ogImageUrl || nested.ogImageUrl || '',
+    twitterHandle: extra.twitterHandle || nested.twitterHandle || '@isleandecho',
+    googleAnalyticsId: extra.googleAnalyticsId || nested.googleAnalyticsId || '',
+    googleTagManagerId: extra.googleTagManagerId || nested.googleTagManagerId || '',
+    googleSearchConsoleId: extra.googleSearchConsoleId || nested.googleSearchConsoleId || '',
+    googleSearchConsoleHtmlFile: extra.googleSearchConsoleHtmlFile || nested.googleSearchConsoleHtmlFile || '',
+    googleSearchConsoleHtmlToken: extra.googleSearchConsoleHtmlToken || nested.googleSearchConsoleHtmlToken || '',
+    facebookPixelId: extra.facebookPixelId || nested.facebookPixelId || '',
+    googleAdsId: extra.googleAdsId || nested.googleAdsId || '',
+    bingWebmasterId: extra.bingWebmasterId || nested.bingWebmasterId || '',
+    yandexWebmasterId: extra.yandexWebmasterId || nested.yandexWebmasterId || '',
+  }
+}
+
+function seoFromFrontend(data: Record<string, unknown>): SeoStore {
+  return {
+    seoTitle: String(data.seoTitle || ''),
+    seoDescription: String(data.seoDescription || ''),
+    seoKeywords: String(data.seoKeywords || ''),
+    ogImageUrl: String(data.ogImageUrl || ''),
+    twitterHandle: String(data.twitterHandle || ''),
+    googleAnalyticsId: String(data.googleAnalyticsId || ''),
+    googleTagManagerId: String(data.googleTagManagerId || ''),
+    googleSearchConsoleId: String(data.googleSearchConsoleId || ''),
+    googleSearchConsoleHtmlFile: String(data.googleSearchConsoleHtmlFile || ''),
+    googleSearchConsoleHtmlToken: String(data.googleSearchConsoleHtmlToken || ''),
+    facebookPixelId: String(data.facebookPixelId || ''),
+    googleAdsId: String(data.googleAdsId || ''),
+    bingWebmasterId: String(data.bingWebmasterId || ''),
+    yandexWebmasterId: String(data.yandexWebmasterId || ''),
+  }
+}
+
 // Map Supabase settings to frontend format
-function mapSupabaseToFrontend(data: Record<string, unknown>) {
+function mapSupabaseToFrontend(data: Record<string, unknown>, seoStore: SeoStore = {}) {
+  const seo = seoFromRecord(data, seoStore)
   return {
     siteName: data.site_name || '',
     siteDescription: data.site_description || '',
@@ -77,7 +118,8 @@ function mapSupabaseToFrontend(data: Record<string, unknown>) {
     logoUrl: data.logo_url || '',
     faviconUrl: data.favicon_url || '',
     theme: data.theme || 'light',
-    whatsappPhone: data.whatsapp_phone || '94741415812'
+    whatsappPhone: data.whatsapp_phone || '94741415812',
+    ...seo,
   }
 }
 
@@ -121,7 +163,8 @@ function mapFrontendToSupabase(data: Record<string, unknown>) {
     logo_url: data.logoUrl || '',
     favicon_url: data.faviconUrl || '',
     theme: data.theme || 'light',
-    whatsapp_phone: data.whatsappPhone || '94741415812'
+    whatsapp_phone: data.whatsappPhone || '94741415812',
+    seo: seoFromFrontend(data),
   }
 }
 
@@ -148,7 +191,8 @@ export async function GET() {
         // Fall through to file storage
       } else if (data) {
         console.log('Loaded payment methods from DB:', data.payment_methods)
-        const mappedSettings = mapSupabaseToFrontend(data)
+        const seoStore = await loadSeoStore()
+        const mappedSettings = mapSupabaseToFrontend(data, seoStore)
         console.log('Mapped payment methods:', mappedSettings.paymentMethods)
         return NextResponse.json({ success: true, data: mappedSettings })
       }
@@ -156,8 +200,9 @@ export async function GET() {
 
     // Fallback to file storage
     const fileSettings = loadSettings()
+    const seoStore = await loadSeoStore()
     if (fileSettings) {
-      return NextResponse.json({ success: true, data: fileSettings })
+      return NextResponse.json({ success: true, data: { ...fileSettings, ...seoFromRecord({}, seoStore), ...seoStore } })
     }
 
     // Return default settings
@@ -169,7 +214,7 @@ export async function GET() {
       timezone: 'Asia/Colombo',
       language: 'en',
       payment_methods: ['payhere', 'credit_card', 'bank_transfer', 'cash']
-    })
+    }, seoStore)
 
     return NextResponse.json({ success: true, data: defaultSettings })
   } catch (error) {
@@ -204,8 +249,11 @@ export async function PUT(request: NextRequest) {
       }
       
       console.log('Saving payment methods:', supabaseData.payment_methods)
+
+      const seoPatch = seoFromFrontend(settings)
+      await saveSeoStore(seoPatch)
       
-      const { data, error } = await supabaseAdmin
+      let { data, error } = await supabaseAdmin
         .from('settings')
         .upsert({
           id: 'main',
@@ -216,6 +264,23 @@ export async function PUT(request: NextRequest) {
         })
         .select()
         .single()
+
+      if (error && /seo/i.test(error.message || '')) {
+        const { seo: _seoCol, ...withoutSeo } = supabaseData as Record<string, unknown> & { seo?: unknown }
+        const retry = await supabaseAdmin
+          .from('settings')
+          .upsert({
+            id: 'main',
+            ...withoutSeo,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'id'
+          })
+          .select()
+          .single()
+        data = retry.data
+        error = retry.error
+      }
 
       if (error) {
         console.error('Supabase update error:', error)
@@ -228,7 +293,7 @@ export async function PUT(request: NextRequest) {
       }
       if (data) {
         console.log('Settings saved successfully, payment methods:', data.payment_methods)
-        const mappedSettings = mapSupabaseToFrontend(data)
+        const mappedSettings = mapSupabaseToFrontend(data, seoPatch)
         return NextResponse.json({ 
           success: true, 
           data: mappedSettings,

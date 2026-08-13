@@ -4,6 +4,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { ArrowLeft, MapPin, Clock, Star } from 'lucide-react'
 import { getDestinationByIdForServer } from '@/lib/destinationsData'
+import { buildPageMetadata, getSiteSeo } from '@/lib/siteSeo'
 
 // Dynamically import Header since it's a client component
 const Header = dynamic(() => import('../../../components/Header'), {
@@ -42,16 +43,13 @@ interface DestinationPageProps {
 export async function generateMetadata({ params }: DestinationPageProps): Promise<Metadata> {
   const { id } = await params
   const destination = await getDestinationByIdForServer(id)
-
-  return {
-    title: `${destination?.name || 'Destination'} - ISLE & ECHO`,
+  const seo = await getSiteSeo()
+  return buildPageMetadata(seo, {
+    title: destination?.name || 'Destination',
     description: destination?.description || 'Discover amazing destinations in Sri Lanka',
-    openGraph: {
-      title: `${destination?.name || 'Destination'} - ISLE & ECHO`,
-      description: destination?.description || 'Discover amazing destinations in Sri Lanka',
-      images: destination?.image ? [destination.image] : [],
-    },
-  }
+    path: `/destinations/${id}`,
+    image: destination?.image,
+  })
 }
 
 // Activity data for each destination

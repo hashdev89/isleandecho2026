@@ -17,6 +17,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import Header from '../../components/Header'
+import SiteDatePicker from '../../components/SiteDatePicker'
 import SafeImage from '../../components/SafeImage'
 import dynamic from 'next/dynamic'
 import { tourFitsGuestCountFromTour, formatGroupSizeRange, getTourGroupSize } from '@/lib/tourGroupSize'
@@ -875,39 +876,22 @@ export default function CustomBookingPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-[var(--ink)] mb-2">
-                      Tour Start Date
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={bookingData.startDate}
-                        onChange={(e) => handleStartDateChange(e.target.value)}
-                        className={`${inputClass} pr-10 cursor-pointer`}
-                        min={new Date().toISOString().split('T')[0]}
-                        required
-                      />
-                      <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ink-soft)] pointer-events-none" />
-                    </div>
+                    <SiteDatePicker
+                      label="Tour Start Date"
+                      value={bookingData.startDate}
+                      placeholder="Select start date"
+                      onChange={handleStartDateChange}
+                    />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-[var(--ink)] mb-2">
-                      Tour End Date
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={bookingData.endDate}
-                        onChange={(e) =>
-                          setBookingData({ ...bookingData, endDate: e.target.value })
-                        }
-                        className={`${inputClass} pr-10 cursor-pointer`}
-                        min={bookingData.startDate || new Date().toISOString().split('T')[0]}
-                        required
-                      />
-                      <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ink-soft)] pointer-events-none" />
-                    </div>
+                    <SiteDatePicker
+                      label="Tour End Date"
+                      value={bookingData.endDate}
+                      placeholder="Select end date"
+                      minDate={bookingData.startDate}
+                      onChange={(endDate) => setBookingData({ ...bookingData, endDate })}
+                    />
                   </div>
 
                   <div>

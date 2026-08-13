@@ -80,7 +80,7 @@ export default function DestinationsManagement() {
   const filteredDestinations = destinations.filter(dest => {
     const matchesSearch = dest.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          dest.region.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesRegion = regionFilter === 'all' || dest.region === regionFilter
+    const matchesRegion = regionFilter === 'all' || dest.region.trim().toLowerCase() === regionFilter.trim().toLowerCase()
     return matchesSearch && matchesRegion
   })
 

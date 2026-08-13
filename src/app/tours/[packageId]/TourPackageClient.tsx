@@ -30,6 +30,7 @@ import { formatDistanceKm, getRouteSegments, getTotalRouteKm } from '@/lib/geoDi
 import { tourFitsGuestCount } from '@/lib/tourGroupSize'
 import { useCurrency } from '@/contexts/CurrencyContext'
 import { getTourRating, getTourReviews } from '@/lib/currency'
+import SiteDatePicker from '../../../components/SiteDatePicker'
 
 // Hero height: use '50vh', '60vh', '70vh', etc. to control how tall the hero is
 const TOUR_HERO_MIN_HEIGHT = '60vh'
@@ -797,54 +798,33 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-[var(--ink)] mb-2">
-                      Tour Start Date
-                      {tourPackage.duration && (
-                        <span className="text-xs text-[var(--ink-soft)] ml-2">({tourPackage.duration})</span>
-                      )}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={bookingData.startDate}
-                        onChange={(e) => {
-                          const newStartDate = e.target.value
-                          const calculatedEndDate = calculateEndDate(newStartDate, tourPackage?.duration || '')
-                          setBookingData({
-                            ...bookingData,
-                            startDate: newStartDate,
-                            endDate: calculatedEndDate || bookingData.endDate
-                          })
-                        }}
-                        className="w-full px-3 py-2 pr-10 border border-black/10 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] bg-[var(--foam)] text-[var(--ink)] cursor-pointer"
-                        min={new Date().toISOString().split('T')[0]}
-                        placeholder="Select start date"
-                      />
-                      <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                    </div>
-                    {bookingData.startDate && tourPackage?.duration && (
-                      <p className="text-xs text-[var(--ink-soft)] mt-1">
-                        End date will be automatically set to {calculateEndDate(bookingData.startDate, tourPackage.duration) || 'N/A'}
-                      </p>
-                    )}
+                    <SiteDatePicker
+                      label={`Tour Start Date${tourPackage.duration ? ` (${tourPackage.duration})` : ''}`}
+                      value={bookingData.startDate}
+                      placeholder="Select start date"
+                      onChange={(newStartDate) => {
+                        const calculatedEndDate = calculateEndDate(newStartDate, tourPackage?.duration || '')
+                        setBookingData({
+                          ...bookingData,
+                          startDate: newStartDate,
+                          endDate: calculatedEndDate || bookingData.endDate
+                        })
+                      }}
+                      helperText={
+                        bookingData.startDate && tourPackage?.duration
+                          ? `End date will be automatically set to ${calculateEndDate(bookingData.startDate, tourPackage.duration) || 'N/A'}`
+                          : undefined
+                      }
+                    />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-[var(--ink)] mb-2">
-                      Tour End Date
-                      <span className="text-xs text-[var(--ink-soft)] ml-2">(Auto-calculated)</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={bookingData.endDate}
-                        onChange={(e) => setBookingData({...bookingData, endDate: e.target.value})}
-                        className="w-full px-3 py-2 pr-10 border border-black/10 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] bg-[var(--foam)] text-[var(--ink)] cursor-pointer"
-                        min={bookingData.startDate || new Date().toISOString().split('T')[0]}
-                        placeholder="Select end date"
-                        title="End date is automatically calculated based on package duration. You can manually adjust if needed."
-                      />
-                      <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                    </div>
+                    <SiteDatePicker
+                      label="Tour End Date (Auto-calculated)"
+                      value={bookingData.endDate}
+                      placeholder="Select end date"
+                      minDate={bookingData.startDate}
+                      onChange={(endDate) => setBookingData({ ...bookingData, endDate })}
+                    />
                     {bookingData.startDate && bookingData.endDate && (
                       <p className="text-xs text-[var(--lagoon)] mt-1 font-medium">
                         Date Range: {new Date(bookingData.startDate).toLocaleDateString('en-US', { 

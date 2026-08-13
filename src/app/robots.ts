@@ -1,12 +1,15 @@
-import { MetadataRoute } from 'next'
+import type { MetadataRoute } from 'next'
+import { getSiteSeo } from '@/lib/siteSeo'
 
-export default function robots(): MetadataRoute.Robots {
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const seo = await getSiteSeo()
   return {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/admin/', '/api/', '/_next/'],
+      disallow: ['/admin/', '/api/', '/_next/', '/payments/'],
     },
-    sitemap: 'https://isleandecho.com/sitemap.xml',
+    sitemap: `${seo.siteUrl}/sitemap.xml`,
+    host: seo.siteUrl,
   }
 }

@@ -13,7 +13,9 @@ import {
   CreditCard,
   Phone,
   CheckCircle,
-  Info
+  Info,
+  Search,
+  ExternalLink
 } from 'lucide-react'
 
 interface SettingsData {
@@ -69,6 +71,22 @@ interface SettingsData {
   logoUrl: string
   faviconUrl: string
   theme: string
+
+  // SEO & Google
+  seoTitle: string
+  seoDescription: string
+  seoKeywords: string
+  ogImageUrl: string
+  twitterHandle: string
+  googleAnalyticsId: string
+  googleTagManagerId: string
+  googleSearchConsoleId: string
+  googleSearchConsoleHtmlFile: string
+  googleSearchConsoleHtmlToken: string
+  facebookPixelId: string
+  googleAdsId: string
+  bingWebmasterId: string
+  yandexWebmasterId: string
 }
 
 export default function AdminSettingsPage() {
@@ -129,8 +147,23 @@ export default function AdminSettingsPage() {
     primaryColor: '#3B82F6',
     secondaryColor: '#1E40AF',
     logoUrl: '/logoisle&echo.png',
-    faviconUrl: '/favicon.ico',
-    theme: 'light'
+    faviconUrl: '/logoisle&echo.png',
+    theme: 'light',
+
+    seoTitle: 'ISLE & ECHO - Feel the Isle, Hear The Echo',
+    seoDescription: 'Discover the beauty of Sri Lanka with our curated tour packages and travel experiences.',
+    seoKeywords: 'Sri Lanka tours, Sri Lanka travel packages, ISLE & ECHO',
+    ogImageUrl: '/srilankabeach.jpg',
+    twitterHandle: '@isleandecho',
+    googleAnalyticsId: '',
+    googleTagManagerId: '',
+    googleSearchConsoleId: '',
+    googleSearchConsoleHtmlFile: '',
+    googleSearchConsoleHtmlToken: '',
+    facebookPixelId: '',
+    googleAdsId: '',
+    bingWebmasterId: '',
+    yandexWebmasterId: '',
   }
   
   const [settings, setSettings] = useState<SettingsData>(defaultSettings)
@@ -187,6 +220,20 @@ export default function AdminSettingsPage() {
             logoUrl: result.data.logoUrl || defaultSettings.logoUrl,
             faviconUrl: result.data.faviconUrl || defaultSettings.faviconUrl,
             theme: result.data.theme || defaultSettings.theme,
+            seoTitle: result.data.seoTitle || defaultSettings.seoTitle,
+            seoDescription: result.data.seoDescription || defaultSettings.seoDescription,
+            seoKeywords: result.data.seoKeywords || defaultSettings.seoKeywords,
+            ogImageUrl: result.data.ogImageUrl || defaultSettings.ogImageUrl,
+            twitterHandle: result.data.twitterHandle || defaultSettings.twitterHandle,
+            googleAnalyticsId: result.data.googleAnalyticsId || defaultSettings.googleAnalyticsId,
+            googleTagManagerId: result.data.googleTagManagerId || defaultSettings.googleTagManagerId,
+            googleSearchConsoleId: result.data.googleSearchConsoleId || defaultSettings.googleSearchConsoleId,
+            googleSearchConsoleHtmlFile: result.data.googleSearchConsoleHtmlFile || defaultSettings.googleSearchConsoleHtmlFile,
+            googleSearchConsoleHtmlToken: result.data.googleSearchConsoleHtmlToken || defaultSettings.googleSearchConsoleHtmlToken,
+            facebookPixelId: result.data.facebookPixelId || defaultSettings.facebookPixelId,
+            googleAdsId: result.data.googleAdsId || defaultSettings.googleAdsId,
+            bingWebmasterId: result.data.bingWebmasterId || defaultSettings.bingWebmasterId,
+            yandexWebmasterId: result.data.yandexWebmasterId || defaultSettings.yandexWebmasterId,
             paymentMethods: paymentMethods,
             // Ensure number fields are never null
             sessionTimeout: result.data.sessionTimeout ?? defaultSettings.sessionTimeout,
@@ -226,7 +273,8 @@ export default function AdminSettingsPage() {
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'payments', label: 'Payments', icon: CreditCard },
-    { id: 'appearance', label: 'Appearance', icon: Palette }
+    { id: 'appearance', label: 'Appearance', icon: Palette },
+    { id: 'seo', label: 'SEO & Google', icon: Search }
   ]
 
   const handleSave = async () => {
@@ -908,6 +956,193 @@ export default function AdminSettingsPage() {
     </div>
   )
 
+  const renderSeoSettings = () => (
+    <div className="space-y-8">
+      <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+        <p className="font-semibold mb-1">Google Search Console setup</p>
+        <ol className="list-decimal pl-5 space-y-1">
+          <li>Open <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" className="underline font-medium">Google Search Console</a> and add your site URL ({settings.siteUrl || 'https://isleandecho.com'}).</li>
+          <li>Choose <strong>HTML tag</strong> verification and paste the content value (not the full meta tag) below.</li>
+          <li>Or choose <strong>HTML file</strong> and enter the filename Google gives you, e.g. <code>google1234567890.html</code>.</li>
+          <li>Save settings, then click Verify in Search Console. Submit <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="underline">/sitemap.xml</a>.</li>
+        </ol>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Default page SEO</h3>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">SEO title</label>
+          <input
+            type="text"
+            value={settings.seoTitle}
+            onChange={(e) => updateSetting('seoTitle', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="ISLE & ECHO - Feel the Isle, Hear The Echo"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Meta description</label>
+          <textarea
+            value={settings.seoDescription}
+            onChange={(e) => updateSetting('seoDescription', e.target.value)}
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Discover Sri Lanka tours and travel experiences..."
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Keywords (comma-separated)</label>
+          <input
+            type="text"
+            value={settings.seoKeywords}
+            onChange={(e) => updateSetting('seoKeywords', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Sri Lanka tours, beach holidays, ISLE & ECHO"
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Open Graph image URL</label>
+            <input
+              type="text"
+              value={settings.ogImageUrl}
+              onChange={(e) => updateSetting('ogImageUrl', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="/srilankabeach.jpg or https://..."
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Twitter / X handle</label>
+            <input
+              type="text"
+              value={settings.twitterHandle}
+              onChange={(e) => updateSetting('twitterHandle', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="@isleandecho"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Google Search Console</h3>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Verification code (HTML tag)</label>
+          <input
+            type="text"
+            value={settings.googleSearchConsoleId}
+            onChange={(e) => updateSetting('googleSearchConsoleId', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Paste google-site-verification content only"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            From a tag like <code>&lt;meta name=&quot;google-site-verification&quot; content=&quot;ABC123&quot; /&gt;</code>, enter <strong>ABC123</strong> only.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Verification HTML filename</label>
+            <input
+              type="text"
+              value={settings.googleSearchConsoleHtmlFile}
+              onChange={(e) => updateSetting('googleSearchConsoleHtmlFile', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="google1234567890.html"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">HTML file token (optional)</label>
+            <input
+              type="text"
+              value={settings.googleSearchConsoleHtmlToken}
+              onChange={(e) => updateSetting('googleSearchConsoleHtmlToken', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Defaults to verification code"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Analytics & ads</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Google Analytics ID</label>
+            <input
+              type="text"
+              value={settings.googleAnalyticsId}
+              onChange={(e) => updateSetting('googleAnalyticsId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="G-XXXXXXXXXX"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Google Tag Manager ID</label>
+            <input
+              type="text"
+              value={settings.googleTagManagerId}
+              onChange={(e) => updateSetting('googleTagManagerId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="GTM-XXXXXXX"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Google Ads ID</label>
+            <input
+              type="text"
+              value={settings.googleAdsId}
+              onChange={(e) => updateSetting('googleAdsId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="AW-XXXXXXXXX"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Facebook Pixel ID</label>
+            <input
+              type="text"
+              value={settings.facebookPixelId}
+              onChange={(e) => updateSetting('facebookPixelId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="123456789012345"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Bing Webmaster</label>
+            <input
+              type="text"
+              value={settings.bingWebmasterId}
+              onChange={(e) => updateSetting('bingWebmasterId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="msvalidate.01 code"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Yandex Webmaster</label>
+            <input
+              type="text"
+              value={settings.yandexWebmasterId}
+              onChange={(e) => updateSetting('yandexWebmasterId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="yandex-verification code"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3 pt-2">
+        <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-sm text-blue-600 hover:underline">
+          <ExternalLink className="h-4 w-4 mr-1" /> Sitemap
+        </a>
+        <a href="/robots.txt" target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-sm text-blue-600 hover:underline">
+          <ExternalLink className="h-4 w-4 mr-1" /> Robots.txt
+        </a>
+        <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-sm text-blue-600 hover:underline">
+          <ExternalLink className="h-4 w-4 mr-1" /> Google Search Console
+        </a>
+      </div>
+    </div>
+  )
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'general':
@@ -924,6 +1159,8 @@ export default function AdminSettingsPage() {
         return renderPaymentSettings()
       case 'appearance':
         return renderAppearanceSettings()
+      case 'seo':
+        return renderSeoSettings()
       default:
         return renderGeneralSettings()
     }
@@ -978,7 +1215,7 @@ export default function AdminSettingsPage() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         {/* Tab Navigation */}
         <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
+          <nav className="flex space-x-8 px-6 overflow-x-auto">
             {tabs.map((tab) => {
               const Icon = tab.icon
               return (

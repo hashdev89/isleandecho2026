@@ -55,6 +55,8 @@ interface AnalyticsSettings {
   googleAnalyticsId: string
   googleTagManagerId: string
   googleSearchConsoleId: string
+  googleSearchConsoleHtmlFile: string
+  googleSearchConsoleHtmlToken: string
   facebookPixelId: string
   googleAdsId: string
   bingWebmasterId: string
@@ -69,6 +71,8 @@ export default function SEOManagement() {
     googleAnalyticsId: '',
     googleTagManagerId: '',
     googleSearchConsoleId: '',
+    googleSearchConsoleHtmlFile: '',
+    googleSearchConsoleHtmlToken: '',
     facebookPixelId: '',
     googleAdsId: '',
     bingWebmasterId: '',
@@ -147,7 +151,18 @@ export default function SEOManagement() {
       const analyticsRes = await fetch('/api/seo/analytics')
       const analyticsData = await analyticsRes.json()
       if (analyticsData.success) {
-        setAnalyticsSettings(analyticsData.data)
+        setAnalyticsSettings({
+          googleAnalyticsId: '',
+          googleTagManagerId: '',
+          googleSearchConsoleId: '',
+          googleSearchConsoleHtmlFile: '',
+          googleSearchConsoleHtmlToken: '',
+          facebookPixelId: '',
+          googleAdsId: '',
+          bingWebmasterId: '',
+          yandexWebmasterId: '',
+          ...analyticsData.data,
+        })
       }
     } catch (error) {
       console.error('Error loading SEO data:', error)
@@ -883,14 +898,37 @@ export default function SEOManagement() {
                   placeholder="GTM-XXXXXXX"
                 />
               </div>
+              <div className="md:col-span-2 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+                Add the property in <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" className="underline font-medium">Google Search Console</a>, then paste the HTML-tag verification code here. These values also live under Settings → SEO & Google.
+              </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Google Search Console</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Google Search Console (HTML tag)</label>
                 <input
                   type="text"
                   value={analyticsSettings.googleSearchConsoleId}
                   onChange={(e) => setAnalyticsSettings({...analyticsSettings, googleSearchConsoleId: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Verification code"
+                  placeholder="Paste google-site-verification content only"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search Console HTML filename</label>
+                <input
+                  type="text"
+                  value={analyticsSettings.googleSearchConsoleHtmlFile}
+                  onChange={(e) => setAnalyticsSettings({...analyticsSettings, googleSearchConsoleHtmlFile: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="google1234567890.html"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search Console HTML token (optional)</label>
+                <input
+                  type="text"
+                  value={analyticsSettings.googleSearchConsoleHtmlToken}
+                  onChange={(e) => setAnalyticsSettings({...analyticsSettings, googleSearchConsoleHtmlToken: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Defaults to verification code"
                 />
               </div>
               <div>
@@ -921,6 +959,16 @@ export default function SEOManagement() {
                   onChange={(e) => setAnalyticsSettings({...analyticsSettings, bingWebmasterId: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Verification code"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Yandex Webmaster</label>
+                <input
+                  type="text"
+                  value={analyticsSettings.yandexWebmasterId}
+                  onChange={(e) => setAnalyticsSettings({...analyticsSettings, yandexWebmasterId: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="yandex-verification code"
                 />
               </div>
             </div>
@@ -983,18 +1031,45 @@ export default function SEOManagement() {
               <div className="space-y-4">
                 <h4 className="font-medium text-gray-900">Quick Actions</h4>
                 <div className="space-y-2">
-                  <button className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rows = [['keyword', 'category', 'priority', 'status', 'targetRank'], ...keywords.map((k) => [k.keyword, k.category, k.priority, k.status, String(k.targetRank)])]
+                      const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = 'seo-keywords.csv'
+                      a.click()
+                      URL.revokeObjectURL(url)
+                    }}
+                    className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center"
+                  >
                     <Download className="h-4 w-4 mr-3 text-blue-500" />
                     Export Keywords CSV
                   </button>
-                  <button className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const url = `${window.location.origin}/sitemap.xml`
+                      await navigator.clipboard.writeText(url)
+                      alert(`Copied: ${url}`)
+                    }}
+                    className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center"
+                  >
                     <Copy className="h-4 w-4 mr-3 text-blue-500" />
                     Copy Sitemap URL
                   </button>
-                  <button className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center">
+                  <a
+                    href="https://search.google.com/search-console"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center"
+                  >
                     <ExternalLink className="h-4 w-4 mr-3 text-blue-500" />
                     Open Google Search Console
-                  </button>
+                  </a>
                 </div>
               </div>
               <div className="space-y-4">
@@ -1013,8 +1088,20 @@ export default function SEOManagement() {
                     <span className="text-sm text-gray-700">Meta tags implemented</span>
                   </div>
                   <div className="flex items-center">
-                    <AlertCircle className="h-4 w-4 text-yellow-500 mr-2" />
+                    {analyticsSettings.googleAnalyticsId ? (
+                      <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-yellow-500 mr-2" />
+                    )}
                     <span className="text-sm text-gray-700">Google Analytics setup</span>
+                  </div>
+                  <div className="flex items-center">
+                    {analyticsSettings.googleSearchConsoleId || analyticsSettings.googleSearchConsoleHtmlFile ? (
+                      <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-yellow-500 mr-2" />
+                    )}
+                    <span className="text-sm text-gray-700">Google Search Console verification</span>
                   </div>
                 </div>
               </div>

@@ -15,6 +15,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import Header from '../../components/Header'
+import SiteDatePicker from '../../components/SiteDatePicker'
 import { formatRentalCurrency } from '@/lib/rentalPricing'
 import type { Vehicle } from '@/lib/vehicleTypes'
 import { useClickOutside } from '@/hooks/useClickOutside'
@@ -286,23 +287,22 @@ export default function RentCarClient() {
               <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] tracking-wide uppercase">
                 Pickup Date
               </label>
-                <input
-                  type="date"
+              <SiteDatePicker
                 value={pickupDate}
-                onChange={(e) => setPickupDate(e.target.value)}
-                className="w-full px-4 py-3 md:py-4 border border-black/10 rounded-xl bg-[var(--foam)] text-[var(--ink)] focus:ring-2 focus:ring-[var(--lagoon)] min-h-[44px] md:min-h-[52px]"
-                />
+                placeholder="Select pickup date"
+                onChange={setPickupDate}
+              />
             </div>
             <div>
               <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] tracking-wide uppercase">
                 Return Date
               </label>
-                <input
-                  type="date"
+              <SiteDatePicker
                 value={returnDate}
-                onChange={(e) => setReturnDate(e.target.value)}
-                className="w-full px-4 py-3 md:py-4 border border-black/10 rounded-xl bg-[var(--foam)] text-[var(--ink)] focus:ring-2 focus:ring-[var(--lagoon)] min-h-[44px] md:min-h-[52px]"
-                />
+                placeholder="Select return date"
+                minDate={pickupDate}
+                onChange={setReturnDate}
+              />
             </div>
           </div>
           {(pickupName || dropoffName) && (

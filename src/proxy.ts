@@ -4,6 +4,12 @@ import type { NextRequest } from 'next/server'
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  if (/^\/google[\w-]+\.html$/i.test(pathname)) {
+    const url = request.nextUrl.clone()
+    url.pathname = `/api/seo/verify${pathname}`
+    return NextResponse.rewrite(url)
+  }
+
   // Check if the request is for an admin route
   if (pathname.startsWith('/admin')) {
     const hasAdminSession = request.cookies.get('admin_session')?.value === '1'

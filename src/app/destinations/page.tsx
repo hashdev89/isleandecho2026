@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
@@ -12,22 +12,17 @@ import {
 import Header from '../../components/Header'
 import { CmsPageHero } from '../../components/CmsPageSections'
 import { useCmsPage } from '@/hooks/useSiteContent'
+import {
+  destinationSearchMatches,
+  isPublicDestination,
+  regionMatches,
+  uniqueRegions,
+} from '@/lib/destinationFilters'
 
 export default function DestinationsPage() {
   const { page } = useCmsPage('/destinations')
   const [selectedRegion, setSelectedRegion] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-
-  const regions = [
-    { id: 'all', name: 'All Sri Lanka' },
-    { id: 'Cultural Triangle', name: 'Cultural Triangle' },
-    { id: 'Hill Country', name: 'Hill Country' },
-    { id: 'Southern Coast', name: 'Beach Destinations' },
-    { id: 'Wildlife', name: 'Wildlife & Nature' },
-    { id: 'Northern', name: 'Northern Region' },
-    { id: 'Customize', name: 'Customize' }
-  ]
-
   const [destinations, setDestinations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -40,7 +35,7 @@ export default function DestinationsPage() {
         const res = await fetch('/api/destinations')
         const json = await res.json()
         if (json.success) {
-          setDestinations(json.data || [])
+          setDestinations(Array.isArray(json.data) ? json.data : [])
         } else {
           setError('Failed to load destinations')
         }
@@ -54,12 +49,32 @@ export default function DestinationsPage() {
     load()
   }, [])
 
-  const filteredDestinations = (destinations || []).filter(destination => {
-    const regionMatch = selectedRegion === 'all' || destination.region === selectedRegion
-    const searchMatch = destination.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                       (destination.description || '').toLowerCase().includes(searchQuery.toLowerCase())
-    return regionMatch && searchMatch
-  })
+  const publicDestinations = useMemo(
+    () => (destinations || []).filter(isPublicDestination),
+    [destinations]
+  )
+
+  const regions = useMemo(
+    () => [{ id: 'all', name: 'All Sri Lanka' }, ...uniqueRegions(publicDestinations).map((region) => ({ id: region, name: region }))],
+    [publicDestinations]
+  )
+
+  const filteredDestinations = useMemo(
+    () =>
+      publicDestinations.filter((destination) => {
+        const regionMatch = regionMatches(destination.region, selectedRegion)
+        const searchMatch = destinationSearchMatches(destination, searchQuery)
+        return regionMatch && searchMatch
+      }),
+    [publicDestinations, selectedRegion, searchQuery]
+  )
+
+  const filtersActive = selectedRegion !== 'all' || searchQuery.trim() !== ''
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setSelectedRegion('all')
+  }
 
   return (
     <div className="min-h-screen bg-[var(--foam)] lp-section-ink">
@@ -91,9 +106,20 @@ export default function DestinationsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-1">
             <div className="lp-panel p-6">
-              <div className="flex items-center mb-6">
-                <Filter className="w-5 h-5 mr-2 text-[var(--lagoon)]" />
-                <h3 className="text-lg font-semibold text-[var(--ink)]">Filters</h3>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                  <Filter className="w-5 h-5 mr-2 text-[var(--lagoon)]" />
+                  <h3 className="text-lg font-semibold text-[var(--ink)]">Filters</h3>
+                </div>
+                {filtersActive ? (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="text-xs font-semibold text-[var(--lagoon)] hover:text-[var(--lagoon-deep)]"
+                  >
+                    Clear
+                  </button>
+                ) : null}
               </div>
 
               <div>
@@ -122,7 +148,7 @@ export default function DestinationsPage() {
               <h2 className="lp-section-title text-2xl sm:text-3xl">
                 {loading ? 'Loading destinations...' : 
                  error ? 'Error loading destinations' :
-                 `${filteredDestinations.length} destinations found`}
+                 `${filteredDestinations.length} destination${filteredDestinations.length === 1 ? '' : 's'} found`}
               </h2>
             </div>
 
@@ -145,12 +171,24 @@ export default function DestinationsPage() {
               </div>
             )}
 
-            {!loading && !error && (
+            {!loading && !error && filteredDestinations.length === 0 && (
+              <div className="text-center py-12">
+                <div className="text-[var(--ink-soft)] mb-4">No destinations found matching your criteria.</div>
+                {filtersActive ? (
+                  <button 
+                    onClick={clearFilters} 
+                    className="bg-[var(--lagoon-deep)] text-white px-5 py-2.5 rounded-full hover:bg-[var(--lagoon)]"
+                  >
+                    Clear Filters
+                  </button>
+                ) : null}
+              </div>
+            )}
+
+            {!loading && !error && filteredDestinations.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
               {filteredDestinations.map((destination) => {
-                const badge = destination.region === 'Cultural Triangle' ? 'Heritage' : 
-                             destination.region === 'Wildlife' ? 'Nature' :
-                             destination.region.includes('Province') ? 'Cultural' : 'Explore'
+                const badge = String(destination.region || 'Explore').trim() || 'Explore'
 
                 return (
                   <Link
@@ -180,21 +218,6 @@ export default function DestinationsPage() {
                   </Link>
                 )
               })}
-              </div>
-            )}
-
-            {!loading && !error && filteredDestinations.length === 0 && (
-              <div className="text-center py-12">
-                <div className="text-[var(--ink-soft)] mb-4">No destinations found matching your criteria.</div>
-                <button 
-                  onClick={() => {
-                    setSearchQuery('')
-                    setSelectedRegion('all')
-                  }} 
-                  className="bg-[var(--lagoon-deep)] text-white px-5 py-2.5 rounded-full hover:bg-[var(--lagoon)]"
-                >
-                  Clear Filters
-                </button>
               </div>
             )}
           </div>

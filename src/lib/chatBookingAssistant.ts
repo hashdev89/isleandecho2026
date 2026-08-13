@@ -97,6 +97,46 @@ export function isGenericCustomerName(name?: string | null): boolean {
   )
 }
 
+const NAME_PREFIX =
+  /^(?:my name is|i['’]?m|i am|im|call me|name is|this is|it['’]?s|its|i go by|you can call me)\s+/i
+
+const NOT_A_NAME = new Set([
+  'hi',
+  'hello',
+  'hey',
+  'yes',
+  'no',
+  'ok',
+  'okay',
+  'none',
+  'customer',
+  'guest',
+  'chatbot',
+  'assistant',
+  'live',
+  'agent',
+  'chatbot assistant',
+  'live agent',
+  'tour packages',
+  'plan your trip',
+])
+
+/** Accepts typed names like "sam", "my name is hashantha", "Mary Jane". */
+export function extractCustomerName(raw?: string | null): string | null {
+  if (!raw) return null
+  let text = String(raw).trim().replace(/[.,!?]+$/g, '').trim()
+  text = text.replace(NAME_PREFIX, '').trim()
+  if (!text) return null
+  if (NOT_A_NAME.has(text.toLowerCase())) return null
+  if (text.length < 2 || text.length > 40) return null
+  if (!/^[A-Za-z][A-Za-z\s'.-]*$/.test(text)) return null
+  const words = text.split(/\s+/).filter(Boolean)
+  if (words.length === 0 || words.length > 4) return null
+  return words
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
 export function scoreTourForTravelType(tour: RecommendableTour, travelType: string): number {
   const haystack = [
     tour.name,
