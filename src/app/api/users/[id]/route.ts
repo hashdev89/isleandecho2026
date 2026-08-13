@@ -1,7 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseClient'
+import { canManageSuperAdmins } from '@/lib/roles'
 import fs from 'fs'
 import path from 'path'
+
+function actorCanSeeSuperAdmins(request: NextRequest) {
+  return canManageSuperAdmins(request.headers.get('x-user-role'))
+}
+
+function forbidSuperAdminAccess(request: NextRequest, role?: string) {
+  if (role === 'super_admin' && !actorCanSeeSuperAdmins(request)) {
+    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  }
+  return null
+}
+
+function forbidSuperAdminAssignment(request: NextRequest, role?: string) {
+  if (role === 'super_admin' && !actorCanSeeSuperAdmins(request)) {
+    return NextResponse.json(
+      { error: 'Only a Super Admin can assign the Super Admin role.' },
+      { status: 403 }
+    )
+  }
+  return null
+}
 
 const USERS_FILE = path.join(process.cwd(), 'data', 'users.json')
 
@@ -97,6 +119,8 @@ export async function GET(
           address: data.address || '',
           notes: data.notes || ''
         }
+        const hidden = forbidSuperAdminAccess(request, mappedUser.role)
+        if (hidden) return hidden
         return NextResponse.json(mappedUser)
       }
     }
@@ -111,6 +135,9 @@ export async function GET(
         { status: 404 }
       )
     }
+
+    const hidden = forbidSuperAdminAccess(request, user.role)
+    if (hidden) return hidden
     
     return NextResponse.json(user)
   } catch (error) {
@@ -130,6 +157,8 @@ export async function PUT(
   try {
     const body = await request.json()
     const resolvedParams = await params
+    const forbiddenRole = forbidSuperAdminAssignment(request, body.role)
+    if (forbiddenRole) return forbiddenRole
     
     // Check if Supabase is configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -141,6 +170,14 @@ export async function PUT(
                                   supabaseKey.length > 50
     
     if (isSupabaseConfigured) {
+      const { data: existingUser } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', resolvedParams.id)
+        .maybeSingle()
+      const hidden = forbidSuperAdminAccess(request, existingUser?.role)
+      if (hidden) return hidden
+
       const updateData: Record<string, unknown> = {}
       
       if (body.name !== undefined) updateData.name = body.name
@@ -207,6 +244,9 @@ export async function PUT(
         { status: 404 }
       )
     }
+
+    const hidden = forbidSuperAdminAccess(request, users[userIndex].role)
+    if (hidden) return hidden
     
     // Update user
     users[userIndex] = {
@@ -265,6 +305,9 @@ export async function DELETE(
         })
       }
       
+      const hidden = forbidSuperAdminAccess(request, userData?.role)
+      if (hidden) return hidden
+
       if (userData?.role === 'super_admin') {
         const { count, error: countError } = await supabaseAdmin
           .from('users')
@@ -329,6 +372,9 @@ export async function DELETE(
         { status: 404 }
       )
     }
+
+    const hidden = forbidSuperAdminAccess(request, users[userIndex].role)
+    if (hidden) return hidden
     
     if (users[userIndex].role === 'super_admin') {
       const superAdminCount = users.filter((u: User) => u.role === 'super_admin').length

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 
 import { useAuth } from '../../../contexts/AuthContext'
-import { hasAdminAccess, isSuperAdmin, roleLabel } from '@/lib/roles'
+import { canManageSuperAdmins, roleLabel } from '@/lib/roles'
 
 interface User {
   id: string
@@ -65,11 +65,23 @@ export default function UsersPage() {
     role: 'customer',
     status: 'active'
   })
+  const roleAuthHeaders = {
+    'x-user-role': currentAuthUser?.role || '',
+    'x-user-id': currentAuthUser?.id || '',
+  }
+  const viewerCanManageSuperAdmins = canManageSuperAdmins(currentAuthUser?.role)
+
+  useEffect(() => {
+    if (!viewerCanManageSuperAdmins && roleFilter === 'super_admin') {
+      setRoleFilter('all')
+    }
+  }, [viewerCanManageSuperAdmins, roleFilter])
+
   useEffect(() => {
     const loadUsers = async () => {
       setLoading(true)
       try {
-        const response = await fetch('/api/users')
+        const response = await fetch('/api/users', { headers: roleAuthHeaders })
         if (response.ok) {
           const usersData = await response.json()
           // Only set users if we got actual data (array with length > 0)
@@ -124,10 +136,15 @@ export default function UsersPage() {
       }
     }
 
+    if (!currentAuthUser) return
     loadUsers()
-  }, [])
+  }, [currentAuthUser?.role, currentAuthUser?.id])
 
-  const filteredUsers = users.filter(user => {
+  const visibleUsers = viewerCanManageSuperAdmins
+    ? users
+    : users.filter((user) => user.role !== 'super_admin')
+
+  const filteredUsers = visibleUsers.filter(user => {
     const matchesSearch = 
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -177,22 +194,25 @@ export default function UsersPage() {
     }
   }
 
-  const totalUsers = users.length
-  const activeUsers = users.filter(u => u.status === 'active').length
-  const customerUsers = users.filter(u => u.role === 'customer').length
-  const staffUsers = users.filter(u => u.role === 'staff').length
-  const canManageSuperAdmin =
-    isSuperAdmin(currentAuthUser?.role) ||
-    (hasAdminAccess(currentAuthUser?.role) && !users.some((u) => u.role === 'super_admin'))
+  const totalUsers = visibleUsers.length
+  const activeUsers = visibleUsers.filter(u => u.status === 'active').length
+  const customerUsers = visibleUsers.filter(u => u.role === 'customer').length
+  const staffUsers = visibleUsers.filter(u => u.role === 'staff').length
 
   const handleAddUser = async () => {
     if (newUser.name && newUser.email && newUser.phone && newUser.password) {
       setLoading(true)
       try {
+        if (newUser.role === 'super_admin' && !viewerCanManageSuperAdmins) {
+          alert('Only a Super Admin can assign the Super Admin role.')
+          setLoading(false)
+          return
+        }
         const response = await fetch('/api/users', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...roleAuthHeaders,
           },
           body: JSON.stringify(newUser),
         })
@@ -213,59 +233,12 @@ export default function UsersPage() {
           // Also save to localStorage as backup
           localStorage.setItem('admin-users', JSON.stringify([...users, addedUser]))
         } else {
-          console.error('Failed to create user via API')
-          // Fallback to local state update
-          const userToAdd: User = {
-            id: (Math.max(...users.map(u => parseInt(u.id)), 0) + 1).toString(),
-            name: newUser.name,
-            email: newUser.email,
-            phone: newUser.phone,
-            role: newUser.role || 'customer',
-            status: newUser.status || 'active',
-            lastLogin: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            totalBookings: 0,
-            totalSpent: 0
-          }
-
-          setUsers([...users, userToAdd])
-          localStorage.setItem('admin-users', JSON.stringify([...users, userToAdd]))
-          setShowAddModal(false)
-          setNewUser({
-            name: '',
-            email: '',
-            phone: '',
-            password: '',
-            role: 'customer',
-            status: 'active'
-          })
+          const errorData = await response.json().catch(() => ({}))
+          alert(errorData.error || 'Failed to create user')
         }
       } catch (error) {
         console.error('Error creating user:', error)
-        // Fallback to local state update
-        const userToAdd: User = {
-          id: (Math.max(...users.map(u => parseInt(u.id)), 0) + 1).toString(),
-          name: newUser.name,
-          email: newUser.email,
-          phone: newUser.phone,
-          role: newUser.role || 'customer',
-          status: newUser.status || 'active',
-          lastLogin: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          totalBookings: 0,
-          totalSpent: 0
-        }
-
-        setUsers([...users, userToAdd])
-        localStorage.setItem('admin-users', JSON.stringify([...users, userToAdd]))
-        setShowAddModal(false)
-        setNewUser({
-          name: '',
-          email: '',
-          phone: '',
-          role: 'customer',
-          status: 'active'
-        })
+        alert(error instanceof Error ? error.message : 'Failed to create user')
       } finally {
         setLoading(false)
       }
@@ -311,6 +284,7 @@ export default function UsersPage() {
       try {
         const response = await fetch(`/api/users/${userToDelete.id}`, {
           method: 'DELETE',
+          headers: roleAuthHeaders,
         })
 
         const data = await response.json()
@@ -323,7 +297,7 @@ export default function UsersPage() {
           // Refresh the users list from API
           const loadUsers = async () => {
             try {
-              const response = await fetch('/api/users')
+              const response = await fetch('/api/users', { headers: roleAuthHeaders })
               if (response.ok) {
                 const usersData = await response.json()
                 setUsers(usersData)
@@ -363,10 +337,16 @@ export default function UsersPage() {
       
       try {
 
+        if (updateData.role === 'super_admin' && !viewerCanManageSuperAdmins) {
+          alert('Only a Super Admin can assign the Super Admin role.')
+          setLoading(false)
+          return
+        }
         const response = await fetch(`/api/users/${userToEdit.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            ...roleAuthHeaders,
           },
           body: JSON.stringify(updateData),
         })
@@ -449,7 +429,7 @@ export default function UsersPage() {
             onClick={async () => {
               setLoading(true)
               try {
-                const response = await fetch('/api/users')
+                const response = await fetch('/api/users', { headers: roleAuthHeaders })
                 if (response.ok) {
                   const usersData = await response.json()
                   setUsers(usersData)
@@ -554,7 +534,7 @@ export default function UsersPage() {
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">All Roles</option>
-              <option value="super_admin">Super Admin</option>
+              {viewerCanManageSuperAdmins && <option value="super_admin">Super Admin</option>}
               <option value="admin">Admin</option>
               <option value="staff">Staff</option>
               <option value="customer">Customer</option>
@@ -784,7 +764,7 @@ export default function UsersPage() {
                       <option value="customer">Customer</option>
                       <option value="staff">Staff</option>
                       <option value="admin">Admin</option>
-                      {canManageSuperAdmin && <option value="super_admin">Super Admin</option>}
+                      {viewerCanManageSuperAdmins && <option value="super_admin">Super Admin</option>}
                     </select>
                   </div>
                   
@@ -947,7 +927,7 @@ export default function UsersPage() {
                       <option value="customer">Customer</option>
                       <option value="staff">Staff</option>
                       <option value="admin">Admin</option>
-                      {canManageSuperAdmin && <option value="super_admin">Super Admin</option>}
+                      {viewerCanManageSuperAdmins && <option value="super_admin">Super Admin</option>}
                     </select>
                   </div>
                   

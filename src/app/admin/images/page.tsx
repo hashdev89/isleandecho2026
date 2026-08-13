@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import ImageUploadModal from '@/components/ImageUploadModal'
 import { useAuth } from '../../../contexts/AuthContext'
+import { hasStaffAccess } from '@/lib/roles'
 
 interface ImageItem {
   id: string
@@ -46,8 +47,7 @@ export default function ImagesManagement() {
   const [imageUsage, setImageUsage] = useState<{ [key: string]: string[] }>({})
   const [migrating, setMigrating] = useState(false)
   
-  // Check if user has access (admin or staff only)
-  const hasAccess = user?.role === 'admin' || user?.role === 'staff'
+  const hasAccess = hasStaffAccess(user?.role)
 
   // Fetch image usage from API
   const fetchImageUsage = async () => {
@@ -244,7 +244,7 @@ export default function ImagesManagement() {
       <div className="p-6">
         <div className="text-center py-12">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
-          <p className="text-gray-600">You need admin or staff privileges to access this page.</p>
+          <p className="text-gray-600">You need staff, admin, or super admin privileges to access this page.</p>
         </div>
       </div>
     )

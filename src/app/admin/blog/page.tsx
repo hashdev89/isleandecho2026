@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Plus, Edit, Trash2, Eye, Search, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '../../../contexts/AuthContext'
+import { hasStaffAccess } from '@/lib/roles'
 
 interface BlogPost {
   id: number | string
@@ -34,8 +35,7 @@ export default function AdminBlogPage() {
   const [selectedCategory, setSelectedCategory] = useState("All")
   const [selectedStatus, setSelectedStatus] = useState("All")
   
-  // Check if user has access (admin or staff only)
-  const hasAccess = user?.role === 'admin' || user?.role === 'staff'
+  const hasAccess = hasStaffAccess(user?.role)
 
   useEffect(() => {
     fetchBlogPosts()

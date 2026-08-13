@@ -520,7 +520,7 @@ export default function BookingsPage() {
                       >
                         <Eye className="w-4 h-4" />
                       </Link>
-                      {(user?.role === 'admin' || user?.role === 'staff') && (
+                      {(user?.role === 'super_admin' || user?.role === 'admin' || user?.role === 'staff') && (
                         <button 
                           onClick={() => handleDeleteClick(booking)}
                           className="text-red-600 hover:text-red-900"

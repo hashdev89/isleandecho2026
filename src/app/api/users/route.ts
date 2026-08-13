@@ -1,7 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseClient'
+import { canManageSuperAdmins } from '@/lib/roles'
 import fs from 'fs'
 import path from 'path'
+
+function hideSuperAdminsIfNeeded<T extends { role?: string }>(users: T[], request: NextRequest) {
+  if (canManageSuperAdmins(request.headers.get('x-user-role'))) return users
+  return users.filter((user) => user.role !== 'super_admin')
+}
+
+function forbidSuperAdminAssignment(request: NextRequest, role?: string) {
+  if (role === 'super_admin' && !canManageSuperAdmins(request.headers.get('x-user-role'))) {
+    return NextResponse.json(
+      { error: 'Only a Super Admin can assign the Super Admin role.' },
+      { status: 403 }
+    )
+  }
+  return null
+}
 
 const USERS_FILE = path.join(process.cwd(), 'data', 'users.json')
 
@@ -58,7 +74,7 @@ const writeUsers = (users: User[]): boolean => {
 }
 
 // GET /api/users - Get all users
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     console.log('GET /api/users - Fetching users...')
     
@@ -104,7 +120,7 @@ export async function GET() {
         }))
         
         console.log(`Retrieved ${mappedUsers.length} users from Supabase`)
-        return NextResponse.json(mappedUsers)
+        return NextResponse.json(hideSuperAdminsIfNeeded(mappedUsers, request))
       } else {
         console.log('No users found in Supabase, falling back to file storage')
       }
@@ -115,12 +131,12 @@ export async function GET() {
     // Fallback to file storage
     const users = readUsers()
     console.log(`Loaded ${users.length} users from file`)
-    return NextResponse.json(users)
+    return NextResponse.json(hideSuperAdminsIfNeeded(users, request))
   } catch (error) {
     console.error('Error fetching users:', error)
     // Fallback to file storage on error
     const users = readUsers()
-    return NextResponse.json(users)
+    return NextResponse.json(hideSuperAdminsIfNeeded(users, request))
   }
 }
 
@@ -128,6 +144,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const forbidden = forbidSuperAdminAssignment(request, body.role)
+    if (forbidden) return forbidden
     
     // Check if Supabase is configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -240,6 +258,15 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
     const users = body.users || []
+    if (
+      !canManageSuperAdmins(request.headers.get('x-user-role')) &&
+      (users as { role?: string }[]).some((user) => user.role === 'super_admin')
+    ) {
+      return NextResponse.json(
+        { error: 'Only a Super Admin can assign the Super Admin role.' },
+        { status: 403 }
+      )
+    }
     
     // Check if Supabase is configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

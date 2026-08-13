@@ -15,6 +15,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
+import { hasAdminAccess } from '@/lib/roles'
 
 interface Destination {
   id: string
@@ -223,7 +224,7 @@ export default function DestinationsManagement() {
                   >
                     <Edit className="h-4 w-4" />
                   </Link>
-                  {user?.role === 'admin' && (
+                  {hasAdminAccess(user?.role) && (
                     <button
                       onClick={() => handleDeleteDestination(destination.id)}
                       className="text-red-400 hover:text-red-600 p-1"
