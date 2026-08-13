@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { randomUUID } from 'crypto'
 import { supabaseAdmin } from './supabaseClient'
+import { loadAppJson, saveAppJson } from './supabaseJsonStore'
 import { sendEmail, formatEmailFrom } from './emailService'
 
 export type EmailFolder = 'inbox' | 'sent' | 'trash' | 'starred'
@@ -74,6 +75,9 @@ const DATA_DIR = path.join(process.cwd(), 'data', 'email')
 const THREADS_FILE = path.join(DATA_DIR, 'threads.json')
 const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json')
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json')
+const THREADS_JSON_KEY = 'email-threads.json'
+const MESSAGES_JSON_KEY = 'email-messages.json'
+const SETTINGS_JSON_KEY = 'email-settings.json'
 
 const hasSupabase = !!(
   process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -81,11 +85,38 @@ const hasSupabase = !!(
   process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://placeholder.supabase.co'
 )
 
+function isServerlessFs() {
+  return !!(
+    process.env.VERCEL ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.cwd().includes('/var/task')
+  )
+}
+
+function isMissingTableError(error?: { code?: string; message?: string } | null) {
+  const msg = (error?.message || '').toLowerCase()
+  return (
+    error?.code === '42P01' ||
+    error?.code === 'PGRST205' ||
+    msg.includes('could not find the table') ||
+    msg.includes('does not exist') ||
+    msg.includes('schema cache')
+  )
+}
+
 function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
+  if (isServerlessFs()) return false
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
+    return true
+  } catch (e) {
+    console.error('emailCenter ensureDataDir:', e)
+    return false
+  }
 }
 
 function loadJson<T>(file: string, fallback: T): T {
+  if (isServerlessFs()) return fallback
   try {
     if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8')) as T
   } catch (e) {
@@ -95,8 +126,19 @@ function loadJson<T>(file: string, fallback: T): T {
 }
 
 function saveJson(file: string, data: unknown) {
-  ensureDataDir()
-  fs.writeFileSync(file, JSON.stringify(data, null, 2))
+  if (isServerlessFs()) return false
+  if (!ensureDataDir()) return false
+  try {
+    fs.writeFileSync(file, JSON.stringify(data, null, 2))
+    return true
+  } catch (e) {
+    console.error(`emailCenter save ${file}:`, e)
+    return false
+  }
+}
+
+function persistFailedMessage(what: string) {
+  return `Could not save ${what} on the live server. Run scripts/supabase-email-center.sql in Supabase, then try again.`
 }
 
 export function defaultEmailAccounts(): EmailAccount[] {
@@ -131,6 +173,13 @@ export async function getEmailCenterSettings(): Promise<EmailCenterSettings> {
     } catch {
       /* fallback */
     }
+    const remote = await loadAppJson<EmailCenterSettings>(SETTINGS_JSON_KEY)
+    if (remote?.accounts?.length) {
+      return {
+        accounts: remote.accounts,
+        resendWebhookSecret: remote.resendWebhookSecret || process.env.RESEND_WEBHOOK_SECRET,
+      }
+    }
   }
   const local = loadJson<EmailCenterSettings>(SETTINGS_FILE, { accounts: defaultEmailAccounts() })
   return {
@@ -140,6 +189,7 @@ export async function getEmailCenterSettings(): Promise<EmailCenterSettings> {
 }
 
 export async function saveEmailCenterSettings(settings: EmailCenterSettings) {
+  let persisted = false
   if (hasSupabase) {
     const { error } = await supabaseAdmin.from('settings').upsert({
       id: 'main',
@@ -147,53 +197,92 @@ export async function saveEmailCenterSettings(settings: EmailCenterSettings) {
       resend_webhook_secret: settings.resendWebhookSecret || null,
       updated_at: new Date().toISOString(),
     })
-    if (error) console.error('emailCenter saveSettings:', error.message)
+    if (!error) persisted = true
+    else {
+      console.error('emailCenter saveSettings:', error.message)
+      persisted = await saveAppJson(SETTINGS_JSON_KEY, settings)
+    }
   }
-  saveJson(SETTINGS_FILE, settings)
+  if (saveJson(SETTINGS_FILE, settings)) persisted = true
+  if (!persisted && isServerlessFs()) throw new Error(persistFailedMessage('email settings'))
 }
 
 async function loadThreads(): Promise<EmailThread[]> {
   if (hasSupabase) {
     try {
-      const { data, error } = await supabaseAdmin.from('email_threads').select('*').order('last_message_at', { ascending: false })
+      const { data, error } = await supabaseAdmin
+        .from('email_threads')
+        .select('*')
+        .order('last_message_at', { ascending: false })
       if (!error && data) return data.map(mapThreadFromDb)
-    } catch {
-      /* fallback */
+      if (error) console.error('emailCenter loadThreads:', error.message)
+    } catch (e) {
+      console.error('emailCenter loadThreads:', e)
     }
+    const remote = await loadAppJson<EmailThread[]>(THREADS_JSON_KEY)
+    if (remote) return remote
   }
   return loadJson<EmailThread[]>(THREADS_FILE, [])
 }
 
 async function saveThreads(threads: EmailThread[]) {
+  let persisted = false
   if (hasSupabase) {
+    let missingTable = false
     for (const t of threads) {
       const { error } = await supabaseAdmin.from('email_threads').upsert(mapThreadToDb(t))
-      if (error) console.error('emailCenter saveThreads:', error.message, t.id)
+      if (!error) continue
+      console.error('emailCenter saveThreads:', error.message, t.id)
+      if (isMissingTableError(error)) {
+        missingTable = true
+        break
+      }
+      throw new Error(error.message)
     }
+    if (!missingTable) persisted = true
+    else persisted = await saveAppJson(THREADS_JSON_KEY, threads)
   }
-  saveJson(THREADS_FILE, threads)
+  if (saveJson(THREADS_FILE, threads)) persisted = true
+  if (!persisted) throw new Error(persistFailedMessage('emails'))
 }
 
 async function loadMessages(): Promise<EmailMessage[]> {
   if (hasSupabase) {
     try {
-      const { data, error } = await supabaseAdmin.from('email_messages').select('*').order('created_at', { ascending: true })
+      const { data, error } = await supabaseAdmin
+        .from('email_messages')
+        .select('*')
+        .order('created_at', { ascending: true })
       if (!error && data) return data.map(mapMessageFromDb)
-    } catch {
-      /* fallback */
+      if (error) console.error('emailCenter loadMessages:', error.message)
+    } catch (e) {
+      console.error('emailCenter loadMessages:', e)
     }
+    const remote = await loadAppJson<EmailMessage[]>(MESSAGES_JSON_KEY)
+    if (remote) return remote
   }
   return loadJson<EmailMessage[]>(MESSAGES_FILE, [])
 }
 
 async function saveMessages(messages: EmailMessage[]) {
+  let persisted = false
   if (hasSupabase) {
+    let missingTable = false
     for (const m of messages) {
       const { error } = await supabaseAdmin.from('email_messages').upsert(mapMessageToDb(m))
-      if (error) console.error('emailCenter saveMessages:', error.message, m.id)
+      if (!error) continue
+      console.error('emailCenter saveMessages:', error.message, m.id)
+      if (isMissingTableError(error)) {
+        missingTable = true
+        break
+      }
+      throw new Error(error.message)
     }
+    if (!missingTable) persisted = true
+    else persisted = await saveAppJson(MESSAGES_JSON_KEY, messages)
   }
-  saveJson(MESSAGES_FILE, messages)
+  if (saveJson(MESSAGES_FILE, messages)) persisted = true
+  if (!persisted) throw new Error(persistFailedMessage('emails'))
 }
 
 function mapThreadFromDb(row: Record<string, unknown>): EmailThread {
