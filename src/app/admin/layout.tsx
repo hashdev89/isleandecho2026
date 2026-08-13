@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import AdminRoute from '../../components/AdminRoute'
+import { hasStaffAccess, isSuperAdmin, roleLabel } from '@/lib/roles'
 
 export default function AdminLayout({
   children,
@@ -57,7 +58,7 @@ export default function AdminLayout({
       }
     }
 
-    if (user && (user.role === 'admin' || user.role === 'staff')) {
+    if (user && hasStaffAccess(user.role)) {
       fetchChatCount()
       // Poll every 10 seconds for updates
       const interval = setInterval(fetchChatCount, 10000)
@@ -66,36 +67,27 @@ export default function AdminLayout({
   }, [user])
 
   const getNavigationItems = () => {
-    const isAdmin = user?.role === 'admin'
-    const isStaff = user?.role === 'staff'
-    const isCustomer = user?.role === 'customer'
-
+    const role = user?.role || ''
     const allItems = [
-      { name: 'Dashboard', href: '/admin', icon: LayoutDashboard, roles: ['admin'] },
-      { name: 'Chat', href: '/admin/chat', icon: MessageCircle, roles: ['admin', 'staff'], badge: totalChatCount },
-      { name: 'Email', href: '/admin/email', icon: Mail, roles: ['admin', 'staff'] },
-      { name: 'Blog Posts', href: '/admin/blog', icon: FileText, roles: ['admin', 'staff'] },
-      { name: 'Bookings', href: '/admin/bookings', icon: Calendar, roles: ['admin', 'staff', 'customer'] },
-      { name: 'Images', href: '/admin/images', icon: ImageIcon, roles: ['admin', 'staff'] },
-      { name: 'Tours', href: '/admin/tours', icon: Package, roles: ['admin', 'staff'] },
-      { name: 'Vehicles', href: '/admin/vehicles', icon: Car, roles: ['admin', 'staff'] },
-      { name: 'Rental settings', href: '/admin/rental-settings', icon: SlidersHorizontal, roles: ['admin', 'staff'] },
-      { name: 'Destinations', href: '/admin/destinations', icon: MapPin, roles: ['admin', 'staff'] },
-      { name: 'Users', href: '/admin/users', icon: Users, roles: ['admin'] },
-      { name: 'Analytics', href: '/admin/analytics', icon: TrendingUp, roles: ['admin'] },
-      { name: 'SEO', href: '/admin/seo', icon: SearchIcon, roles: ['admin'] },
-      { name: 'Site Content', href: '/admin/site-content', icon: LayoutTemplate, roles: ['admin'] },
-      { name: 'Settings', href: '/admin/settings', icon: Settings, roles: ['admin'] },
+      { name: 'Dashboard', href: '/admin', icon: LayoutDashboard, roles: ['super_admin', 'admin'] },
+      { name: 'Chat', href: '/admin/chat', icon: MessageCircle, roles: ['super_admin', 'admin', 'staff'], badge: totalChatCount },
+      { name: 'Email', href: '/admin/email', icon: Mail, roles: ['super_admin'] },
+      { name: 'Blog Posts', href: '/admin/blog', icon: FileText, roles: ['super_admin', 'admin', 'staff'] },
+      { name: 'Bookings', href: '/admin/bookings', icon: Calendar, roles: ['super_admin', 'admin', 'staff', 'customer'] },
+      { name: 'Images', href: '/admin/images', icon: ImageIcon, roles: ['super_admin', 'admin', 'staff'] },
+      { name: 'Tours', href: '/admin/tours', icon: Package, roles: ['super_admin', 'admin', 'staff'] },
+      { name: 'Vehicles', href: '/admin/vehicles', icon: Car, roles: ['super_admin', 'admin', 'staff'] },
+      { name: 'Rental settings', href: '/admin/rental-settings', icon: SlidersHorizontal, roles: ['super_admin', 'admin', 'staff'] },
+      { name: 'Destinations', href: '/admin/destinations', icon: MapPin, roles: ['super_admin', 'admin', 'staff'] },
+      { name: 'Users', href: '/admin/users', icon: Users, roles: ['super_admin', 'admin'] },
+      { name: 'Analytics', href: '/admin/analytics', icon: TrendingUp, roles: ['super_admin', 'admin'] },
+      { name: 'SEO', href: '/admin/seo', icon: SearchIcon, roles: ['super_admin', 'admin'] },
+      { name: 'Site Content', href: '/admin/site-content', icon: LayoutTemplate, roles: ['super_admin', 'admin'] },
+      { name: 'Settings', href: '/admin/settings', icon: Settings, roles: ['super_admin', 'admin'] },
     ]
 
-    if (isAdmin) {
-      return allItems
-    } else if (isStaff) {
-      return allItems.filter(item => item.roles.includes('staff'))
-    } else if (isCustomer) {
-      return allItems.filter(item => item.roles.includes('customer'))
-    }
-    return []
+    if (isSuperAdmin(role)) return allItems
+    return allItems.filter((item) => item.roles.includes(role))
   }
 
   const navigation = getNavigationItems()
@@ -136,7 +128,7 @@ export default function AdminLayout({
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">Admin Panel</h2>
-                  <p className="text-xs text-gray-500 capitalize">{user?.role || 'User'}</p>
+                  <p className="text-xs text-gray-500">{roleLabel(user?.role) || 'User'}</p>
                 </div>
               </div>
               <button

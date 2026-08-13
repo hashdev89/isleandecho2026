@@ -32,7 +32,7 @@ interface User {
   name: string
   email: string
   phone: string
-  role: 'admin' | 'staff' | 'customer'
+  role: 'super_admin' | 'admin' | 'staff' | 'customer'
   status: 'active' | 'inactive' | 'suspended'
   lastLogin: string
   createdAt: string
@@ -163,7 +163,20 @@ export async function PUT(
       
       if (error) {
         console.error('Supabase error:', error)
-        // Fall through to file storage
+        const message = error.message || 'Failed to update user'
+        const needsRoleMigration =
+          body.role === 'super_admin' &&
+          (/check constraint|invalid input value|enum/i.test(message) ||
+            /users_role/i.test(message) ||
+            /value too long/i.test(message))
+        return NextResponse.json(
+          {
+            error: needsRoleMigration
+              ? `${message} Run scripts/supabase-users-super-admin.sql in the Supabase SQL Editor, then try again.`
+              : message,
+          },
+          { status: 500 }
+        )
       } else if (data) {
         // Map back to expected format
         const mappedUser = {
@@ -252,6 +265,20 @@ export async function DELETE(
         })
       }
       
+      if (userData?.role === 'super_admin') {
+        const { count, error: countError } = await supabaseAdmin
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .eq('role', 'super_admin')
+
+        if (countError || (count ?? 0) <= 1) {
+          return NextResponse.json(
+            { error: 'Cannot delete the last super admin. Ensure at least one other super admin exists first.' },
+            { status: 403 }
+          )
+        }
+      }
+
       if (userData?.role === 'admin') {
         const { count, error: countError } = await supabaseAdmin
           .from('users')
@@ -303,6 +330,16 @@ export async function DELETE(
       )
     }
     
+    if (users[userIndex].role === 'super_admin') {
+      const superAdminCount = users.filter((u: User) => u.role === 'super_admin').length
+      if (superAdminCount <= 1) {
+        return NextResponse.json(
+          { error: 'Cannot delete the last super admin. Ensure at least one other super admin exists first.' },
+          { status: 403 }
+        )
+      }
+    }
+
     // If user is admin, require at least one other admin
     if (users[userIndex].role === 'admin') {
       const adminCount = users.filter((u: User) => u.role === 'admin').length

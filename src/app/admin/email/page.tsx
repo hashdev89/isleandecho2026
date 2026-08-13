@@ -17,20 +17,40 @@ import {
   Paperclip,
   X,
   ChevronLeft,
+  Download,
+  FileText,
 } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
-import type { EmailAccount, EmailMessage, EmailThread } from '@/lib/emailCenter'
+import type { EmailAccount, EmailAttachment, EmailMessage, EmailThread } from '@/lib/emailCenter'
+import { canAccessEmailCenter } from '@/lib/roles'
+import {
+  MAX_EMAIL_ATTACHMENT_BYTES,
+  MAX_EMAIL_ATTACHMENTS,
+  isImageAttachment,
+  isPdfAttachment,
+} from '@/lib/emailAttachments'
 
 type Folder = 'inbox' | 'unread' | 'starred' | 'sent' | 'trash' | 'all'
 
 type Stats = { inbox: number; unread: number; starred: number; sent: number; trash: number }
 
-function staffHeaders(user: { id?: string; name?: string; role?: string } | null) {
-  const h: HeadersInit = { 'Content-Type': 'application/json' }
+function staffAuthHeaders(user: { id?: string; name?: string; role?: string } | null) {
+  const h: HeadersInit = {}
   if (user?.id) h['x-user-id'] = user.id
   if (user?.name) h['x-user-name'] = user.name
   if (user?.role) h['x-user-role'] = user.role
   return h
+}
+
+function staffHeaders(user: { id?: string; name?: string; role?: string } | null) {
+  return { ...staffAuthHeaders(user), 'Content-Type': 'application/json' }
+}
+
+function formatFileSize(bytes?: number) {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function defaultAccountId(accounts: EmailAccount[]) {
@@ -78,6 +98,8 @@ export default function AdminEmailPage() {
     threadId: '' as string | undefined,
     inReplyTo: '' as string | undefined,
   })
+  const [composeFiles, setComposeFiles] = useState<File[]>([])
+  const [previewAttachment, setPreviewAttachment] = useState<EmailAttachment | null>(null)
 
   const selectedThread = useMemo(
     () => threads.find((t) => t.id === selectedId) || null,
@@ -170,7 +192,26 @@ export default function AdminEmailPage() {
         inReplyTo: undefined,
       })
     }
+    setComposeFiles([])
     setComposeOpen(true)
+  }
+
+  const addComposeFiles = (fileList: FileList | null) => {
+    if (!fileList?.length) return
+    const next = [...composeFiles]
+    for (const file of Array.from(fileList)) {
+      if (file.size > MAX_EMAIL_ATTACHMENT_BYTES) {
+        alert(`${file.name} is larger than 4MB`)
+        continue
+      }
+      if (next.length >= MAX_EMAIL_ATTACHMENTS) {
+        alert(`You can attach up to ${MAX_EMAIL_ATTACHMENTS} files`)
+        break
+      }
+      if (next.some((existing) => existing.name === file.name && existing.size === file.size)) continue
+      next.push(file)
+    }
+    setComposeFiles(next)
   }
 
   const handleSend = async () => {
@@ -184,6 +225,21 @@ export default function AdminEmailPage() {
     }
     setSending(true)
     try {
+      const uploaded: EmailAttachment[] = []
+      for (const file of composeFiles) {
+        const form = new FormData()
+        form.append('file', file)
+        const uploadRes = await fetch('/api/emails/upload', {
+          method: 'POST',
+          credentials: 'include',
+          headers: staffAuthHeaders(user),
+          body: form,
+        })
+        const uploadJson = await uploadRes.json()
+        if (!uploadJson.success) throw new Error(uploadJson.error || `Failed to upload ${file.name}`)
+        uploaded.push(uploadJson.data as EmailAttachment)
+      }
+
       const bodyHtml = compose.body
         .split('\n')
         .map((line) => (line.trim() === '' ? '<br>' : `<p>${line.replace(/</g, '&lt;')}</p>`))
@@ -202,11 +258,13 @@ export default function AdminEmailPage() {
           bodyText: compose.body,
           threadId: compose.threadId,
           inReplyTo: compose.inReplyTo,
+          attachments: uploaded,
         }),
       })
       const json = await res.json()
       if (!json.success) throw new Error(json.error || 'Send failed')
       setComposeOpen(false)
+      setComposeFiles([])
       setFolder('sent')
       await loadThreads()
       if (json.data?.thread?.id) await loadThread(json.data.thread.id)
@@ -241,6 +299,15 @@ export default function AdminEmailPage() {
     } finally {
       setSyncing(false)
     }
+  }
+
+  if (!canAccessEmailCenter(user?.role)) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
+        <h1 className="text-xl font-bold text-gray-900">Email Center</h1>
+        <p className="mt-2 text-gray-600">Only the Super Admin can access Email Center.</p>
+      </div>
+    )
   }
 
   const navItems: { id: Folder; label: string; icon: typeof Inbox; count?: number }[] = [
@@ -287,7 +354,7 @@ export default function AdminEmailPage() {
         </button>
         <Link
           href="/admin/email/settings"
-          className={`rounded-lg p-2 text-gray-500 hover:bg-gray-100 ${user?.role !== 'admin' ? 'hidden' : ''}`}
+          className={`rounded-lg p-2 text-gray-500 hover:bg-gray-100 ${!canAccessEmailCenter(user?.role) ? 'hidden' : ''}`}
           aria-label="Email settings"
         >
           <Settings className="h-4 w-4" />
@@ -398,7 +465,7 @@ export default function AdminEmailPage() {
             ) : accounts.length === 0 ? (
               <div className="p-8 text-center text-sm text-gray-500">
                 No email inboxes assigned to your account.
-                {user?.role === 'admin' ? (
+                {canAccessEmailCenter(user?.role) ? (
                   <>
                     {' '}
                     <Link href="/admin/email/settings" className="text-teal-700 underline">
@@ -518,13 +585,32 @@ export default function AdminEmailPage() {
                     {msg.attachments?.length ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {msg.attachments.map((a) => (
-                          <span
+                          <button
                             key={a.id}
-                            className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-xs"
+                            type="button"
+                            onClick={() => {
+                              if (!a.url) {
+                                alert('This attachment is not available yet.')
+                                return
+                              }
+                              if (isImageAttachment(a) || isPdfAttachment(a)) {
+                                setPreviewAttachment(a)
+                                return
+                              }
+                              window.open(a.url, '_blank', 'noopener,noreferrer')
+                            }}
+                            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-100"
                           >
-                            <Paperclip className="h-3 w-3" />
-                            {a.filename}
-                          </span>
+                            {isImageAttachment(a) ? (
+                              <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                            ) : (
+                              <FileText className="h-3.5 w-3.5 shrink-0" />
+                            )}
+                            <span className="truncate">{a.filename}</span>
+                            {a.size ? (
+                              <span className="shrink-0 text-gray-400">{formatFileSize(a.size)}</span>
+                            ) : null}
+                          </button>
                         ))}
                       </div>
                     ) : null}
@@ -598,24 +684,116 @@ export default function AdminEmailPage() {
                 rows={12}
                 className="w-full rounded-lg border px-3 py-2 text-sm"
               />
+              {composeFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {composeFiles.map((file, index) => (
+                    <span
+                      key={`${file.name}-${index}`}
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-xs text-gray-800"
+                    >
+                      <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{file.name}</span>
+                      <span className="text-gray-400">{formatFileSize(file.size)}</span>
+                      <button
+                        type="button"
+                        onClick={() => setComposeFiles(composeFiles.filter((_, i) => i !== index))}
+                        className="rounded p-0.5 hover:bg-gray-200"
+                        aria-label={`Remove ${file.name}`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="flex justify-end gap-2 border-t px-4 py-3">
-              <button
-                type="button"
-                onClick={() => setComposeOpen(false)}
-                className="rounded-xl border px-4 py-2 text-sm font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={sending}
-                className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                <Send className="h-4 w-4" />
-                {sending ? 'Sending…' : 'Send'}
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium hover:bg-gray-50">
+                <Paperclip className="h-4 w-4" />
+                Attach files
+                <span className="hidden text-xs font-normal text-gray-400 sm:inline">up to 4MB each</span>
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    addComposeFiles(e.target.files)
+                    e.target.value = ''
+                  }}
+                />
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setComposeOpen(false)
+                    setComposeFiles([])
+                  }}
+                  className="rounded-xl border px-4 py-2 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={sending}
+                  className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  <Send className="h-4 w-4" />
+                  {sending ? (composeFiles.length ? 'Uploading…' : 'Sending…') : 'Send'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewAttachment?.url && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPreviewAttachment(null)}
+        >
+          <div
+            className="relative max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+              <p className="truncate text-sm font-semibold text-gray-900">{previewAttachment.filename}</p>
+              <div className="flex items-center gap-1">
+                <a
+                  href={previewAttachment.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={previewAttachment.filename}
+                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-teal-800 hover:bg-teal-50"
+                >
+                  <Download className="h-4 w-4" />
+                  Download
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewAttachment(null)}
+                  className="rounded-lg p-2 hover:bg-gray-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[80vh] overflow-auto bg-gray-50 p-4">
+              {isImageAttachment(previewAttachment) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={previewAttachment.url}
+                  alt={previewAttachment.filename}
+                  className="mx-auto max-h-[72vh] w-auto max-w-full rounded-lg object-contain"
+                />
+              ) : (
+                <iframe
+                  title={previewAttachment.filename}
+                  src={previewAttachment.url}
+                  className="h-[72vh] w-full rounded-lg bg-white"
+                />
+              )}
             </div>
           </div>
         </div>

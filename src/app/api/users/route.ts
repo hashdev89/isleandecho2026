@@ -35,7 +35,7 @@ interface User {
   name: string
   email: string
   phone: string
-  role: 'admin' | 'staff' | 'customer'
+  role: 'super_admin' | 'admin' | 'staff' | 'customer'
   status: 'active' | 'inactive' | 'suspended'
   lastLogin: string
   createdAt: string
@@ -180,7 +180,20 @@ export async function POST(request: NextRequest) {
       
       if (error) {
         console.error('Supabase error:', error)
-        // Fall through to file storage
+        const message = error.message || 'Failed to create user'
+        const needsRoleMigration =
+          newUser.role === 'super_admin' &&
+          (/check constraint|invalid input value|enum/i.test(message) ||
+            /users_role/i.test(message) ||
+            /value too long/i.test(message))
+        return NextResponse.json(
+          {
+            error: needsRoleMigration
+              ? `${message} Run scripts/supabase-users-super-admin.sql in the Supabase SQL Editor, then try again.`
+              : message,
+          },
+          { status: 500 }
+        )
       } else if (data) {
         // Map back to expected format
         const mappedUser = {

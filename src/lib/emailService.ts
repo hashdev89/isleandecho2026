@@ -39,8 +39,9 @@ interface SendEmailOptions {
   bcc?: string[]
   attachments?: Array<{
     filename: string
-    content: Buffer
+    content?: Buffer
     contentType?: string
+    url?: string
   }>
 }
 
@@ -208,11 +209,11 @@ async function sendViaResend(options: SendEmailOptions, settings: EmailSettings)
     html: options.html,
     text: options.text,
     replyTo: options.replyTo,
-    attachments: options.attachments?.map((file) => ({
-      filename: file.filename,
-      content: file.content,
-      contentType: file.contentType,
-    })),
+    attachments: options.attachments?.map((file) =>
+      file.url
+        ? { filename: file.filename, path: file.url, contentType: file.contentType }
+        : { filename: file.filename, content: file.content, contentType: file.contentType }
+    ),
   })
 
   if (error) {
@@ -248,7 +249,11 @@ async function sendViaSmtp(options: SendEmailOptions, settings: EmailSettings) {
     text: options.text || '',
     html: options.html,
     replyTo: options.replyTo,
-    attachments: options.attachments || [],
+    attachments: options.attachments?.map((file) =>
+      file.url
+        ? { filename: file.filename, href: file.url, contentType: file.contentType }
+        : { filename: file.filename, content: file.content, contentType: file.contentType }
+    ),
   })
   console.log('Email sent via SMTP:', info.messageId)
   return true

@@ -20,13 +20,15 @@ import {
   DollarSign,
   Clock
 } from 'lucide-react'
+import { useAuth } from '../../../../contexts/AuthContext'
+import { hasAdminAccess, isSuperAdmin, roleLabel } from '@/lib/roles'
 
 interface User {
   id: string
   name: string
   email: string
   phone: string
-  role: 'admin' | 'staff' | 'customer'
+  role: 'super_admin' | 'admin' | 'staff' | 'customer'
   status: 'active' | 'inactive' | 'suspended'
   lastLogin: string
   createdAt: string
@@ -39,6 +41,7 @@ interface User {
 export default function UserDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { user: currentAuthUser } = useAuth()
   const [user, setUser] = useState<User | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [editedUser, setEditedUser] = useState<User | null>(null)
@@ -76,6 +79,7 @@ export default function UserDetailPage() {
 
   const getRoleColor = (role: string) => {
     switch (role) {
+      case 'super_admin': return 'text-purple-700 bg-purple-100'
       case 'admin': return 'text-red-600 bg-red-100'
       case 'staff': return 'text-blue-600 bg-blue-100'
       case 'customer': return 'text-green-600 bg-green-100'
@@ -94,6 +98,7 @@ export default function UserDetailPage() {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
+      case 'super_admin': return <Shield className="w-4 h-4" />
       case 'admin': return <Shield className="w-4 h-4" />
       case 'staff': return <UserCheck className="w-4 h-4" />
       case 'customer': return <Users className="w-4 h-4" />
@@ -110,11 +115,35 @@ export default function UserDetailPage() {
     }
   }
 
-  const handleSave = () => {
-    if (editedUser) {
-      setUser(editedUser)
+  const handleSave = async () => {
+    if (!editedUser) return
+    try {
+      const response = await fetch(`/api/users/${editedUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editedUser),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        alert(data.error || 'Failed to update user')
+        return
+      }
+      setUser(data)
+      setEditedUser(data)
       setIsEditing(false)
-      // In a real app, save to backend here
+      try {
+        const savedAuth = localStorage.getItem('user')
+        if (savedAuth) {
+          const authUser = JSON.parse(savedAuth)
+          if (authUser?.id === data.id) {
+            localStorage.setItem('user', JSON.stringify({ ...authUser, role: data.role, name: data.name, email: data.email }))
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to update user')
     }
   }
 
@@ -362,11 +391,14 @@ export default function UserDetailPage() {
                     <option value="customer">Customer</option>
                     <option value="staff">Staff</option>
                     <option value="admin">Admin</option>
+                    {(isSuperAdmin(currentAuthUser?.role) || hasAdminAccess(currentAuthUser?.role)) && (
+                      <option value="super_admin">Super Admin</option>
+                    )}
                   </select>
                 ) : (
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(user.role)}`}>
                     {getRoleIcon(user.role)}
-                    <span className="ml-1 capitalize">{user.role}</span>
+                    <span className="ml-1">{roleLabel(user.role)}</span>
                   </span>
                 )}
               </div>

@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { syncInboundFromResend } from '@/lib/emailCenter'
-import { requireStaffSession } from '@/lib/adminAuth'
+import { requireSuperAdminSession } from '@/lib/adminAuth'
 
 /** Pull received emails from Resend into the dashboard inbox */
-export async function POST() {
-  const denied = await requireStaffSession()
+export async function POST(request: NextRequest) {
+  const denied = await requireSuperAdminSession(request)
   if (denied) return denied
 
   try {

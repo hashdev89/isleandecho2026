@@ -7,10 +7,10 @@ import {
   sendStaffEmail,
   type EmailFolder,
 } from '@/lib/emailCenter'
-import { requireStaffSession, staffUserFromRequest } from '@/lib/adminAuth'
+import { requireSuperAdminSession, staffUserFromRequest } from '@/lib/adminAuth'
 
 export async function GET(request: NextRequest) {
-  const denied = await requireStaffSession()
+  const denied = await requireSuperAdminSession(request)
   if (denied) return denied
 
   try {
@@ -51,12 +51,24 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const denied = await requireStaffSession()
+  const denied = await requireSuperAdminSession(request)
   if (denied) return denied
 
   try {
     const body = await request.json()
     const staff = staffUserFromRequest(request)
+
+    const attachments = Array.isArray(body.attachments)
+      ? body.attachments
+          .filter((item: { filename?: string; url?: string }) => item?.filename && item?.url)
+          .map((item: { id?: string; filename: string; url: string; contentType?: string; size?: number }) => ({
+            id: String(item.id || crypto.randomUUID()),
+            filename: String(item.filename),
+            url: String(item.url),
+            contentType: item.contentType ? String(item.contentType) : undefined,
+            size: item.size ? Number(item.size) : undefined,
+          }))
+      : undefined
 
     const result = await sendStaffEmail({
       to: body.to,
@@ -69,6 +81,7 @@ export async function POST(request: NextRequest) {
       threadId: body.threadId,
       inReplyTo: body.inReplyTo,
       references: body.references,
+      attachments,
       sentByUserId: staff.id,
       sentByUserName: staff.name,
       userId: staff.id,

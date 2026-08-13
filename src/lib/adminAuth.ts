@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { canAccessEmailCenter, hasAdminAccess, isSuperAdmin } from '@/lib/roles'
 
 export async function requireStaffSession() {
   const cookieStore = await cookies()
@@ -22,8 +23,21 @@ export async function requireAdminSession(request: NextRequest) {
   const denied = await requireStaffSession()
   if (denied) return denied
   const { role } = staffUserFromRequest(request)
-  if (role !== 'admin') {
+  if (!hasAdminAccess(role)) {
     return NextResponse.json({ success: false, error: 'Admin access required' }, { status: 403 })
+  }
+  return null
+}
+
+export async function requireSuperAdminSession(request: NextRequest) {
+  const denied = await requireStaffSession()
+  if (denied) return denied
+  const { role } = staffUserFromRequest(request)
+  if (!isSuperAdmin(role) && !canAccessEmailCenter(role)) {
+    return NextResponse.json(
+      { success: false, error: 'Super admin access required' },
+      { status: 403 }
+    )
   }
   return null
 }
