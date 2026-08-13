@@ -675,7 +675,7 @@ export default function AdminChatPage() {
                     >
                       <Phone className="w-5 h-5" />
                     </button>
-                    {selectedConversation.status === 'active' && user?.role === 'admin' && (
+                    {selectedConversation.status === 'active' && (user?.role === 'super_admin' || user?.role === 'admin') && (
                       <button
                         onClick={() => closeConversation(selectedConversation.id)}
                         className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"

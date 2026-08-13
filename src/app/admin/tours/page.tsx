@@ -13,6 +13,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
+import { hasAdminAccess } from '@/lib/roles'
 
 interface TourPackage {
   id: string
@@ -164,7 +165,7 @@ export default function ToursManagement() {
           <p className="text-gray-600">Manage your tour packages and itineraries</p>
         </div>
         <div className="flex items-center space-x-3">
-          {user?.role === 'admin' && selectedIds.size > 0 && (
+          {hasAdminAccess(user?.role) && selectedIds.size > 0 && (
             <button
               onClick={handleDeleteSelected}
               disabled={loading}
@@ -237,7 +238,7 @@ export default function ToursManagement() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {user?.role === 'admin' && (
+                {hasAdminAccess(user?.role) && (
                   <th className="px-4 py-3 text-left">
                     <input
                       type="checkbox"
@@ -274,14 +275,14 @@ export default function ToursManagement() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={user?.role === 'admin' ? 8 : 7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={hasAdminAccess(user?.role) ? 8 : 7} className="px-6 py-8 text-center text-gray-500">
                     <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
                     Loading tours...
                   </td>
                 </tr>
               ) : filteredTours.length === 0 ? (
                 <tr>
-                  <td colSpan={user?.role === 'admin' ? 8 : 7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={hasAdminAccess(user?.role) ? 8 : 7} className="px-6 py-8 text-center text-gray-500">
                     No tours found. <Link href="/admin/tours/new" className="text-blue-600 hover:text-blue-800">Create your first tour</Link>
                   </td>
                 </tr>
@@ -292,7 +293,7 @@ export default function ToursManagement() {
                   className="hover:bg-gray-50 cursor-pointer group transition-colors"
                   onClick={() => window.location.href = `/admin/tours/${tour.id}`}
                 >
-                  {user?.role === 'admin' && (
+                  {hasAdminAccess(user?.role) && (
                     <td className="px-4 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
@@ -357,7 +358,7 @@ export default function ToursManagement() {
                       >
                         <Edit className="h-4 w-4" />
                       </Link>
-                      {user?.role === 'admin' && (
+                      {hasAdminAccess(user?.role) && (
                         <button
                           onClick={() => handleDeleteTour(tour.id)}
                           className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"

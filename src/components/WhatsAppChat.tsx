@@ -1069,7 +1069,14 @@ export default function WhatsAppChat() {
 
   return (
     <>
-      <div ref={chatRootRef} className="hidden sm:block fixed bottom-6 right-6 z-50">
+      <div
+        ref={chatRootRef}
+        className={`fixed right-4 z-50 md:right-6 ${
+          isOpen
+            ? 'hidden sm:block sm:bottom-6'
+            : 'bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] md:bottom-6'
+        }`}
+      >
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}

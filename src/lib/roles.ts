@@ -26,6 +26,11 @@ export function canAccessEmailCenter(role?: string | null) {
   return isSuperAdmin(role)
 }
 
+/** Only super admins can see, create, or assign the Super Admin role. */
+export function canManageSuperAdmins(role?: string | null) {
+  return isSuperAdmin(role)
+}
+
 export function roleLabel(role?: string | null) {
   const value = normalizeRole(role)
   if (value === 'super_admin') return 'Super Admin'

@@ -21,7 +21,7 @@ import {
   Clock
 } from 'lucide-react'
 import { useAuth } from '../../../../contexts/AuthContext'
-import { hasAdminAccess, isSuperAdmin, roleLabel } from '@/lib/roles'
+import { canManageSuperAdmins, roleLabel } from '@/lib/roles'
 
 interface User {
   id: string
@@ -50,16 +50,25 @@ export default function UserDetailPage() {
   useEffect(() => {
     // Fetch user data from API based on params.id
     const fetchUser = async () => {
-      if (!params.id) {
+      if (!params.id || !currentAuthUser) {
         setLoading(false)
         return
       }
       
       try {
         setLoading(true)
-        const response = await fetch(`/api/users/${params.id}`)
+        const response = await fetch(`/api/users/${params.id}`, {
+          headers: {
+            'x-user-role': currentAuthUser?.role || '',
+            'x-user-id': currentAuthUser?.id || '',
+          },
+        })
         if (response.ok) {
           const userData = await response.json()
+          if (userData?.role === 'super_admin' && !canManageSuperAdmins(currentAuthUser?.role)) {
+            router.replace('/admin/users')
+            return
+          }
           setUser(userData)
           setEditedUser(userData)
         } else {
@@ -75,7 +84,7 @@ export default function UserDetailPage() {
     }
 
     fetchUser()
-  }, [params.id])
+  }, [params.id, currentAuthUser?.role, currentAuthUser?.id, router])
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -120,7 +129,11 @@ export default function UserDetailPage() {
     try {
       const response = await fetch(`/api/users/${editedUser.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentAuthUser?.role || '',
+          'x-user-id': currentAuthUser?.id || '',
+        },
         body: JSON.stringify(editedUser),
       })
       const data = await response.json().catch(() => ({}))
@@ -391,7 +404,7 @@ export default function UserDetailPage() {
                     <option value="customer">Customer</option>
                     <option value="staff">Staff</option>
                     <option value="admin">Admin</option>
-                    {(isSuperAdmin(currentAuthUser?.role) || hasAdminAccess(currentAuthUser?.role)) && (
+                    {canManageSuperAdmins(currentAuthUser?.role) && (
                       <option value="super_admin">Super Admin</option>
                     )}
                   </select>
