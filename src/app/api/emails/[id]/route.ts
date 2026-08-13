@@ -4,6 +4,8 @@ import {
   getEmailCenterSettings,
   getThreadWithMessages,
   markThreadRead,
+  permanentlyDeleteThread,
+  restoreThread,
   updateThread,
 } from '@/lib/emailCenter'
 import { requireSuperAdminSession, staffUserFromRequest } from '@/lib/adminAuth'
@@ -55,11 +57,13 @@ export async function PATCH(
     if (access.error) return access.error
 
     const body = await request.json()
-    const thread = await updateThread(id, {
-      starred: body.starred,
-      folder: body.folder,
-      status: body.status,
-    })
+    const thread = body.restore
+      ? await restoreThread(id)
+      : await updateThread(id, {
+          starred: body.starred,
+          folder: body.folder,
+          status: body.status,
+        })
     if (!thread) {
       return NextResponse.json({ success: false, error: 'Thread not found' }, { status: 404 })
     }
@@ -85,11 +89,11 @@ export async function DELETE(
     const access = await assertThreadAccess(request, id)
     if (access.error) return access.error
 
-    const thread = await updateThread(id, { folder: 'trash' })
-    if (!thread) {
+    const ok = await permanentlyDeleteThread(id)
+    if (!ok) {
       return NextResponse.json({ success: false, error: 'Thread not found' }, { status: 404 })
     }
-    return NextResponse.json({ success: true, data: thread })
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Email thread DELETE error:', error)
     return NextResponse.json(

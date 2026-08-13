@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
+  emptyTrash,
   getAccessibleAccounts,
   getEmailCenterSettings,
   getEmailStats,
@@ -93,6 +94,27 @@ export async function POST(request: NextRequest) {
     console.error('Emails POST error:', error)
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Failed to send email' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const denied = await requireSuperAdminSession(request)
+  if (denied) return denied
+
+  try {
+    const staff = staffUserFromRequest(request)
+    const settings = await getEmailCenterSettings()
+    const accessibleEmails = getAccessibleAccounts(settings.accounts, staff.id, staff.role).map(
+      (a) => a.email
+    )
+    const deleted = await emptyTrash(accessibleEmails)
+    return NextResponse.json({ success: true, data: { deleted } })
+  } catch (error) {
+    console.error('Emails empty trash error:', error)
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Failed to empty trash' },
       { status: 500 }
     )
   }

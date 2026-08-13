@@ -17,6 +17,12 @@ export type EmailAccount = {
   isActive?: boolean
   /** Dashboard user IDs (admin/staff) who can access this inbox. Admins always see all. */
   assignedUserIds?: string[]
+  /** Personal backup inbox, e.g. hashdev89@gmail.com */
+  backupEmail?: string
+  /** Auto-forward received mail to backupEmail */
+  forwardInbound?: boolean
+  /** BCC sent mail to backupEmail as a backup copy */
+  forwardOutbound?: boolean
 }
 
 export type EmailAttachment = {
@@ -556,6 +562,89 @@ export async function updateThread(
   return threads[idx]
 }
 
+export async function restoreThread(threadId: string) {
+  const threads = await loadThreads()
+  const messages = await loadMessages()
+  const idx = threads.findIndex((t) => t.id === threadId)
+  if (idx === -1) return null
+  const threadMsgs = messages.filter((m) => m.threadId === threadId)
+  const hasInbound = threadMsgs.some((m) => m.direction === 'inbound')
+  const folder: EmailFolder = hasInbound || threadMsgs.length === 0 ? 'inbox' : 'sent'
+  threads[idx] = {
+    ...threads[idx],
+    folder,
+    status: 'open',
+    updatedAt: new Date().toISOString(),
+  }
+  await saveThreads(threads)
+  return threads[idx]
+}
+
+export async function permanentlyDeleteThread(threadId: string) {
+  const threads = await loadThreads()
+  const messages = await loadMessages()
+  if (!threads.some((t) => t.id === threadId)) return false
+
+  const nextThreads = threads.filter((t) => t.id !== threadId)
+  const nextMessages = messages.filter((m) => m.threadId !== threadId)
+
+  if (hasSupabase) {
+    const { error: msgErr } = await supabaseAdmin.from('email_messages').delete().eq('thread_id', threadId)
+    if (msgErr && !isMissingTableError(msgErr)) throw new Error(msgErr.message)
+    const { error: thErr } = await supabaseAdmin.from('email_threads').delete().eq('id', threadId)
+    if (thErr && !isMissingTableError(thErr)) throw new Error(thErr.message)
+    await saveAppJson(THREADS_JSON_KEY, nextThreads)
+    await saveAppJson(MESSAGES_JSON_KEY, nextMessages)
+  }
+
+  saveJson(THREADS_FILE, nextThreads)
+  saveJson(MESSAGES_FILE, nextMessages)
+  return true
+}
+
+export async function emptyTrash(accessibleEmails?: string[]) {
+  let threads = await loadThreads()
+  if (accessibleEmails) threads = filterByAccessibleEmails(threads, accessibleEmails)
+  const trashIds = threads.filter((t) => t.folder === 'trash').map((t) => t.id)
+  for (const id of trashIds) {
+    await permanentlyDeleteThread(id)
+  }
+  return trashIds.length
+}
+
+function backupAddress(account?: EmailAccount | null) {
+  const backup = parseEmailAddress(account?.backupEmail || '')
+  if (!backup || !backup.includes('@')) return null
+  if (account?.email && parseEmailAddress(account.email) === backup) return null
+  return backup
+}
+
+async function forwardInboundBackup(account: EmailAccount | undefined, message: EmailMessage) {
+  const backup = backupAddress(account)
+  if (!backup || !account?.forwardInbound) return
+  if (parseEmailAddress(message.fromEmail) === backup) return
+  try {
+    const subject = message.subject.startsWith('[Fwd]') ? message.subject : `[Fwd] ${message.subject}`
+    await sendEmail({
+      to: backup,
+      subject,
+      html: `<p style="color:#555;font-size:13px;margin:0 0 12px">Backup copy of mail received at <strong>${account.email}</strong> from ${message.fromName} &lt;${message.fromEmail}&gt;.</p><hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 16px"/>${message.bodyHtml || `<p>${(message.bodyText || '').replace(/\n/g, '<br>')}</p>`}`,
+      text: `Backup copy of mail received at ${account.email} from ${message.fromEmail}\n\n${message.bodyText || ''}`,
+      replyTo: message.fromEmail,
+      from: formatEmailFrom(account.name || 'Isle & Echo', account.email),
+      attachments: message.attachments
+        ?.filter((file) => file.url)
+        .map((file) => ({
+          filename: file.filename,
+          contentType: file.contentType,
+          url: file.url,
+        })),
+    })
+  } catch (error) {
+    console.error('emailCenter inbound backup forward failed:', error)
+  }
+}
+
 export async function recordInboundEmail(input: {
   fromEmail: string
   fromName?: string
@@ -674,6 +763,7 @@ export async function recordInboundEmail(input: {
   messages.push(message)
   await saveThreads(threads)
   await saveMessages(messages)
+  await forwardInboundBackup(matchedAccount, message)
   return { thread, message }
 }
 
@@ -830,6 +920,16 @@ export async function sendStaffEmail(input: {
   const to = normalizeEmailList(input.to)
   const cc = normalizeEmailList(input.cc)
   const bcc = normalizeEmailList(input.bcc)
+  const backup = backupAddress(account)
+  if (
+    account.forwardOutbound &&
+    backup &&
+    !to.some((addr) => parseEmailAddress(addr) === backup) &&
+    !cc.some((addr) => parseEmailAddress(addr) === backup) &&
+    !bcc.some((addr) => parseEmailAddress(addr) === backup)
+  ) {
+    bcc.push(backup)
+  }
   if (!to.length) throw new Error('At least one recipient is required')
 
   const messageId = `<${randomUUID()}@isleandecho.local>`

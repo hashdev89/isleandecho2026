@@ -33,6 +33,9 @@ export async function PUT(request: NextRequest) {
             ...a,
             email: a.email?.trim().toLowerCase() || '',
             assignedUserIds: Array.isArray(a.assignedUserIds) ? a.assignedUserIds : [],
+            backupEmail: a.backupEmail?.trim().toLowerCase() || '',
+            forwardInbound: Boolean(a.forwardInbound),
+            forwardOutbound: Boolean(a.forwardOutbound),
           }))
         : [],
       resendWebhookSecret: body.resendWebhookSecret,

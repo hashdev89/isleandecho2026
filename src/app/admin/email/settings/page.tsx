@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Save, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, Plus, Save, Trash2, Users, Mail } from 'lucide-react'
 import { useAuth } from '../../../../contexts/AuthContext'
 import type { EmailAccount } from '@/lib/emailCenter'
 import { canAccessEmailCenter } from '@/lib/roles'
@@ -96,6 +96,9 @@ export default function EmailSettingsPage() {
         email: '',
         isActive: true,
         assignedUserIds: [],
+        backupEmail: '',
+        forwardInbound: false,
+        forwardOutbound: false,
       },
     ])
   }
@@ -135,7 +138,7 @@ export default function EmailSettingsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Email settings</h1>
           <p className="text-sm text-gray-600">
-            Create @{EMAIL_DOMAIN} addresses and assign staff who can send and receive from each inbox
+            Create @{EMAIL_DOMAIN} addresses, assign staff, and set a backup email to auto-forward send and receive copies
           </p>
         </div>
       </div>
@@ -231,8 +234,53 @@ export default function EmailSettingsPage() {
                 </div>
               )}
               <p className="mt-2 text-xs text-gray-500">
-                Admins always see all inboxes. Assigned staff only see and send from accounts they are linked to.
+                Super Admin always sees all inboxes. Assigned staff only see and send from accounts they are linked to.
               </p>
+            </div>
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-3">
+              <p className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                <Mail className="h-4 w-4" />
+                Backup auto-forward
+              </p>
+              <p className="text-xs text-gray-500">
+                Example: mail to <strong>hashantha@{EMAIL_DOMAIN}</strong> can automatically copy to{' '}
+                <strong>hashdev89@gmail.com</strong> as a backup of received and sent messages.
+              </p>
+              <input
+                type="email"
+                value={acc.backupEmail || ''}
+                onChange={(e) => {
+                  const next = [...accounts]
+                  next[i] = { ...acc, backupEmail: e.target.value.trim() }
+                  setAccounts(next)
+                }}
+                placeholder="backup@gmail.com"
+                className="w-full rounded-lg border bg-white px-3 py-2 text-sm"
+              />
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={Boolean(acc.forwardInbound)}
+                  onChange={(e) => {
+                    const next = [...accounts]
+                    next[i] = { ...acc, forwardInbound: e.target.checked }
+                    setAccounts(next)
+                  }}
+                />
+                Forward received emails to backup
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={Boolean(acc.forwardOutbound)}
+                  onChange={(e) => {
+                    const next = [...accounts]
+                    next[i] = { ...acc, forwardOutbound: e.target.checked }
+                    setAccounts(next)
+                  }}
+                />
+                Copy sent emails to backup (BCC)
+              </label>
             </div>
             <button
               type="button"

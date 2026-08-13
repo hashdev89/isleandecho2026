@@ -48,5 +48,6 @@ create index if not exists email_messages_thread_idx on email_messages(thread_id
 create index if not exists email_messages_resend_id_idx on email_messages(resend_email_id);
 
 -- Store email account config in settings (required when deployed — local JSON is not persistent on Vercel)
+-- email_accounts jsonb may include backupEmail, forwardInbound, forwardOutbound per account
 alter table settings add column if not exists email_accounts jsonb default '[]'::jsonb;
 alter table settings add column if not exists resend_webhook_secret text;
