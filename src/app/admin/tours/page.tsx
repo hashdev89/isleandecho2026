@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { hasAdminAccess } from '@/lib/roles'
+import { useCurrency } from '@/contexts/CurrencyContext'
+import { getTourReviews } from '@/lib/currency'
 
 interface TourPackage {
   id: string
@@ -24,6 +26,8 @@ interface TourPackage {
   destinations: string[]
   highlights: string[]
   featured?: boolean
+  rating?: number
+  reviews?: number
   status: 'active' | 'draft' | 'archived'
   bookings: number
   revenue: number
@@ -32,6 +36,7 @@ interface TourPackage {
 
 export default function ToursManagement() {
   const { user } = useAuth()
+  const { formatBasePrice } = useCurrency()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [tours, setTours] = useState<TourPackage[]>([])
@@ -262,7 +267,7 @@ export default function ToursManagement() {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Performance
+                  Reviews
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Last Updated
@@ -314,7 +319,7 @@ export default function ToursManagement() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm text-gray-900">{tour.duration}</div>
-                      <div className="text-sm font-medium text-green-600">{tour.price}</div>
+                      <div className="text-sm font-medium text-green-600">{formatBasePrice(tour.price)}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -329,12 +334,7 @@ export default function ToursManagement() {
                     {getStatusBadge(tour.status)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm text-gray-900">{tour.bookings} bookings</div>
-                      <div className="text-sm font-medium text-green-600">
-                        ${tour.revenue.toLocaleString()}
-                      </div>
-                    </div>
+                    <div className="text-sm text-gray-900">{getTourReviews(tour)} reviews</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(tour.lastUpdated).toLocaleDateString()}

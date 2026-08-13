@@ -10,7 +10,8 @@ import {
   DollarSign,
   User,
   LogOut,
-  Settings
+  Settings,
+  Search
 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -19,14 +20,15 @@ import { useMobileMenu } from '../contexts/MobileMenuContext'
 import AuthModal from './AuthModal'
 import { getGoogleTranslateLanguage, setGoogleTranslateLanguage } from './GoogleTranslate'
 import { useClickOutside } from '../hooks/useClickOutside'
+import { useCurrency } from '../contexts/CurrencyContext'
 
 
 export default function Header() {
   const { isMenuOpen, setIsMenuOpen } = useMobileMenu()
   const [activeDropdown, setActiveDropdown] = useState('')
   const [selectedLanguage, setSelectedLanguage] = useState('EN')
-  const [selectedCurrency, setSelectedCurrency] = useState('USD')
   const headerRef = useRef<HTMLElement>(null)
+  const { currencies, selectedCurrency, setSelectedCurrency } = useCurrency()
 
   // Sync language with Google Translate cookie on load
   useEffect(() => {
@@ -80,32 +82,24 @@ export default function Header() {
     { code: 'ZH', name: '中文' },
   ]
 
-  const currencies = [
-    { code: 'USD', name: 'US Dollar', symbol: '$' },
-    { code: 'EUR', name: 'Euro', symbol: '€' },
-    { code: 'GBP', name: 'British Pound', symbol: '£' },
-    { code: 'LKR', name: 'Sri Lankan Rupee', symbol: 'Rs' },
-    { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
-    { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' }
-  ]
-
-  const [featuredTours, setFeaturedTours] = useState<{ id: string, name: string, duration?: string }[]>([])
+  const [navTours, setNavTours] = useState<{ id: string; name: string; duration?: string }[]>([])
+  const [tourSearch, setTourSearch] = useState('')
 
   useEffect(() => {
     const load = async () => {
       try {
-        // Use featured endpoint instead of fetching all tours
-        const res = await fetch('/api/tours/featured', {
-          cache: 'force-cache',
-        })
+        const res = await fetch('/api/tours')
         const json = await res.json()
-        if (json.success && json.data) {
-          const items = (json.data || []).slice(0, 10).map((t: any) => ({ 
-            id: t.id, 
-            name: t.name, 
-            duration: t.duration 
-          }))
-          setFeaturedTours(items)
+        if (json.success && Array.isArray(json.data)) {
+          const items = json.data
+            .filter((t: any) => t?.id && t?.name && t.status !== 'inactive')
+            .map((t: any) => ({
+              id: String(t.id),
+              name: String(t.name),
+              duration: t.duration ? String(t.duration) : undefined,
+            }))
+            .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name))
+          setNavTours(items)
         }
       } catch {
         // Silently fail - dropdown will just be empty
@@ -113,6 +107,18 @@ export default function Header() {
     }
     load()
   }, [])
+
+  useEffect(() => {
+    if (activeDropdown !== 'tours' && activeDropdown !== 'tours-mobile') {
+      setTourSearch('')
+    }
+  }, [activeDropdown])
+
+  const filteredNavTours = navTours.filter((t) => {
+    const q = tourSearch.trim().toLowerCase()
+    if (!q) return true
+    return t.name.toLowerCase().includes(q) || (t.duration || '').toLowerCase().includes(q)
+  })
 
   const navigation = [
     { name: 'Home', href: '/' },
@@ -178,24 +184,40 @@ export default function Header() {
                       <ChevronDown className="w-4 h-4" />
                     </button>
                     {activeDropdown === 'tours' && (
-                      <div className="absolute left-0 mt-3 w-72 lp-nav-glass rounded-2xl shadow-2xl py-2 z-10">
-                        <Link
-                          href="/tours"
-                          className="block px-4 py-2.5 text-sm text-[var(--ink)] dark:text-gray-200 hover:bg-[var(--lagoon)] hover:text-white transition-all duration-200 rounded-xl mx-2"
-                          onClick={() => setActiveDropdown('')}
-                        >
-                          All Tour Packages
-                        </Link>
-                        {featuredTours.map(t => (
+                      <div className="absolute left-0 mt-3 w-80 lp-nav-glass rounded-2xl shadow-2xl py-2 z-10">
+                        <div className="relative mx-2 mb-2">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="search"
+                            value={tourSearch}
+                            onChange={(e) => setTourSearch(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Search tour name..."
+                            className="w-full rounded-xl border border-gray-200 bg-white/80 py-2 pl-9 pr-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--lagoon)] focus:ring-2 focus:ring-[var(--lagoon)]/20"
+                          />
+                        </div>
+                        <div className="max-h-[min(24rem,60vh)] overflow-y-auto">
                           <Link
-                            key={t.id}
-                            href={`/tours/${t.id}`}
-                            className="block px-4 py-2.5 text-sm text-[var(--ink-soft)] dark:text-gray-300 hover:bg-[var(--lagoon)] hover:text-white transition-all duration-200 rounded-xl mx-2"
+                            href="/tours"
+                            className="block px-4 py-2.5 text-sm text-[var(--ink)] dark:text-gray-200 hover:bg-[var(--lagoon)] hover:text-white transition-all duration-200 rounded-xl mx-2"
                             onClick={() => setActiveDropdown('')}
                           >
-                            {t.name} {t.duration ? `– ${t.duration}` : ''}
+                            All Tour Packages
                           </Link>
-                        ))}
+                          {filteredNavTours.map((t) => (
+                            <Link
+                              key={t.id}
+                              href={`/tours/${t.id}`}
+                              className="block px-4 py-2.5 text-sm text-[var(--ink-soft)] dark:text-gray-300 hover:bg-[var(--lagoon)] hover:text-white transition-all duration-200 rounded-xl mx-2"
+                              onClick={() => setActiveDropdown('')}
+                            >
+                              {t.name} {t.duration ? `– ${t.duration}` : ''}
+                            </Link>
+                          ))}
+                          {filteredNavTours.length === 0 && (
+                            <p className="px-4 py-3 text-sm text-gray-500">No tours match “{tourSearch}”</p>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -349,6 +371,7 @@ export default function Header() {
             <div className="min-[1400px]:hidden lp-nav-glass border-t border-gray-200 dark:border-gray-700 shadow-lg">
               <div className="px-2 pt-2 pb-3 space-y-1">
                 {navigation.map((item) => (
+                  item.name !== 'Tour Package' ? (
                   <Link
                     key={item.name}
                     href={item.href}
@@ -357,6 +380,54 @@ export default function Header() {
                   >
                     {item.name}
                   </Link>
+                  ) : (
+                    <div key={item.name}>
+                      <button
+                        type="button"
+                        onClick={() => toggleDropdown('tours-mobile')}
+                        className="flex w-full items-center justify-between px-3 py-3 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 font-medium min-h-[44px] touch-manipulation"
+                      >
+                        <span>Tour Package</span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'tours-mobile' ? 'rotate-180' : ''}`} />
+                      </button>
+                      {activeDropdown === 'tours-mobile' && (
+                        <div className="ml-2 mb-2 space-y-1">
+                          <div className="relative px-1 py-1">
+                            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                            <input
+                              type="search"
+                              value={tourSearch}
+                              onChange={(e) => setTourSearch(e.target.value)}
+                              placeholder="Search tour name..."
+                              className="w-full rounded-lg border border-gray-200 py-2.5 pl-9 pr-3 text-sm min-h-[44px]"
+                            />
+                          </div>
+                          <Link
+                            href="/tours"
+                            className="block px-3 py-2.5 text-sm font-medium text-[var(--lagoon-deep)] rounded-lg hover:bg-blue-50"
+                            onClick={() => setIsMenuOpen(false)}
+                          >
+                            All Tour Packages
+                          </Link>
+                          <div className="max-h-64 overflow-y-auto">
+                            {filteredNavTours.map((t) => (
+                              <Link
+                                key={t.id}
+                                href={`/tours/${t.id}`}
+                                className="block px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700"
+                                onClick={() => setIsMenuOpen(false)}
+                              >
+                                {t.name} {t.duration ? `– ${t.duration}` : ''}
+                              </Link>
+                            ))}
+                            {filteredNavTours.length === 0 && (
+                              <p className="px-3 py-2 text-sm text-gray-500">No tours match “{tourSearch}”</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
                 ))}
                 
 

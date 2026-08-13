@@ -10,6 +10,7 @@ export type SectionType =
   | 'features'
   | 'solutions'
   | 'destinations'
+  | 'testimonials'
   | 'blogPreview'
   | 'cta'
   | 'pageHero'
@@ -67,6 +68,7 @@ export const SECTION_META: Record<
   features: { label: 'Why Choose / Features', description: 'Feature cards grid' },
   solutions: { label: 'Discover cards', description: 'Image cards with highlights' },
   destinations: { label: 'Destinations', description: 'Destinations section titles' },
+  testimonials: { label: 'Testimonials', description: 'Guest reviews after Where to go' },
   blogPreview: { label: 'Blog preview', description: 'Latest posts section titles' },
   cta: { label: 'CTA band', description: 'Call-to-action with buttons' },
   pageHero: { label: 'Page hero', description: 'Inner page hero (kicker, title, subtitle)' },
@@ -177,6 +179,38 @@ export function defaultDataForSection(type: SectionType): Record<string, unknown
       return {
         title: "Discover Sri Lanka's destinations",
         subtitle: 'Explore the diverse beauty of Sri Lanka with our curated list of destinations and activities.',
+      }
+    case 'testimonials':
+      return {
+        kicker: 'Guest stories',
+        title: 'What travelers say',
+        subtitle: 'Real experiences from guests who explored Sri Lanka with ISLE & ECHO.',
+        items: [
+          {
+            name: 'Emma Thompson',
+            location: 'United Kingdom',
+            quote:
+              'Every day felt effortless — the guides, the hotels, and the little details made our Sri Lanka trip unforgettable.',
+            rating: 5,
+            image: '',
+          },
+          {
+            name: 'Arjun Patel',
+            location: 'India',
+            quote:
+              'From Sigiriya to the south coast, the itinerary was perfectly paced. We felt looked after without losing the adventure.',
+            rating: 5,
+            image: '',
+          },
+          {
+            name: 'Sophie Müller',
+            location: 'Germany',
+            quote:
+              'Beautiful stays, kind drivers, and wildlife we will never forget. I would book with ISLE & ECHO again in a heartbeat.',
+            rating: 5,
+            image: '',
+          },
+        ],
       }
     case 'blogPreview':
       return { title: 'Travel stories & tips', subtitle: 'Ideas and inspiration for your next island escape' }
@@ -333,6 +367,7 @@ function buildHomeSections(legacy: Record<string, unknown> = {}): PageSection[] 
     createSection('features', { ...defaultDataForSection('features'), ...features }),
     createSection('solutions', { ...defaultDataForSection('solutions'), ...solutions }),
     createSection('destinations', { ...defaultDataForSection('destinations'), ...dest }),
+    createSection('testimonials'),
     createSection('blogPreview'),
     createSection('cta', { ...defaultDataForSection('cta'), ...cta }),
   ]
@@ -560,6 +595,15 @@ export function normalizeSiteContent(raw: Record<string, unknown> | null | undef
       if (!pages.some((p) => p.slug === d.slug)) {
         pages.push(d)
       }
+    }
+
+    for (const page of pages) {
+      if (normalizeSlug(page.slug) !== '/') continue
+      if (page.sections.some((s) => s.type === 'testimonials')) continue
+      const destIdx = page.sections.findIndex((s) => s.type === 'destinations')
+      const section = createSection('testimonials')
+      if (destIdx >= 0) page.sections.splice(destIdx + 1, 0, section)
+      else page.sections.push(section)
     }
   } else {
     pages = buildDefaultPages(input)

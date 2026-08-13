@@ -273,8 +273,8 @@ export async function GET() {
       images: tour.images || [],
       importantInfo: importantObj,
       style: tour.style || 'Adventure',
-      rating: tour.rating || 0,
-      reviews: tour.reviews || 0,
+      rating: Number(tour.rating ?? importantObj.rating ?? 0) || 0,
+      reviews: Number(tour.reviews ?? importantObj.reviews ?? 0) || 0,
       destinationsRoute: tour.destinations_route || '',
       includingAll: tour.including_all || '',
       groupSize: String(tour.group_size ?? tour.groupsize ?? tour.groupSize ?? importantObj.groupSize ?? ''),
@@ -485,8 +485,14 @@ export async function POST(request: NextRequest) {
     const bestTimeCreate = String(newTour.bestTime ?? importantInfoCreate.bestTime ?? '').trim()
     dbTour.group_size = groupSizeCreate
     dbTour.best_time = bestTimeCreate
+    const ratingCreate = Number(newTour.rating ?? importantInfoCreate.rating ?? 0) || 0
+    const reviewsCreate = Number(newTour.reviews ?? importantInfoCreate.reviews ?? 0) || 0
+    dbTour.rating = ratingCreate
+    dbTour.reviews = reviewsCreate
     dbTour.important_info = {
       ...importantInfoCreate,
+      rating: ratingCreate,
+      reviews: reviewsCreate,
       groupSize: groupSizeCreate,
       bestTime: bestTimeCreate
     }
@@ -774,10 +780,16 @@ export async function PUT(request: NextRequest) {
     
     // important_info JSONB: always include groupSize/bestTime (same values as table columns for sync)
     const existingImportant = (updateData.importantInfo && typeof updateData.importantInfo === 'object') ? updateData.importantInfo as Record<string, unknown> : { requirements: [], whatToBring: [] }
+    const ratingVal = Number(updateData.rating ?? existingImportant.rating ?? 0) || 0
+    const reviewsVal = Number(updateData.reviews ?? existingImportant.reviews ?? 0) || 0
+    dbUpdateData.rating = ratingVal
+    dbUpdateData.reviews = reviewsVal
     dbUpdateData.important_info = {
       ...existingImportant,
       groupSize: groupSizeVal,
-      bestTime: bestTimeVal
+      bestTime: bestTimeVal,
+      rating: ratingVal,
+      reviews: reviewsVal,
     }
     console.log('PUT important_info and group_size/best_time being saved:', { group_size: groupSizeVal, best_time: bestTimeVal, important_info: dbUpdateData.important_info })
     

@@ -28,6 +28,8 @@ import SafeImage from '../../../components/SafeImage'
 import dynamic from 'next/dynamic'
 import { formatDistanceKm, getRouteSegments, getTotalRouteKm } from '@/lib/geoDistance'
 import { tourFitsGuestCount } from '@/lib/tourGroupSize'
+import { useCurrency } from '@/contexts/CurrencyContext'
+import { getTourRating, getTourReviews } from '@/lib/currency'
 
 // Hero height: use '50vh', '60vh', '70vh', etc. to control how tall the hero is
 const TOUR_HERO_MIN_HEIGHT = '60vh'
@@ -81,6 +83,8 @@ interface TourPackage {
   bestTime: string
   style: string
   images: string[]
+  rating?: number
+  reviews?: number
 }
 
 interface Day {
@@ -98,6 +102,7 @@ interface Day {
 
 export default function TourPackageClient({ params }: { params: Promise<{ packageId: string }> }) {
   const searchParams = useSearchParams()
+  const { formatPrice } = useCurrency()
   const [selectedImage, setSelectedImage] = useState(0)
   const [tourPackage, setTourPackage] = useState<TourPackage | null>(null)
   const [loading, setLoading] = useState(true)
@@ -179,7 +184,9 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
       transportation: tour.transportation || '',
       groupSize: tour.groupSize || tour.group_size || (tour.importantInfo as Record<string, string>)?.groupSize || (tour.important_info as Record<string, string>)?.groupSize || '',
       bestTime: tour.bestTime || tour.best_time || (tour.importantInfo as Record<string, string>)?.bestTime || (tour.important_info as Record<string, string>)?.bestTime || '',
-      images: Array.isArray(tour.images) ? tour.images : []
+      images: Array.isArray(tour.images) ? tour.images : [],
+      rating: getTourRating(tour),
+      reviews: getTourReviews(tour),
     }
   }
 
@@ -423,11 +430,13 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
               </div>
               <div className="flex items-center space-x-2">
                 <Star className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="text-sm sm:text-base">4.8/5 (127 reviews)</span>
+                <span className="text-sm sm:text-base">
+                  {getTourRating(tourPackage) || 0}/5 ({getTourReviews(tourPackage)} reviews)
+                </span>
               </div>
             </div>
             {parseFloat(tourPackage?.price?.replace(/[^0-9.]/g, '') || '0') > 0 && (
-              <div className="text-2xl sm:text-3xl font-bold text-[var(--sun)] mb-4 sm:mb-6">{tourPackage.price}</div>
+              <div className="text-2xl sm:text-3xl font-bold text-[var(--sun)] mb-4 sm:mb-6">{formatPrice(tourPackage.price)}</div>
             )}
           </div>
         </div>
@@ -904,6 +913,12 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
                       className="w-full px-3 py-2 border border-black/10 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] bg-[var(--foam)] text-[var(--ink)]"
                     />
                   </div>
+                  {parseFloat(tourPackage?.price?.replace(/[^0-9.]/g, '') || '0') > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[var(--ink-soft)]">Package price</span>
+                      <span className="font-bold text-[var(--lagoon-deep)]">{formatPrice(tourPackage.price)}</span>
+                    </div>
+                  )}
                   <button 
                     onClick={handleBooking}
                     className="w-full bg-[var(--lagoon-deep)] text-white py-3 rounded-full font-bold hover:bg-[var(--lagoon)] transition-colors"
