@@ -22,11 +22,12 @@ import {
   AlertCircle,
   Mail,
   Star,
+  Shield,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCurrency } from '../../contexts/CurrencyContext'
 import { getTourReviews } from '@/lib/currency'
-import { canAccessEmailCenter, hasAdminAccess } from '@/lib/roles'
+import { useDashboardAccess } from '@/hooks/useDashboardAccess'
 
 interface BookingRow {
   id: string
@@ -83,8 +84,9 @@ export default function AdminDashboard() {
     reviews: 0,
   })
 
-  const isAdmin = hasAdminAccess(user?.role)
-  const showEmailCenter = canAccessEmailCenter(user?.role)
+  const { canAccess, isSuperAdmin: viewerIsSuperAdmin } = useDashboardAccess()
+  const canViewDashboard = canAccess('dashboard')
+  const showEmailCenter = canAccess('email')
 
   const loadDashboard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -146,8 +148,8 @@ export default function AdminDashboard() {
   }, [])
 
   useEffect(() => {
-    if (isAdmin) loadDashboard()
-  }, [isAdmin, loadDashboard])
+    if (canViewDashboard) loadDashboard()
+  }, [canViewDashboard, loadDashboard])
 
   const stats: StatCard[] = useMemo(
     () => [
@@ -276,6 +278,17 @@ export default function AdminDashboard() {
           },
         ]
       : []),
+    ...(viewerIsSuperAdmin
+      ? [
+          {
+            name: 'Access control',
+            description: 'Sections each role can see',
+            href: '/admin/access',
+            icon: Shield,
+            color: 'bg-slate-800',
+          },
+        ]
+      : []),
     {
       name: 'Upload images',
       description: 'Photos for tours & site',
@@ -285,12 +298,12 @@ export default function AdminDashboard() {
     },
   ]
 
-  if (!isAdmin) {
+  if (!canViewDashboard) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         <AlertCircle className="mx-auto mb-3 h-10 w-10 text-amber-500" />
         <h1 className="text-xl font-bold text-gray-900">Access denied</h1>
-        <p className="mt-2 text-gray-600">You need admin privileges to view the dashboard.</p>
+        <p className="mt-2 text-gray-600">You do not have access to the dashboard overview.</p>
       </div>
     )
   }

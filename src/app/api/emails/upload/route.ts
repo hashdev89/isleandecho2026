@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireSuperAdminSession } from '@/lib/adminAuth'
+import { requireDashboardSection } from '@/lib/adminAuth'
 import {
   MAX_EMAIL_ATTACHMENT_BYTES,
   storeEmailAttachment,
 } from '@/lib/emailAttachments'
 
 export async function POST(request: NextRequest) {
-  const denied = await requireSuperAdminSession(request)
+  const denied = await requireDashboardSection(request, 'email')
   if (denied) return denied
 
   try {

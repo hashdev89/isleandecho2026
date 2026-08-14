@@ -4,10 +4,10 @@ import {
   saveEmailCenterSettings,
   type EmailCenterSettings,
 } from '@/lib/emailCenter'
-import { requireSuperAdminSession } from '@/lib/adminAuth'
+import { requireDashboardSection } from '@/lib/adminAuth'
 
 export async function GET(request: NextRequest) {
-  const denied = await requireSuperAdminSession(request)
+  const denied = await requireDashboardSection(request, 'email')
   if (denied) return denied
 
   try {
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const denied = await requireSuperAdminSession(request)
+  const denied = await requireDashboardSection(request, 'email')
   if (denied) return denied
 
   try {

@@ -22,8 +22,11 @@ export function hasDashboardAccess(role?: string | null) {
   return value === 'super_admin' || value === 'admin' || value === 'staff' || value === 'customer'
 }
 
-export function canAccessEmailCenter(role?: string | null) {
-  return isSuperAdmin(role)
+/** Fallback when the dashboard access matrix is not loaded yet. Super Admin always has Email. */
+export function canAccessEmailCenter(role?: string | null, allowedRoles?: string[]) {
+  if (isSuperAdmin(role)) return true
+  if (!allowedRoles?.length) return false
+  return allowedRoles.map((value) => normalizeRole(value)).includes(normalizeRole(role))
 }
 
 /** Only super admins can see, create, or assign the Super Admin role. */

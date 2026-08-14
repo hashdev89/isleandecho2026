@@ -120,7 +120,7 @@ export default function BlogPage() {
           )}
 
           {!loading && !error && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1180px]:grid-cols-3 gap-5">
               {filteredPosts.map(post => (
               <article key={post.id} className="group">
                 <button

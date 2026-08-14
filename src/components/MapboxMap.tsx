@@ -338,6 +338,7 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                       font-weight: bold;
                       z-index: 0;
                       backdrop-filter: blur(10px);
+                      -webkit-backdrop-filter: blur(10px);
                       max-width: min(280px, calc(100% - 40px));
                     ">
                       <div>${tourName}</div>

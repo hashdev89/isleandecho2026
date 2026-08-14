@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Plus, Save, Trash2, Users } from 'lucide-react'
 import { useAuth } from '../../../../contexts/AuthContext'
 import type { EmailAccount } from '@/lib/emailCenter'
-import { canAccessEmailCenter } from '@/lib/roles'
+import { useDashboardAccess } from '@/hooks/useDashboardAccess'
 
 const EMAIL_DOMAIN = 'isleandecho.com'
 
@@ -39,7 +39,8 @@ export default function EmailSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const isAdmin = canAccessEmailCenter(user?.role)
+  const { canAccess } = useDashboardAccess()
+  const isAdmin = canAccess('email')
 
   useEffect(() => {
     if (!isAdmin) {

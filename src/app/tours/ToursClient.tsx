@@ -224,8 +224,8 @@ export default function ToursClient() {
       />
 
       <div className="w-full max-w-[1920px] mx-auto lp-gutter py-8 sm:py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
-          <div className="lg:col-span-1">
+        <div className="grid grid-cols-1 min-[1180px]:grid-cols-4 gap-6 sm:gap-8">
+          <div className="min-[1180px]:col-span-1">
             <div className="lp-panel p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
@@ -355,7 +355,7 @@ export default function ToursClient() {
             </div>
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="min-[1180px]:col-span-3">
             <div className="flex justify-between items-center mb-8">
               <h2 className="lp-section-title text-2xl sm:text-3xl">
                 {filteredTours.length} tour{filteredTours.length === 1 ? '' : 's'} found
@@ -377,7 +377,7 @@ export default function ToursClient() {
                 ) : null}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1400px]:grid-cols-3 gap-5">
                 {filteredTours.map((tour) => (
                   <button
                     key={tour.id}

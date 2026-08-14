@@ -7,10 +7,10 @@ import {
   sendStaffEmail,
   type EmailFolder,
 } from '@/lib/emailCenter'
-import { requireSuperAdminSession, staffUserFromRequest } from '@/lib/adminAuth'
+import { requireDashboardSection, staffUserFromRequest } from '@/lib/adminAuth'
 
 export async function GET(request: NextRequest) {
-  const denied = await requireSuperAdminSession(request)
+  const denied = await requireDashboardSection(request, 'email')
   if (denied) return denied
 
   try {
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const denied = await requireSuperAdminSession(request)
+  const denied = await requireDashboardSection(request, 'email')
   if (denied) return denied
 
   try {

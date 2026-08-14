@@ -5,7 +5,7 @@ import { supabaseAdmin } from './supabaseClient'
 import { loadAppJson, saveAppJson } from './supabaseJsonStore'
 import { sendEmail, formatEmailFrom } from './emailService'
 import { storeEmailAttachment } from './emailAttachments'
-import { canAccessEmailCenter } from './roles'
+import { hasAdminAccess } from './roles'
 
 export type EmailFolder = 'inbox' | 'sent' | 'trash' | 'starred'
 
@@ -410,7 +410,7 @@ export function getAccessibleAccounts(
   userRole: string
 ): EmailAccount[] {
   const active = accounts.filter((a) => a.isActive !== false && a.email?.trim())
-  if (canAccessEmailCenter(userRole) || userRole === 'admin') return active
+  if (hasAdminAccess(userRole)) return active
   return active.filter((a) => (a.assignedUserIds || []).includes(userId))
 }
 
@@ -420,7 +420,7 @@ export function canAccessAccount(
   userId: string,
   userRole: string
 ): boolean {
-  if (canAccessEmailCenter(userRole) || userRole === 'admin') return true
+  if (hasAdminAccess(userRole)) return true
   const account = accounts.find((a) => a.id === accountId)
   if (!account) return false
   return (account.assignedUserIds || []).includes(userId)
@@ -432,7 +432,7 @@ export function canAccessThread(
   userId: string,
   userRole: string
 ): boolean {
-  if (canAccessEmailCenter(userRole) || userRole === 'admin') return true
+  if (hasAdminAccess(userRole)) return true
   const accessible = getAccessibleAccounts(accounts, userId, userRole)
   return accessible.some((a) => normalizeEmail(a.email) === normalizeEmail(thread.accountEmail))
 }
