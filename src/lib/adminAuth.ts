@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { hasAdminAccess, isSuperAdmin } from '@/lib/roles'
-import {
-  loadDashboardAccessMatrix,
-  roleCanAccessSection,
-  type DashboardSectionId,
-} from '@/lib/dashboardAccess'
+import { roleCanAccessSection, type DashboardSectionId } from '@/lib/dashboardAccess'
+import { loadDashboardAccessMatrix } from '@/lib/dashboardAccessStore'
 
 export async function requireStaffSession() {
   const cookieStore = await cookies()

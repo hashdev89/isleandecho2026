@@ -4,10 +4,11 @@ import {
   saveEmailCenterSettings,
   type EmailCenterSettings,
 } from '@/lib/emailCenter'
-import { requireDashboardSection } from '@/lib/adminAuth'
+import { requireSuperAdminSession } from '@/lib/adminAuth'
 
+/** Only Super Admin can manage email accounts and per-user inbox access. */
 export async function GET(request: NextRequest) {
-  const denied = await requireDashboardSection(request, 'email')
+  const denied = await requireSuperAdminSession(request)
   if (denied) return denied
 
   try {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const denied = await requireDashboardSection(request, 'email')
+  const denied = await requireSuperAdminSession(request)
   if (denied) return denied
 
   try {
@@ -32,7 +33,9 @@ export async function PUT(request: NextRequest) {
         ? body.accounts.map((a) => ({
             ...a,
             email: a.email?.trim().toLowerCase() || '',
-            assignedUserIds: Array.isArray(a.assignedUserIds) ? a.assignedUserIds : [],
+            assignedUserIds: Array.isArray(a.assignedUserIds)
+              ? Array.from(new Set(a.assignedUserIds.map(String).filter(Boolean)))
+              : [],
           }))
         : [],
       resendWebhookSecret: body.resendWebhookSecret,

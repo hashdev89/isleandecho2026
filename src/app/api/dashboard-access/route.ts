@@ -4,9 +4,8 @@ import {
   ASSIGNABLE_DASHBOARD_ROLES,
   DASHBOARD_SECTIONS,
   DEFAULT_DASHBOARD_ACCESS,
-  loadDashboardAccessMatrix,
-  saveDashboardAccessMatrix,
 } from '@/lib/dashboardAccess'
+import { loadDashboardAccessMatrix, saveDashboardAccessMatrix } from '@/lib/dashboardAccessStore'
 
 export async function GET() {
   const denied = await requireStaffSession()

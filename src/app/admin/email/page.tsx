@@ -23,6 +23,7 @@ import {
 import { useAuth } from '../../../contexts/AuthContext'
 import type { EmailAccount, EmailAttachment, EmailMessage, EmailThread } from '@/lib/emailCenter'
 import { useDashboardAccess } from '@/hooks/useDashboardAccess'
+import { isSuperAdmin } from '@/lib/roles'
 import {
   MAX_EMAIL_ATTACHMENT_BYTES,
   MAX_EMAIL_ATTACHMENTS,
@@ -75,6 +76,7 @@ export default function AdminEmailPage() {
   const { user } = useAuth()
   const { canAccess, loaded: accessLoaded } = useDashboardAccess()
   const hasEmailAccess = canAccess('email')
+  const canManageAccounts = isSuperAdmin(user?.role)
   const [folder, setFolder] = useState<Folder>('inbox')
   const [threads, setThreads] = useState<EmailThread[]>([])
   const [stats, setStats] = useState<Stats>({ inbox: 0, unread: 0, starred: 0, sent: 0, trash: 0 })
@@ -356,7 +358,7 @@ export default function AdminEmailPage() {
         </button>
         <Link
           href="/admin/email/settings"
-          className={`rounded-lg p-2 text-gray-500 hover:bg-gray-100 ${!hasEmailAccess ? 'hidden' : ''}`}
+          className={`rounded-lg p-2 text-gray-500 hover:bg-gray-100 ${!canManageAccounts ? 'hidden' : ''}`}
           aria-label="Email settings"
         >
           <Settings className="h-4 w-4" />
@@ -466,16 +468,16 @@ export default function AdminEmailPage() {
               <div className="p-6 text-center text-sm text-gray-500">Loading…</div>
             ) : accounts.length === 0 ? (
               <div className="p-8 text-center text-sm text-gray-500">
-                No email inboxes assigned to your account.
-                {hasEmailAccess ? (
+                No email inboxes are available for your account.
+                {canManageAccounts ? (
                   <>
                     {' '}
                     <Link href="/admin/email/settings" className="text-teal-700 underline">
-                      Add email accounts
+                      Assign email accounts to users
                     </Link>
                   </>
                 ) : (
-                  ' Ask an admin to assign you to an inbox.'
+                  ' Ask Super Admin to assign an inbox to your user.'
                 )}
               </div>
             ) : threads.length === 0 ? (
