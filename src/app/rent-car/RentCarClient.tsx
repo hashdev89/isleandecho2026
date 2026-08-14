@@ -128,7 +128,7 @@ export default function RentCarClient() {
 
       <div className="w-full max-w-[1920px] mx-auto lp-gutter py-8 sm:py-12">
         <div className="lp-panel p-4 sm:p-6 md:p-8 mb-8 overflow-visible">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 md:gap-6 overflow-visible">
+          <div className="grid grid-cols-1 sm:grid-cols-2 min-[1400px]:grid-cols-4 gap-3 sm:gap-5 md:gap-6 overflow-visible">
             <div className={`relative ${showPickupDropdown ? 'z-[100]' : 'z-10'}`} ref={pickupDropdownRef}>
               <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] tracking-wide uppercase">
                 Pickup City
@@ -315,8 +315,8 @@ export default function RentCarClient() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
-          <div className="lg:col-span-1">
+        <div className="grid grid-cols-1 min-[1180px]:grid-cols-4 gap-6 sm:gap-8">
+          <div className="min-[1180px]:col-span-1">
             <div className="lp-panel p-6">
               <div className="flex items-center mb-6">
                 <Filter className="w-5 h-5 mr-2 text-[var(--lagoon)]" />
@@ -359,7 +359,7 @@ export default function RentCarClient() {
             </div>
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="min-[1180px]:col-span-3">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
               <h2 className="lp-section-title text-2xl sm:text-3xl">
                 {loading ? 'Loading…' : `${filteredVehicles.length} vehicles available`}
@@ -373,7 +373,7 @@ export default function RentCarClient() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1400px]:grid-cols-3 gap-5">
               {filteredVehicles.map((vehicle) => (
                 <button
                   key={vehicle.id}

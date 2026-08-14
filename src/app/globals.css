@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
-:root {
+/* Site is light-only: never apply Tailwind dark: variants */
+@custom-variant dark (&:where(.never-dark, .never-dark *));
+
+:root,
+.dark,
+.light {
   --background: #f7f9f8;
   --foreground: #102429;
   --color-background: var(--background);
@@ -11,24 +16,12 @@
   --lagoon: #0b6e7a;
   --lagoon-deep: #0b3d4a;
   --sun: #d4f06a;
-  --glass: rgba(255, 255, 255, 0.72);
+  --glass: rgba(255, 255, 255, 0.87);
   --glass-border: rgba(255, 255, 255, 0.35);
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Inter', ui-sans-serif, system-ui, sans-serif;
-}
-
-.dark {
-  --background: #07161a;
-  --foreground: #eef4f3;
-  --ink: #eef4f3;
-  --ink-soft: #b7c8cb;
-  --foam: #0c1c21;
-  --lagoon: #3eb8c4;
-  --lagoon-deep: #9adfe6;
-  --sun: #d4f06a;
-  --glass: rgba(12, 28, 33, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  color-scheme: dark;
+  color-scheme: light;
+  color-scheme: only light;
 }
 
 @theme inline {
@@ -45,16 +38,24 @@
   font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
+html,
 body {
   background: var(--background);
-  color: var(--foreground);
+  color: #102429;
+  color-scheme: light;
+  color-scheme: only light;
+  accent-color: #0b6e7a;
+}
+
+body {
   font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* Site-wide horizontal page gutters
-   Mobile: 24px · Tablet/iPad (incl. iPad Pro): 60px · Large desktop: 120px */
+   Mobile: 24px · iPad portrait: 48px · iPad landscape / laptop: 80px · Large desktop: 120px */
 .lp-gutter {
   padding-left: 24px;
   padding-right: 24px;
@@ -62,12 +63,18 @@ body {
 
 @media (min-width: 768px) {
   .lp-gutter {
-    padding-left: 60px;
-    padding-right: 60px;
+    padding-left: 48px;
+    padding-right: 48px;
   }
 }
 
-/* 1400px+ keeps all iPad Pro sizes (up to 1366 landscape) on tablet gutters */
+@media (min-width: 1180px) {
+  .lp-gutter {
+    padding-left: 80px;
+    padding-right: 80px;
+  }
+}
+
 @media (min-width: 1400px) {
   .lp-gutter {
     padding-left: 120px;
@@ -152,9 +159,9 @@ body {
 }
 
 .lp-glass {
-  background: #ffffffde;
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  background: rgba(255, 255, 255, 0.87);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
 }
 
@@ -163,9 +170,9 @@ body {
 }
 
 .lp-search-panel {
-  background: #ffffffde;
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  background: rgba(255, 255, 255, 0.87);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   box-shadow: 0 20px 50px rgba(11, 61, 74, 0.22);
 }
@@ -320,15 +327,82 @@ button, a[role="button"], input[type="button"], input[type="submit"] {
 html {
   transition: none;
   scroll-behavior: smooth;
+  color-scheme: light;
+  color-scheme: only light;
 }
 
 html * {
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
-/* Ensure dark mode classes work properly */
 .dark {
-  color-scheme: dark;
+  color-scheme: light;
+  color-scheme: only light;
+}
+
+/* Safari follows macOS dark mode for form controls unless color-scheme is valid */
+input,
+textarea,
+select,
+button {
+  color-scheme: light;
+  color-scheme: only light;
+}
+
+/* Nav + homepage search text: same hex in Safari and Chrome */
+header.lp-nav-glass nav a,
+header.lp-nav-glass nav button {
+  color: #102429;
+  -webkit-text-fill-color: #102429;
+}
+
+header.lp-nav-glass nav a:hover,
+header.lp-nav-glass nav button:hover {
+  color: #0b6e7a;
+  -webkit-text-fill-color: #0b6e7a;
+}
+
+header.lp-nav-glass nav a:hover[class*="hover:text-white"] {
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+}
+
+header.lp-nav-glass input[type="search"],
+header.lp-nav-glass input[type="text"],
+header.lp-nav-glass select,
+.lp-glass input,
+.lp-glass select,
+.lp-search-field {
+  color: #102429 !important;
+  -webkit-text-fill-color: #102429;
+  caret-color: #102429;
+}
+
+header.lp-nav-glass input::placeholder,
+.lp-glass input::placeholder,
+.lp-search-field::placeholder {
+  color: #3a5459 !important;
+  -webkit-text-fill-color: #3a5459;
+  opacity: 1;
+}
+
+.lp-glass > div label,
+.lp-glass label,
+.lp-search-label {
+  color: #0b3d4a !important;
+  -webkit-text-fill-color: #0b3d4a;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: #102429;
+  -webkit-box-shadow: 0 0 0 1000px #f7f9f8 inset;
+  box-shadow: 0 0 0 1000px #f7f9f8 inset;
+  caret-color: #102429;
+  transition: background-color 99999s ease-out;
 }
 
 /* Mobile optimizations */
@@ -739,6 +813,7 @@ input[type="date"]::-moz-calendar-picker-indicator {
 
 /* Animated gradient text for Sri Lanka heading */
 .animated-gradient-text {
+  color: #2563eb;
   background: linear-gradient(90deg, 
     #2563eb 0%, 
     #3b82f6 20%, 

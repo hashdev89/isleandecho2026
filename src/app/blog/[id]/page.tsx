@@ -294,9 +294,9 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
       <section className="py-12">
         <div className="w-full max-w-[1920px] mx-auto lp-gutter">
           <div className="mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 min-[1180px]:grid-cols-3 gap-8">
               {/* Main Content - no image in body */}
-              <div className="lg:col-span-2">
+              <div className="min-[1180px]:col-span-2">
                 {/* Article Content with clear paragraph separation */}
                 <article className="prose prose-lg max-w-none prose-p:mb-5 prose-p:leading-relaxed prose-headings:mb-4 prose-headings:mt-6 first:prose-p:mt-0">
                   <div className="text-gray-700">
@@ -346,7 +346,7 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
               </div>
 
               {/* Sidebar */}
-              <div className="lg:col-span-1">
+              <div className="min-[1180px]:col-span-1">
                 <div className="sticky top-6 space-y-6">
                   {/* Related Posts */}
                   <div className="lp-panel-lg p-6">

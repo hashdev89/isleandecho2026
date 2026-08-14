@@ -1020,7 +1020,7 @@ export default function HomePage() {
       {/* Hero — mobile + iPad Mini (<820px): auto height, 48px top/bottom
           iPad Air/Pro: centered · large desktop: bottom-aligned */}
       <section
-        className="relative text-white overflow-visible w-full flex items-start min-[820px]:min-h-[100dvh] min-[820px]:items-center min-[1400px]:items-end"
+        className="relative text-white overflow-visible w-full flex items-start min-[1400px]:min-h-[100dvh] min-[1400px]:items-end"
       >
         {/* Background Video/Image */}
         <div className="absolute inset-0 z-0 overflow-hidden">
@@ -1089,7 +1089,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="relative w-full max-w-[1920px] mx-auto lp-gutter z-30 py-12 min-[820px]:py-16 min-[1400px]:py-24">
+        <div className="relative w-full max-w-[1920px] mx-auto lp-gutter z-30 py-12 min-[820px]:py-14 min-[1180px]:py-16 min-[1400px]:py-24">
           <div className="max-w-3xl w-full lp-reveal text-left">
             <p className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-white mb-3 sm:mb-4 tracking-tight">
               {String(heroCms?.brandLine || 'ISLE & ECHO')}
@@ -1210,16 +1210,16 @@ export default function HomePage() {
             
                              {/* Search Form — overflow visible so package list + calendars can pop outside the glass panel */}
              <div
-               className={`rounded-2xl sm:rounded-3xl shadow-2xl p-3 sm:p-6 md:p-8 lg:p-10 xl:p-12 lp-glass relative overflow-visible ${
+               className={`rounded-2xl sm:rounded-3xl shadow-2xl p-3 sm:p-6 min-[1180px]:p-8 min-[1400px]:p-12 lp-glass relative overflow-visible ${
                  searchOverlayOpen ? 'z-50' : 'z-30'
                }`}
              >
                {searchTab === 'tours' && (
                  <>
-                   <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1024px]:grid-cols-3 gap-3 min-[820px]:gap-5 min-[1024px]:gap-6 lg:gap-8 relative min-w-0 overflow-visible items-start">
+                   <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1180px]:grid-cols-3 gap-3 min-[820px]:gap-5 min-[1180px]:gap-6 min-[1400px]:gap-8 relative min-w-0 overflow-visible items-start">
                      {/* Tour Package */}
                      <div className={`relative min-w-0 w-full self-start ${showPackageDropdown ? 'z-[100]' : 'z-10'}`} ref={packageDropdownRef}>
-                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Tour Package</label>
+                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[#0b3d4a] tracking-wide uppercase">Tour Package</label>
                        <div className="relative min-w-0 w-full overflow-visible">
                          <button
                            type="button"
@@ -1233,7 +1233,7 @@ export default function HomePage() {
                            }}
                            aria-expanded={showPackageDropdown}
                            aria-haspopup="listbox"
-                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-10 sm:pr-11 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation flex items-center"
+                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-10 sm:pr-11 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 text-[#102429] lp-search-field min-h-[44px] md:min-h-[56px] touch-manipulation flex items-center"
                          >
                            <span className="block truncate">
                              {(() => {
@@ -1246,10 +1246,10 @@ export default function HomePage() {
                              })()}
                            </span>
                          </button>
-                         <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-600 dark:text-gray-400 transition-transform ${showPackageDropdown ? 'rotate-180' : ''}`} />
+                         <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-[#3a5459] transition-transform ${showPackageDropdown ? 'rotate-180' : ''}`} />
 
                          {showPackageDropdown && (
-                           <div className="absolute left-0 right-0 top-full mt-1 z-[110] overflow-hidden rounded-xl border border-black/10 bg-white dark:bg-gray-800 shadow-2xl w-full min-w-0">
+                           <div className="absolute left-0 right-0 top-full mt-1 z-[110] overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl w-full min-w-0">
                              <div className="relative border-b border-gray-100 p-2">
                                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                                <input
@@ -1259,7 +1259,7 @@ export default function HomePage() {
                                  onChange={(e) => setPackageSearch(e.target.value)}
                                  onClick={(e) => e.stopPropagation()}
                                  placeholder="Search tour name..."
-                                 className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-900 outline-none focus:border-[var(--lagoon)] focus:ring-2 focus:ring-[var(--lagoon)]/20"
+                                 className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-[#102429] outline-none focus:border-[#0b6e7a] focus:ring-2 focus:ring-[#0b6e7a]/20"
                                />
                              </div>
                              <ul
@@ -1275,7 +1275,7 @@ export default function HomePage() {
                                      setSearchData({ ...searchData, tourPackage: '' })
                                      closePackageDropdown()
                                    }}
-                                   className="w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-700 dark:text-gray-200 hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)] transition-colors"
+                                   className="w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-[#3a5459] hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)] transition-colors"
                                  >
                                    Select Your Package
                                  </button>
@@ -1298,7 +1298,7 @@ export default function HomePage() {
                                        className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base transition-colors break-words ${
                                          isSelected
                                            ? 'bg-[var(--lagoon-deep)] text-[var(--sun)]'
-                                           : 'text-gray-900 dark:text-white hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
+                                           : 'text-[#102429] hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
                                        }`}
                                      >
                                        {label}
@@ -1307,7 +1307,7 @@ export default function HomePage() {
                                  )
                                })}
                                {searchableTours.length === 0 && (
-                                 <li className="px-3 sm:px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400">
+                                 <li className="px-3 sm:px-4 py-2.5 text-sm text-[#6b7280]">
                                    {publicTours.length === 0
                                      ? 'No tour packages available'
                                      : `No tours match “${packageSearch}”`}
@@ -1321,7 +1321,7 @@ export default function HomePage() {
                      
                      {/* Start Date */}
                      <div className={`relative min-w-0 w-full self-start overflow-visible ${showToursDatePicker ? 'z-[120]' : 'z-20'}`} ref={toursDatePickerRef}>
-                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Start Date</label>
+                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[#0b3d4a] tracking-wide uppercase">Start Date</label>
                        <div className="relative min-w-0 w-full overflow-visible">
                          <button
                            type="button"
@@ -1333,7 +1333,7 @@ export default function HomePage() {
                                setShowToursDatePicker(true)
                              }
                            }}
-                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-8 sm:pr-10 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation truncate"
+                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-8 sm:pr-10 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 text-[#102429] lp-search-field min-h-[44px] md:min-h-[56px] touch-manipulation truncate"
                            aria-expanded={showToursDatePicker}
                          >
                            {searchData.startDate 
@@ -1348,22 +1348,22 @@ export default function HomePage() {
 
                          {/* Date Picker Popup — anchored to the date button */}
                          {showToursDatePicker && (
-                           <div className="absolute top-full left-0 right-0 mt-1 text-black dark:text-white bg-white dark:bg-gray-800 border border-black/10 rounded-xl shadow-2xl z-[130] p-3 sm:p-4 w-full max-w-full min-w-0 sm:w-auto sm:min-w-[300px]">
+                           <div className="absolute top-full left-0 right-0 mt-1 text-[#102429] bg-white border border-black/10 rounded-xl shadow-2xl z-[130] p-3 sm:p-4 w-full max-w-full min-w-0 sm:w-auto sm:min-w-[300px]">
                              <div className="flex items-center justify-between mb-4">
                                <button
                                  type="button"
                                  onClick={() => setCurrentToursMonth(new Date(currentToursMonth.getFullYear(), currentToursMonth.getMonth() - 1))}
-                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                                 className="p-1 hover:bg-gray-100 rounded text-[#102429]"
                                >
                                  ←
                                </button>
-                               <h3 className="font-semibold text-gray-900 dark:text-white">
+                               <h3 className="font-semibold text-[#102429]">
                                  {currentToursMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                                </h3>
                                <button
                                  type="button"
                                  onClick={() => setCurrentToursMonth(new Date(currentToursMonth.getFullYear(), currentToursMonth.getMonth() + 1))}
-                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                                 className="p-1 hover:bg-gray-100 rounded text-[#102429]"
                                >
                                  →
                                </button>
@@ -1371,7 +1371,7 @@ export default function HomePage() {
 
                              <div className="grid grid-cols-7 gap-1 mb-2">
                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                 <div key={day} className="text-center text-xs font-medium text-gray-700 dark:text-gray-300 p-1">
+                                 <div key={day} className="text-center text-xs font-medium text-[#3a5459] p-1">
                                    {day}
                                  </div>
                                ))}
@@ -1396,12 +1396,12 @@ export default function HomePage() {
                                      disabled={isPast}
                                      className={`p-2 text-sm rounded transition-colors ${
                                        isPast
-                                         ? 'text-gray-500 dark:text-gray-500 cursor-not-allowed'
+                                         ? 'text-gray-500 cursor-not-allowed'
                                          : isTourDateSelected(date)
-                                         ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                                         ? 'bg-blue-600 text-white'
                                          : isToday
-                                         ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                                         : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
+                                         ? 'bg-gray-100 text-[#102429]'
+                                         : 'hover:bg-gray-100 text-[#102429]'
                                      }`}
                                    >
                                      {day}
@@ -1410,7 +1410,7 @@ export default function HomePage() {
                                })}
                              </div>
 
-                             <div className="mt-3 text-xs text-gray-700 dark:text-gray-300 text-center">
+                             <div className="mt-3 text-xs text-[#3a5459] text-center">
                                {!selectedTourStartDate
                                  ? 'Click to select start date'
                                  : 'Date selected'
@@ -1423,7 +1423,7 @@ export default function HomePage() {
                      
                      {/* Number of Guests */}
                      <div className="relative z-10 self-start min-w-0 w-full">
-                     <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Number of Guests</label>
+                     <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[#0b3d4a] tracking-wide uppercase">Number of Guests</label>
                        <div className="relative flex items-center min-w-0 w-full">
                          <button
                            type="button"
@@ -1448,7 +1448,7 @@ export default function HomePage() {
                              if (!Number.isFinite(n)) return
                              setSearchData({ ...searchData, guests: Math.max(1, Math.min(999, n)) })
                            }}
-                           className="w-full pl-12 pr-12 py-3 sm:py-4 md:py-5 text-base md:text-lg text-center border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent transition-colors text-gray-900 dark:text-white bg-white/70 dark:bg-gray-800/80 min-h-[44px] md:min-h-[56px] touch-manipulation [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                           className="w-full pl-12 pr-12 py-3 sm:py-4 md:py-5 text-base md:text-lg text-center border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent transition-colors text-[#102429] bg-white/70 lp-search-field min-h-[44px] md:min-h-[56px] touch-manipulation [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                          />
                          <button
                            type="button"
@@ -1459,13 +1459,13 @@ export default function HomePage() {
                            +
                          </button>
                        </div>
-                       <p className="mt-1.5 text-[11px] md:text-xs text-[var(--lagoon-deep)]/70 dark:text-white/70">Enter any number of guests</p>
+                       <p className="mt-1.5 text-[11px] md:text-xs text-[#0b3d4a]/70">Enter any number of guests</p>
                      </div>
                    </div>
                    
                    {/* Tour Package Summary */}
                    {searchData.tourPackage && (
-                     <div className="mt-6 md:mt-8 p-4 md:p-6 rounded-xl border border-white/40 bg-white/70 dark:bg-gray-800/80 backdrop-blur-sm">
+                     <div className="mt-6 md:mt-8 p-4 md:p-6 rounded-xl border border-white/40 bg-white/70 backdrop-blur-sm">
                        {(() => {
                          const selectedTour = allTours.find((tour: Tour) => tour.id === searchData.tourPackage);
                          if (!selectedTour) return null;
@@ -1475,31 +1475,31 @@ export default function HomePage() {
                              {/* Tour Info */}
                              <div className="flex items-center justify-between gap-4">
                                <div className="text-left min-w-0">
-                                 <h3 className="text-lg font-bold text-[var(--lagoon-deep)] dark:text-white">{selectedTour.name}</h3>
-                                 <p className="text-[var(--lagoon)] dark:text-[var(--sun)] font-medium pb-2">{selectedTour.duration}</p>
+                                 <h3 className="text-lg font-bold text-[#0b3d4a]">{selectedTour.name}</h3>
+                                 <p className="text-[#0b6e7a] font-medium pb-2">{selectedTour.duration}</p>
                                </div>
                                <div className="text-right shrink-0">
                                  <div className="flex items-center justify-end space-x-1">
                                    <Star className="w-4 h-4 text-[var(--sun)] fill-current" />
-                                   <span className="text-sm font-semibold text-[var(--lagoon-deep)] dark:text-white">{getTourRating(selectedTour) || '—'}</span>
+                                   <span className="text-sm font-semibold text-[#0b3d4a]">{getTourRating(selectedTour) || '—'}</span>
                                  </div>
-                                 <p className="text-xs text-[var(--lagoon-deep)]/70 dark:text-white/70">({getTourReviews(selectedTour)} reviews)</p>
+                                 <p className="text-xs text-[#0b3d4a]/70">({getTourReviews(selectedTour)} reviews)</p>
                                  {parseFloat(String(selectedTour.price || '').replace(/[^0-9.]/g, '')) > 0 && (
-                                   <p className="mt-1 text-sm font-bold text-[var(--lagoon-deep)] dark:text-[var(--sun)]">{formatPrice(selectedTour.price)}</p>
+                                   <p className="mt-1 text-sm font-bold text-[#0b3d4a]">{formatPrice(selectedTour.price)}</p>
                                  )}
                                </div>
                              </div>
                              
                              {/* Location Summary */}
                              <div>
-                               <h4 className="text-xs sm:text-sm font-semibold text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase mb-2">
+                               <h4 className="text-xs sm:text-sm font-semibold text-[#0b3d4a] tracking-wide uppercase mb-2">
                                  Tour Locations
                                </h4>
                                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                                  {(selectedTour.destinations || []).map((destination: string, idx: number) => (
                                    <span
                                      key={idx}
-                                     className="inline-flex items-center px-2.5 py-1 bg-white/90 dark:bg-gray-800/90 text-[var(--lagoon-deep)] dark:text-white text-xs sm:text-sm rounded-full border border-white/40 shadow-sm font-medium"
+                                     className="inline-flex items-center px-2.5 py-1 bg-white/90 text-[#0b3d4a] text-xs sm:text-sm rounded-full border border-white/40 shadow-sm font-medium"
                                    >
                                      {destination}
                                    </span>
@@ -1527,10 +1527,10 @@ export default function HomePage() {
 
                                {searchTab === 'plan-trip' && (
                   <>
-                    <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1024px]:grid-cols-3 gap-3 min-[820px]:gap-5 min-[1024px]:gap-6 lg:gap-8 relative min-w-0 overflow-visible items-start">
+                    <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1180px]:grid-cols-3 gap-3 min-[820px]:gap-5 min-[1180px]:gap-6 min-[1400px]:gap-8 relative min-w-0 overflow-visible items-start">
                       {/* Destinations Selection */}
                       <div className={`relative min-w-0 w-full self-start ${showDestDropdown ? 'z-[100]' : 'z-10'}`} ref={destDropdownRef}>
-                        <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Destinations</label>
+                        <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[#0b3d4a] tracking-wide uppercase">Destinations</label>
                         <div className="relative min-w-0 w-full overflow-visible">
                           <button
                             type="button"
@@ -1544,7 +1544,7 @@ export default function HomePage() {
                             }}
                             aria-expanded={showDestDropdown}
                             aria-haspopup="listbox"
-                            className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-10 sm:pr-11 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation flex items-center"
+                            className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-10 sm:pr-11 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 text-[#102429] lp-search-field min-h-[44px] md:min-h-[56px] touch-manipulation flex items-center"
                           >
                             <span className="block truncate">
                               {customTripData.destinations.length > 0
@@ -1552,13 +1552,13 @@ export default function HomePage() {
                                 : 'Select destinations'}
                             </span>
                           </button>
-                          <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-600 dark:text-gray-400 transition-transform ${showDestDropdown ? 'rotate-180' : ''}`} />
+                          <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-[#3a5459] transition-transform ${showDestDropdown ? 'rotate-180' : ''}`} />
 
                           {showDestDropdown && (
                             <ul
                               role="listbox"
                               aria-multiselectable="true"
-                              className="absolute left-0 right-0 top-full mt-1 z-[110] max-h-[min(280px,50vh)] sm:max-h-[min(320px,45vh)] overflow-y-auto overscroll-contain rounded-xl border border-black/10 bg-white dark:bg-gray-800 shadow-2xl py-1 w-full min-w-0"
+                              className="absolute left-0 right-0 top-full mt-1 z-[110] max-h-[min(280px,50vh)] sm:max-h-[min(320px,45vh)] overflow-y-auto overscroll-contain rounded-xl border border-black/10 bg-white shadow-2xl py-1 w-full min-w-0"
                             >
                               {availableDestinations.map((destination) => {
                                 const isSelected = customTripData.destinations.includes(destination.id)
@@ -1574,7 +1574,7 @@ export default function HomePage() {
                                       className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base transition-colors break-words ${
                                         isSelected
                                           ? 'bg-[var(--lagoon-deep)] text-[var(--sun)]'
-                                          : 'text-gray-900 dark:text-white hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
+                                          : 'text-[#102429] hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
                                       }`}
                                     >
                                       {label}
@@ -1589,7 +1589,7 @@ export default function HomePage() {
 
                       {/* Date Range */}
                       <div className={`relative min-w-0 w-full self-start overflow-visible ${showDatePicker ? 'z-[120]' : 'z-20'}`} ref={customDatePickerRef}>
-                        <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Date Range</label>
+                        <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[#0b3d4a] tracking-wide uppercase">Date Range</label>
                         <div className="relative min-w-0 w-full overflow-visible">
                           <button
                             type="button"
@@ -1601,7 +1601,7 @@ export default function HomePage() {
                                 setShowDatePicker(true)
                               }
                             }}
-                            className="w-full pl-3 sm:pl-4 md:pl-5 pr-8 sm:pr-10 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation"
+                            className="w-full pl-3 sm:pl-4 md:pl-5 pr-8 sm:pr-10 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 text-[#102429] lp-search-field min-h-[44px] md:min-h-[56px] touch-manipulation"
                             aria-expanded={showDatePicker}
                           >
                             {customTripData.dateRange || 'Select date range'}
@@ -1610,22 +1610,22 @@ export default function HomePage() {
 
                           {/* Date Picker Popup — anchored to the date button, not the stretched grid cell */}
                           {showDatePicker && (
-                            <div className="absolute top-full left-0 right-0 mt-1 text-black dark:text-white bg-white dark:bg-gray-800 border border-black/10 rounded-xl shadow-2xl z-[130] p-3 sm:p-4 w-full max-w-full min-w-0 sm:w-auto sm:min-w-[300px]">
+                            <div className="absolute top-full left-0 right-0 mt-1 text-[#102429] bg-white border border-black/10 rounded-xl shadow-2xl z-[130] p-3 sm:p-4 w-full max-w-full min-w-0 sm:w-auto sm:min-w-[300px]">
                               <div className="flex items-center justify-between mb-4">
                                 <button
                                   type="button"
                                   onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
-                                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                                  className="p-1 hover:bg-gray-100 rounded text-[#102429]"
                                 >
                                   ←
                                 </button>
-                                <h3 className="font-semibold text-gray-900 dark:text-white">
+                                <h3 className="font-semibold text-[#102429]">
                                   {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                                 </h3>
                                 <button
                                   type="button"
                                   onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
-                                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                                  className="p-1 hover:bg-gray-100 rounded text-[#102429]"
                                 >
                                   →
                                 </button>
@@ -1633,7 +1633,7 @@ export default function HomePage() {
 
                               <div className="grid grid-cols-7 gap-1 mb-2">
                                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                  <div key={day} className="text-center text-xs font-medium text-gray-700 dark:text-gray-300 p-1">
+                                  <div key={day} className="text-center text-xs font-medium text-[#3a5459] p-1">
                                     {day}
                                   </div>
                                 ))}
@@ -1658,14 +1658,14 @@ export default function HomePage() {
                                       disabled={isPast}
                                       className={`p-2 text-sm rounded transition-colors ${
                                         isPast
-                                          ? 'text-gray-500 dark:text-gray-500 cursor-not-allowed'
+                                          ? 'text-gray-500 cursor-not-allowed'
                                           : isDateSelected(date)
-                                          ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                                          ? 'bg-blue-600 text-white'
                                           : isDateInRange(date)
-                                          ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200'
+                                          ? 'bg-blue-100 text-blue-800'
                                           : isToday
-                                          ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                                          : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
+                                          ? 'bg-gray-100 text-[#102429]'
+                                          : 'hover:bg-gray-100 text-[#102429]'
                                       }`}
                                     >
                                       {day}
@@ -1674,7 +1674,7 @@ export default function HomePage() {
                                 })}
                               </div>
 
-                              <div className="mt-3 text-xs text-gray-700 dark:text-gray-300 text-center">
+                              <div className="mt-3 text-xs text-[#3a5459] text-center">
                                 {!selectedStartDate
                                   ? 'Click to select start date'
                                   : !selectedEndDate
@@ -1689,7 +1689,7 @@ export default function HomePage() {
 
                       {/* Number of Guests */}
                       <div className="relative z-10 self-start min-w-0 w-full">
-                        <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Number of Guests</label>
+                        <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[#0b3d4a] tracking-wide uppercase">Number of Guests</label>
                         <div className="relative flex items-center">
                           <button
                             type="button"
@@ -1714,7 +1714,7 @@ export default function HomePage() {
                               if (!Number.isFinite(n)) return
                               setCustomTripData({ ...customTripData, guests: Math.max(1, Math.min(999, n)) })
                             }}
-                            className="w-full pl-12 pr-12 py-3 sm:py-4 md:py-5 text-base md:text-lg text-center border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent transition-colors text-gray-900 dark:text-white bg-white/70 dark:bg-gray-800/80 min-h-[44px] md:min-h-[56px] touch-manipulation [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-full pl-12 pr-12 py-3 sm:py-4 md:py-5 text-base md:text-lg text-center border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent transition-colors text-[#102429] bg-white/70 lp-search-field min-h-[44px] md:min-h-[56px] touch-manipulation [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           <button
                             type="button"
@@ -1725,7 +1725,7 @@ export default function HomePage() {
                             +
                           </button>
                         </div>
-                        <p className="mt-1.5 text-[11px] md:text-xs text-[var(--lagoon-deep)]/70 dark:text-white/70">Enter any number of guests</p>
+                        <p className="mt-1.5 text-[11px] md:text-xs text-[#0b3d4a]/70">Enter any number of guests</p>
                       </div>
                     </div>
 
@@ -1738,7 +1738,7 @@ export default function HomePage() {
                             return destination ? (
                               <span
                                 key={destId}
-                                className="inline-flex max-w-full items-center gap-1 px-2.5 py-1 bg-white/90 dark:bg-gray-800/90 text-[var(--lagoon-deep)] dark:text-white text-xs sm:text-sm rounded-full border border-white/40 shadow-sm"
+                                className="inline-flex max-w-full items-center gap-1 px-2.5 py-1 bg-white/90 text-[#0b3d4a] text-xs sm:text-sm rounded-full border border-white/40 shadow-sm"
                               >
                                 <span className="truncate">{destination.name}</span>
                                 <button
@@ -1758,7 +1758,7 @@ export default function HomePage() {
 
                     {/* Interests Row */}
                     <div className="mt-4 sm:mt-6 md:mt-8">
-                      <label className="block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Interests</label>
+                      <label className="block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 text-[#0b3d4a] tracking-wide uppercase">Interests</label>
                       <div className="flex flex-wrap gap-2 sm:gap-3">
                         {tripInterests.map((interest) => (
                           <button
@@ -1794,9 +1794,9 @@ export default function HomePage() {
 
                {searchTab === 'rent-car' && (
                  <>
-                   <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1024px]:grid-cols-4 gap-3 min-[820px]:gap-5 min-[1024px]:gap-6 lg:gap-8 relative min-w-0 overflow-visible items-start">
+                   <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1400px]:grid-cols-4 gap-3 min-[820px]:gap-5 min-[1400px]:gap-8 relative min-w-0 overflow-visible items-start">
                      <div className={`relative min-w-0 w-full self-start ${showPickupDropdown ? 'z-[100]' : 'z-10'}`} ref={pickupDropdownRef}>
-                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Pickup City</label>
+                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[#0b3d4a] tracking-wide uppercase">Pickup City</label>
                        <div className="relative min-w-0 w-full overflow-visible">
                          <button
                            type="button"
@@ -1810,7 +1810,7 @@ export default function HomePage() {
                            }}
                            aria-expanded={showPickupDropdown}
                            aria-haspopup="listbox"
-                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-10 sm:pr-11 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation flex items-center"
+                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-10 sm:pr-11 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 text-[#102429] lp-search-field min-h-[44px] md:min-h-[56px] touch-manipulation flex items-center"
                          >
                            <span className="block truncate">
                              {(() => {
@@ -1821,11 +1821,11 @@ export default function HomePage() {
                              })()}
                            </span>
                          </button>
-                         <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-600 dark:text-gray-400 transition-transform ${showPickupDropdown ? 'rotate-180' : ''}`} />
+                         <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-[#3a5459] transition-transform ${showPickupDropdown ? 'rotate-180' : ''}`} />
                          {showPickupDropdown && (
                            <ul
                              role="listbox"
-                             className="absolute left-0 right-0 top-full mt-1 z-[110] max-h-[min(280px,50vh)] sm:max-h-[min(320px,45vh)] overflow-y-auto overscroll-contain rounded-xl border border-black/10 bg-white dark:bg-gray-800 shadow-2xl py-1 w-full min-w-0"
+                             className="absolute left-0 right-0 top-full mt-1 z-[110] max-h-[min(280px,50vh)] sm:max-h-[min(320px,45vh)] overflow-y-auto overscroll-contain rounded-xl border border-black/10 bg-white shadow-2xl py-1 w-full min-w-0"
                            >
                              <li>
                                <button
@@ -1836,7 +1836,7 @@ export default function HomePage() {
                                    setRentCarData({ ...rentCarData, pickupCityId: '' })
                                    setShowPickupDropdown(false)
                                  }}
-                                 className="w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-700 dark:text-gray-200 hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)] transition-colors"
+                                 className="w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-[#3a5459] hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)] transition-colors"
                                >
                                  Select pickup city
                                </button>
@@ -1858,7 +1858,7 @@ export default function HomePage() {
                                      className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base transition-colors break-words ${
                                        isSelected
                                          ? 'bg-[var(--lagoon-deep)] text-[var(--sun)]'
-                                         : 'text-gray-900 dark:text-white hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
+                                         : 'text-[#102429] hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
                                      }`}
                                    >
                                      {label}
@@ -1872,7 +1872,7 @@ export default function HomePage() {
                      </div>
 
                      <div className={`relative min-w-0 w-full self-start ${showDropoffDropdown ? 'z-[100]' : 'z-10'}`} ref={dropoffDropdownRef}>
-                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Drop-off City</label>
+                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[#0b3d4a] tracking-wide uppercase">Drop-off City</label>
                        <div className="relative min-w-0 w-full overflow-visible">
                          <button
                            type="button"
@@ -1886,7 +1886,7 @@ export default function HomePage() {
                            }}
                            aria-expanded={showDropoffDropdown}
                            aria-haspopup="listbox"
-                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-10 sm:pr-11 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation flex items-center"
+                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-10 sm:pr-11 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 text-[#102429] lp-search-field min-h-[44px] md:min-h-[56px] touch-manipulation flex items-center"
                          >
                            <span className="block truncate">
                              {(() => {
@@ -1897,11 +1897,11 @@ export default function HomePage() {
                              })()}
                            </span>
                          </button>
-                         <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-600 dark:text-gray-400 transition-transform ${showDropoffDropdown ? 'rotate-180' : ''}`} />
+                         <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-[#3a5459] transition-transform ${showDropoffDropdown ? 'rotate-180' : ''}`} />
                          {showDropoffDropdown && (
                            <ul
                              role="listbox"
-                             className="absolute left-0 right-0 top-full mt-1 z-[110] max-h-[min(280px,50vh)] sm:max-h-[min(320px,45vh)] overflow-y-auto overscroll-contain rounded-xl border border-black/10 bg-white dark:bg-gray-800 shadow-2xl py-1 w-full min-w-0"
+                             className="absolute left-0 right-0 top-full mt-1 z-[110] max-h-[min(280px,50vh)] sm:max-h-[min(320px,45vh)] overflow-y-auto overscroll-contain rounded-xl border border-black/10 bg-white shadow-2xl py-1 w-full min-w-0"
                            >
                              <li>
                                <button
@@ -1912,7 +1912,7 @@ export default function HomePage() {
                                    setRentCarData({ ...rentCarData, dropoffCityId: '' })
                                    setShowDropoffDropdown(false)
                                  }}
-                                 className="w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-700 dark:text-gray-200 hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)] transition-colors"
+                                 className="w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-[#3a5459] hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)] transition-colors"
                                >
                                  Select drop-off city
                                </button>
@@ -1934,7 +1934,7 @@ export default function HomePage() {
                                      className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base transition-colors break-words ${
                                        isSelected
                                          ? 'bg-[var(--lagoon-deep)] text-[var(--sun)]'
-                                         : 'text-gray-900 dark:text-white hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
+                                         : 'text-[#102429] hover:bg-[var(--sun)]/40 hover:text-[var(--lagoon-deep)]'
                                      }`}
                                    >
                                      {label}
@@ -1948,7 +1948,7 @@ export default function HomePage() {
                      </div>
 
                      <div className={`relative min-w-0 w-full self-start overflow-visible ${showRentPickupDatePicker ? 'z-[120]' : 'z-20'}`} ref={rentPickupDatePickerRef}>
-                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Pickup Date</label>
+                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[#0b3d4a] tracking-wide uppercase">Pickup Date</label>
                        <div className="relative min-w-0 w-full overflow-visible">
                          <button
                            type="button"
@@ -1960,7 +1960,7 @@ export default function HomePage() {
                                setShowRentPickupDatePicker(true)
                              }
                            }}
-                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-8 sm:pr-10 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation truncate"
+                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-8 sm:pr-10 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 text-[#102429] lp-search-field min-h-[44px] md:min-h-[56px] touch-manipulation truncate"
                            aria-expanded={showRentPickupDatePicker}
                          >
                            {rentCarData.pickupDate
@@ -1970,22 +1970,22 @@ export default function HomePage() {
                          <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-600 pointer-events-none" />
 
                          {showRentPickupDatePicker && (
-                           <div className="absolute top-full left-0 right-0 mt-1 text-black dark:text-white bg-white dark:bg-gray-800 border border-black/10 rounded-xl shadow-2xl z-[130] p-3 sm:p-4 w-full max-w-full min-w-0 sm:w-auto sm:min-w-[300px]">
+                           <div className="absolute top-full left-0 right-0 mt-1 text-[#102429] bg-white border border-black/10 rounded-xl shadow-2xl z-[130] p-3 sm:p-4 w-full max-w-full min-w-0 sm:w-auto sm:min-w-[300px]">
                              <div className="flex items-center justify-between mb-4">
                                <button
                                  type="button"
                                  onClick={() => setCurrentRentPickupMonth(new Date(currentRentPickupMonth.getFullYear(), currentRentPickupMonth.getMonth() - 1))}
-                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                                 className="p-1 hover:bg-gray-100 rounded text-[#102429]"
                                >
                                  ←
                                </button>
-                               <h3 className="font-semibold text-gray-900 dark:text-white">
+                               <h3 className="font-semibold text-[#102429]">
                                  {currentRentPickupMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                                </h3>
                                <button
                                  type="button"
                                  onClick={() => setCurrentRentPickupMonth(new Date(currentRentPickupMonth.getFullYear(), currentRentPickupMonth.getMonth() + 1))}
-                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                                 className="p-1 hover:bg-gray-100 rounded text-[#102429]"
                                >
                                  →
                                </button>
@@ -1993,7 +1993,7 @@ export default function HomePage() {
 
                              <div className="grid grid-cols-7 gap-1 mb-2">
                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                 <div key={day} className="text-center text-xs font-medium text-gray-700 dark:text-gray-300 p-1">
+                                 <div key={day} className="text-center text-xs font-medium text-[#3a5459] p-1">
                                    {day}
                                  </div>
                                ))}
@@ -2018,12 +2018,12 @@ export default function HomePage() {
                                      disabled={isPast}
                                      className={`p-2 text-sm rounded transition-colors ${
                                        isPast
-                                         ? 'text-gray-500 dark:text-gray-500 cursor-not-allowed'
+                                         ? 'text-gray-500 cursor-not-allowed'
                                          : isRentPickupDateSelected(date)
-                                         ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                                         ? 'bg-blue-600 text-white'
                                          : isToday
-                                         ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                                         : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
+                                         ? 'bg-gray-100 text-[#102429]'
+                                         : 'hover:bg-gray-100 text-[#102429]'
                                      }`}
                                    >
                                      {day}
@@ -2032,7 +2032,7 @@ export default function HomePage() {
                                })}
                              </div>
 
-                             <div className="mt-3 text-xs text-gray-700 dark:text-gray-300 text-center">
+                             <div className="mt-3 text-xs text-[#3a5459] text-center">
                                {!rentCarData.pickupDate
                                  ? 'Click to select pickup date'
                                  : 'Pickup date selected'}
@@ -2043,7 +2043,7 @@ export default function HomePage() {
                      </div>
 
                      <div className={`relative min-w-0 w-full self-start overflow-visible ${showRentReturnDatePicker ? 'z-[120]' : 'z-20'}`} ref={rentReturnDatePickerRef}>
-                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[var(--lagoon-deep)] dark:text-white tracking-wide uppercase">Return Date</label>
+                       <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-[#0b3d4a] tracking-wide uppercase">Return Date</label>
                        <div className="relative min-w-0 w-full overflow-visible">
                          <button
                            type="button"
@@ -2055,7 +2055,7 @@ export default function HomePage() {
                                setShowRentReturnDatePicker(true)
                              }
                            }}
-                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-8 sm:pr-10 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 dark:bg-gray-800/80 text-gray-900 dark:text-white min-h-[44px] md:min-h-[56px] touch-manipulation truncate"
+                           className="w-full min-w-0 max-w-full pl-3 sm:pl-4 md:pl-5 pr-8 sm:pr-10 py-3 sm:py-4 md:py-5 text-base md:text-lg border border-white/40 rounded-xl focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent cursor-pointer hover:border-[var(--lagoon)] transition-colors text-left bg-white/70 text-[#102429] lp-search-field min-h-[44px] md:min-h-[56px] touch-manipulation truncate"
                            aria-expanded={showRentReturnDatePicker}
                          >
                            {rentCarData.returnDate
@@ -2065,22 +2065,22 @@ export default function HomePage() {
                          <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-600 pointer-events-none" />
 
                          {showRentReturnDatePicker && (
-                           <div className="absolute top-full left-0 right-0 mt-1 text-black dark:text-white bg-white dark:bg-gray-800 border border-black/10 rounded-xl shadow-2xl z-[130] p-3 sm:p-4 w-full max-w-full min-w-0 sm:w-auto sm:min-w-[300px]">
+                           <div className="absolute top-full left-0 right-0 mt-1 text-[#102429] bg-white border border-black/10 rounded-xl shadow-2xl z-[130] p-3 sm:p-4 w-full max-w-full min-w-0 sm:w-auto sm:min-w-[300px]">
                              <div className="flex items-center justify-between mb-4">
                                <button
                                  type="button"
                                  onClick={() => setCurrentRentReturnMonth(new Date(currentRentReturnMonth.getFullYear(), currentRentReturnMonth.getMonth() - 1))}
-                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                                 className="p-1 hover:bg-gray-100 rounded text-[#102429]"
                                >
                                  ←
                                </button>
-                               <h3 className="font-semibold text-gray-900 dark:text-white">
+                               <h3 className="font-semibold text-[#102429]">
                                  {currentRentReturnMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                                </h3>
                                <button
                                  type="button"
                                  onClick={() => setCurrentRentReturnMonth(new Date(currentRentReturnMonth.getFullYear(), currentRentReturnMonth.getMonth() + 1))}
-                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white"
+                                 className="p-1 hover:bg-gray-100 rounded text-[#102429]"
                                >
                                  →
                                </button>
@@ -2088,7 +2088,7 @@ export default function HomePage() {
 
                              <div className="grid grid-cols-7 gap-1 mb-2">
                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                 <div key={day} className="text-center text-xs font-medium text-gray-700 dark:text-gray-300 p-1">
+                                 <div key={day} className="text-center text-xs font-medium text-[#3a5459] p-1">
                                    {day}
                                  </div>
                                ))}
@@ -2116,12 +2116,12 @@ export default function HomePage() {
                                      disabled={disabled}
                                      className={`p-2 text-sm rounded transition-colors ${
                                        disabled
-                                         ? 'text-gray-500 dark:text-gray-500 cursor-not-allowed'
+                                         ? 'text-gray-500 cursor-not-allowed'
                                          : isRentReturnDateSelected(date)
-                                         ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                                         ? 'bg-blue-600 text-white'
                                          : isToday
-                                         ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                                         : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
+                                         ? 'bg-gray-100 text-[#102429]'
+                                         : 'hover:bg-gray-100 text-[#102429]'
                                      }`}
                                    >
                                      {day}
@@ -2130,7 +2130,7 @@ export default function HomePage() {
                                })}
                              </div>
 
-                             <div className="mt-3 text-xs text-gray-700 dark:text-gray-300 text-center">
+                             <div className="mt-3 text-xs text-[#3a5459] text-center">
                                {!rentCarData.returnDate
                                  ? 'Click to select return date'
                                  : 'Return date selected'}
@@ -2285,7 +2285,7 @@ export default function HomePage() {
       {showStats && (
       <section ref={statsSectionRef} className="py-16 sm:py-20 md:py-24 bg-[var(--lagoon-deep)] text-white">
         <div className="w-full max-w-[1920px] mx-auto lp-gutter">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 md:gap-12">
+          <div className="grid grid-cols-2 min-[1180px]:grid-cols-4 gap-8 sm:gap-10 md:gap-12">
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
                 <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/10 border border-white/15 mb-4 sm:mb-5">
@@ -2342,7 +2342,7 @@ export default function HomePage() {
                       
  
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 min-[1180px]:grid-cols-4 gap-6 sm:gap-8">
             {(
               (featuresCms?.items as Array<{ title?: string; description?: string }>)?.length
                 ? (featuresCms!.items as Array<{ title?: string; description?: string }>).map((item, index) => ({
@@ -2389,14 +2389,14 @@ export default function HomePage() {
                   placeholder="Search destinations..."
                   value={destinationSearchQuery}
                   onChange={(e) => setDestinationSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2.5 pl-10 border border-black/10 dark:border-white/15 rounded-full focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent text-base bg-[var(--foam)] text-[var(--ink)] min-h-[44px] touch-manipulation"
+                  className="w-full px-4 py-2.5 pl-10 border border-black/10 rounded-full focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent text-base bg-white text-[#102429] min-h-[44px] touch-manipulation"
                 />
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--ink-soft)]" />
               </div>
               <select 
                 value={selectedRegion}
                 onChange={(e) => setSelectedRegion(e.target.value)}
-                className="px-4 py-2.5 border border-black/10 dark:border-white/15 rounded-full focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent text-base bg-[var(--foam)] text-[var(--ink)] min-h-[44px] touch-manipulation"
+                className="px-4 py-2.5 border border-black/10 rounded-full focus:ring-2 focus:ring-[var(--lagoon)] focus:border-transparent text-base bg-white text-[#102429] min-h-[44px] touch-manipulation"
               >
                 <option value="all">All Regions</option>
                 {destinationRegions.map((region) => (
@@ -2410,7 +2410,7 @@ export default function HomePage() {
 
           {/* Destinations Grid */}
           {loadingDestinations ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 min-[1180px]:grid-cols-3 gap-4 sm:gap-5">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="lp-photo-card min-h-[320px] sm:min-h-[360px] animate-pulse bg-gray-200" />
               ))}
@@ -2423,7 +2423,7 @@ export default function HomePage() {
             </div>
           ) : filteredDestinations.length > 0 ? (
             <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 min-[1180px]:grid-cols-3 gap-4 sm:gap-5">
               {displayedDestinations.map((destination) => {
                 const badge = String(destination.region || 'Explore').trim() || 'Explore'
 
@@ -2495,7 +2495,7 @@ export default function HomePage() {
               )}
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1180px]:grid-cols-3 gap-4 sm:gap-6">
             {((testimonialsCms?.items as Array<{ name?: string; location?: string; quote?: string; rating?: number }>)?.length
               ? (testimonialsCms!.items as Array<{ name?: string; location?: string; quote?: string; rating?: number }>)
               : DEFAULT_TESTIMONIALS
@@ -2580,7 +2580,7 @@ export default function HomePage() {
                     {blogPosts.map((post) => (
                       <div
                         key={post.id}
-                        className="flex-shrink-0 w-full sm:w-1/2 lg:w-1/3 px-2"
+                        className="flex-shrink-0 w-full sm:w-1/2 min-[1180px]:w-1/3 px-2"
                       >
                         <Link href={`/blog/${post.id}`} className="lp-photo-card group block h-[360px] sm:h-[400px]">
                             <SafeImage

@@ -254,8 +254,8 @@ export default function VehicleDetailClient({ params }: { params: Promise<{ vehi
       </section>
 
       <div className="max-w-[1920px] mx-auto lp-gutter py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
-          <div className="lg:col-span-2 space-y-8">
+        <div className="grid grid-cols-1 min-[1180px]:grid-cols-3 gap-8 min-[1180px]:gap-12">
+          <div className="min-[1180px]:col-span-2 space-y-8">
             <div className="rounded-2xl overflow-hidden border border-black/5">
               <Image
                 src={vehicle.images?.[selectedImage] || vehicle.images?.[0] || '/placeholder-image.svg'}
@@ -482,7 +482,7 @@ export default function VehicleDetailClient({ params }: { params: Promise<{ vehi
             </div>
           </div>
 
-          <div className="lg:sticky lg:top-6 lg:h-fit space-y-6">
+          <div className="min-[1180px]:sticky min-[1180px]:top-6 min-[1180px]:h-fit space-y-6">
             <div className="lp-panel p-6">
               <h3 className="text-xl font-bold text-[var(--ink)] mb-4">Book this vehicle</h3>
               <div className="space-y-4">

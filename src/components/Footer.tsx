@@ -82,7 +82,7 @@ export default function Footer() {
       {/* Main Footer */}
       <div className="py-12">
         <div className="w-full max-w-[1920px] mx-auto lp-gutter">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+          <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1180px]:grid-cols-5 gap-8">
             {/* Contact Us */}
             <div>
               <h3 className="text-lg font-semibold mb-6 text-white">{f?.contactHeading || 'Contact Us'}</h3>

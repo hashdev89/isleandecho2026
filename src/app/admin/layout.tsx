@@ -23,10 +23,13 @@ import {
   Car,
   SlidersHorizontal,
   Mail,
+  Shield,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import AdminRoute from '../../components/AdminRoute'
-import { hasStaffAccess, isSuperAdmin, roleLabel } from '@/lib/roles'
+import { hasStaffAccess, roleLabel } from '@/lib/roles'
+import { useDashboardAccess } from '@/hooks/useDashboardAccess'
+import { DASHBOARD_SECTIONS, type DashboardSectionId } from '@/lib/dashboardAccess'
 
 export default function AdminLayout({
   children,
@@ -38,6 +41,7 @@ export default function AdminLayout({
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [totalChatCount, setTotalChatCount] = useState(0)
+  const { canAccess, loaded: accessLoaded, firstAllowedHref, sectionIdFromPathname } = useDashboardAccess()
 
   const handleLogout = () => {
     logout()
@@ -66,31 +70,41 @@ export default function AdminLayout({
     }
   }, [user])
 
-  const getNavigationItems = () => {
-    const role = user?.role || ''
-    const allItems = [
-      { name: 'Dashboard', href: '/admin', icon: LayoutDashboard, roles: ['super_admin', 'admin'] },
-      { name: 'Chat', href: '/admin/chat', icon: MessageCircle, roles: ['super_admin', 'admin', 'staff'], badge: totalChatCount },
-      { name: 'Email', href: '/admin/email', icon: Mail, roles: ['super_admin'] },
-      { name: 'Blog Posts', href: '/admin/blog', icon: FileText, roles: ['super_admin', 'admin', 'staff'] },
-      { name: 'Bookings', href: '/admin/bookings', icon: Calendar, roles: ['super_admin', 'admin', 'staff', 'customer'] },
-      { name: 'Images', href: '/admin/images', icon: ImageIcon, roles: ['super_admin', 'admin', 'staff'] },
-      { name: 'Tours', href: '/admin/tours', icon: Package, roles: ['super_admin', 'admin', 'staff'] },
-      { name: 'Vehicles', href: '/admin/vehicles', icon: Car, roles: ['super_admin', 'admin', 'staff'] },
-      { name: 'Rental settings', href: '/admin/rental-settings', icon: SlidersHorizontal, roles: ['super_admin', 'admin', 'staff'] },
-      { name: 'Destinations', href: '/admin/destinations', icon: MapPin, roles: ['super_admin', 'admin', 'staff'] },
-      { name: 'Users', href: '/admin/users', icon: Users, roles: ['super_admin', 'admin'] },
-      { name: 'Analytics', href: '/admin/analytics', icon: TrendingUp, roles: ['super_admin', 'admin'] },
-      { name: 'SEO', href: '/admin/seo', icon: SearchIcon, roles: ['super_admin', 'admin'] },
-      { name: 'Site Content', href: '/admin/site-content', icon: LayoutTemplate, roles: ['super_admin', 'admin'] },
-      { name: 'Settings', href: '/admin/settings', icon: Settings, roles: ['super_admin', 'admin'] },
-    ]
-
-    if (isSuperAdmin(role)) return allItems
-    return allItems.filter((item) => item.roles.includes(role))
+  const iconBySection: Record<DashboardSectionId, typeof LayoutDashboard> = {
+    dashboard: LayoutDashboard,
+    chat: MessageCircle,
+    email: Mail,
+    blog: FileText,
+    bookings: Calendar,
+    images: ImageIcon,
+    tours: Package,
+    vehicles: Car,
+    'rental-settings': SlidersHorizontal,
+    destinations: MapPin,
+    users: Users,
+    analytics: TrendingUp,
+    seo: SearchIcon,
+    'site-content': LayoutTemplate,
+    settings: Settings,
+    'access-control': Shield,
   }
 
-  const navigation = getNavigationItems()
+  const navigation = DASHBOARD_SECTIONS
+    .filter((section) => canAccess(section.id))
+    .map((section) => ({
+      name: section.name,
+      href: section.href,
+      icon: iconBySection[section.id],
+      badge: section.id === 'chat' ? totalChatCount : undefined,
+    }))
+
+  useEffect(() => {
+    if (!accessLoaded || !user) return
+    const sectionId = sectionIdFromPathname(pathname)
+    if (!sectionId) return
+    if (canAccess(sectionId)) return
+    router.replace(firstAllowedHref)
+  }, [accessLoaded, canAccess, firstAllowedHref, pathname, router, sectionIdFromPathname, user])
 
   const isActive = (href: string) => {
     if (href === '/admin') {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { canAccessEmailCenter, hasAdminAccess, isSuperAdmin } from '@/lib/roles'
+import { hasAdminAccess, isSuperAdmin } from '@/lib/roles'
+import { roleCanAccessSection, type DashboardSectionId } from '@/lib/dashboardAccess'
+import { loadDashboardAccessMatrix } from '@/lib/dashboardAccessStore'
 
 export async function requireStaffSession() {
   const cookieStore = await cookies()
@@ -33,9 +35,23 @@ export async function requireSuperAdminSession(request: NextRequest) {
   const denied = await requireStaffSession()
   if (denied) return denied
   const { role } = staffUserFromRequest(request)
-  if (!isSuperAdmin(role) && !canAccessEmailCenter(role)) {
+  if (!isSuperAdmin(role)) {
     return NextResponse.json(
       { success: false, error: 'Super admin access required' },
+      { status: 403 }
+    )
+  }
+  return null
+}
+
+export async function requireDashboardSection(request: NextRequest, sectionId: DashboardSectionId) {
+  const denied = await requireStaffSession()
+  if (denied) return denied
+  const { role } = staffUserFromRequest(request)
+  const matrix = await loadDashboardAccessMatrix()
+  if (!roleCanAccessSection(role, sectionId, matrix)) {
+    return NextResponse.json(
+      { success: false, error: 'You do not have access to this section' },
       { status: 403 }
     )
   }

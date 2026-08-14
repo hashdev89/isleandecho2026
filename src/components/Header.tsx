@@ -133,7 +133,7 @@ export default function Header() {
     <>
       <header
         ref={headerRef}
-        className="sticky top-0 z-[100] transition-all duration-500 lp-nav-glass shadow-[0_8px_30px_rgba(11,61,74,0.08)] border-b border-white/40 dark:border-white/10"
+        className="sticky top-0 z-[100] transition-all duration-500 lp-nav-glass shadow-[0_8px_30px_rgba(11,61,74,0.08)] border-b border-white/40"
       >
         <div className="w-full max-w-[1920px] mx-auto lp-gutter">
           <div className="flex justify-between items-center h-[4.5rem]">
@@ -152,20 +152,20 @@ export default function Header() {
                 </div>
                 {/* Logo Text */}
                 <div className="hidden md:block">
-                  <div className="font-display text-[1.35rem] font-semibold tracking-tight text-[var(--lagoon-deep)] dark:text-[var(--lagoon)] leading-none">ISLE & ECHO</div>
-                  <div className="text-[var(--ink-soft)] text-[0.65rem] font-medium tracking-[0.12em] uppercase mt-1">Feel the Isle, Hear The Echo</div>
+                  <div className="font-display text-[1.2rem] min-[1400px]:text-[1.35rem] font-semibold tracking-tight text-[#0b3d4a] leading-none">ISLE & ECHO</div>
+                  <div className="hidden min-[1400px]:block text-[var(--ink-soft)] text-[0.65rem] font-medium tracking-[0.12em] uppercase mt-1">Feel the Isle, Hear The Echo</div>
                 </div>
               </Link>
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden min-[1400px]:flex items-center space-x-1">
+            <nav className="hidden min-[1180px]:flex items-center space-x-0.5 min-[1400px]:space-x-1">
               {navigation.map((item) => (
                 item.name !== 'Tour Package' ? (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="px-3 py-2 text-[0.92rem] font-medium text-[var(--ink)] dark:text-gray-100 hover:text-[var(--lagoon)] transition-colors relative after:absolute after:left-3 after:right-3 after:-bottom-0.5 after:h-0.5 after:origin-left after:scale-x-0 after:bg-[var(--sun)] after:transition-transform hover:after:scale-x-100"
+                    className="px-2 min-[1400px]:px-3 py-2 text-[0.82rem] min-[1400px]:text-[0.92rem] font-medium text-[#102429] hover:text-[#0b6e7a] transition-colors relative after:absolute after:left-2 min-[1400px]:after:left-3 after:right-2 min-[1400px]:after:right-3 after:-bottom-0.5 after:h-0.5 after:origin-left after:scale-x-0 after:bg-[var(--sun)] after:transition-transform hover:after:scale-x-100"
                   >
                     {item.name}
                   </Link>
@@ -177,7 +177,7 @@ export default function Header() {
                         e.stopPropagation()
                         toggleDropdown('tours')
                       }}
-                      className="flex items-center space-x-1 px-3 py-2 text-[0.92rem] font-medium text-[var(--ink)] dark:text-gray-100 hover:text-[var(--lagoon)] transition-colors"
+                      className="flex items-center space-x-1 px-2 min-[1400px]:px-3 py-2 text-[0.82rem] min-[1400px]:text-[0.92rem] font-medium text-[#102429] hover:text-[#0b6e7a] transition-colors"
                       aria-expanded={activeDropdown === 'tours'}
                     >
                       <span>Tour Package</span>
@@ -193,13 +193,13 @@ export default function Header() {
                             onChange={(e) => setTourSearch(e.target.value)}
                             onClick={(e) => e.stopPropagation()}
                             placeholder="Search tour name..."
-                            className="w-full rounded-xl border border-gray-200 bg-white/80 py-2 pl-9 pr-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--lagoon)] focus:ring-2 focus:ring-[var(--lagoon)]/20"
+                            className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-[#102429] outline-none focus:border-[#0b6e7a] focus:ring-2 focus:ring-[#0b6e7a]/20"
                           />
                         </div>
                         <div className="max-h-[min(24rem,60vh)] overflow-y-auto">
                           <Link
                             href="/tours"
-                            className="block px-4 py-2.5 text-sm text-[var(--ink)] dark:text-gray-200 hover:bg-[var(--lagoon)] hover:text-white transition-all duration-200 rounded-xl mx-2"
+                            className="block px-4 py-2.5 text-sm text-[#102429] hover:bg-[var(--lagoon)] hover:text-white transition-all duration-200 rounded-xl mx-2"
                             onClick={() => setActiveDropdown('')}
                           >
                             All Tour Packages
@@ -208,7 +208,7 @@ export default function Header() {
                             <Link
                               key={t.id}
                               href={`/tours/${t.id}`}
-                              className="block px-4 py-2.5 text-sm text-[var(--ink-soft)] dark:text-gray-300 hover:bg-[var(--lagoon)] hover:text-white transition-all duration-200 rounded-xl mx-2"
+                              className="block px-4 py-2.5 text-sm text-[#3a5459] hover:bg-[var(--lagoon)] hover:text-white transition-all duration-200 rounded-xl mx-2"
                               onClick={() => setActiveDropdown('')}
                             >
                               {t.name} {t.duration ? `– ${t.duration}` : ''}
@@ -226,7 +226,7 @@ export default function Header() {
             </nav>
 
                                {/* Desktop Utility Buttons */}
-                   <div className="hidden min-[1400px]:flex items-center space-x-4">
+                   <div className="hidden min-[1180px]:flex items-center space-x-2 min-[1400px]:space-x-4">
               {/* Language Selector */}
               <div className="relative">
                 <button
@@ -235,7 +235,7 @@ export default function Header() {
                     e.stopPropagation()
                     toggleDropdown('language')
                   }}
-                  className="flex items-center space-x-2 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 transition-all duration-300 rounded-full px-3 py-2 hover:bg-blue-50 dark:hover:bg-gray-700 backdrop-blur-sm font-medium"
+                  className="flex items-center space-x-2 text-[#102429] hover:text-[#0b6e7a] transition-all duration-300 rounded-full px-3 py-2 hover:bg-blue-50 backdrop-blur-sm font-medium"
                   aria-expanded={activeDropdown === 'language'}
                 >
                   <Globe className="w-4 h-4" />
@@ -243,7 +243,7 @@ export default function Header() {
                   <ChevronDown className="w-4 h-4" />
                 </button>
                 {activeDropdown === 'language' && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl py-2 z-10 border border-white/20 dark:border-gray-700/20">
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl py-2 z-10 border border-black/10">
                     {languages.map((language) => (
                       <button
                         key={language.code}
@@ -252,7 +252,7 @@ export default function Header() {
                           setSelectedLanguage(language.code)
                           setGoogleTranslateLanguage(language.code)
                         }}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-white transition-all duration-200 rounded-lg mx-1 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
+                        className="block w-full text-left px-4 py-2 text-sm text-[#3a5459] hover:text-white transition-all duration-200 rounded-lg mx-1 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
                       >
                         {language.name}
                       </button>
@@ -269,7 +269,7 @@ export default function Header() {
                     e.stopPropagation()
                     toggleDropdown('currency')
                   }}
-                  className="flex items-center space-x-2 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 transition-all duration-300 rounded-full px-3 py-2 hover:bg-blue-50 dark:hover:bg-gray-700 backdrop-blur-sm font-medium"
+                  className="flex items-center space-x-2 text-[#102429] hover:text-[#0b6e7a] transition-all duration-300 rounded-full px-3 py-2 hover:bg-blue-50 backdrop-blur-sm font-medium"
                   aria-expanded={activeDropdown === 'currency'}
                 >
                   <DollarSign className="w-4 h-4" />
@@ -277,7 +277,7 @@ export default function Header() {
                   <ChevronDown className="w-4 h-4" />
                 </button>
                 {activeDropdown === 'currency' && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl py-2 z-10 border border-white/20 dark:border-gray-700/20">
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl py-2 z-10 border border-black/10">
                     {currencies.map((currency) => (
                       <button
                         key={currency.code}
@@ -285,7 +285,7 @@ export default function Header() {
                           setSelectedCurrency(currency.code)
                           setActiveDropdown('')
                         }}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-white transition-all duration-200 rounded-lg mx-1 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
+                        className="block w-full text-left px-4 py-2 text-sm text-[#3a5459] hover:text-white transition-all duration-200 rounded-lg mx-1 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
                       >
                         <span className="font-medium">{currency.symbol}</span> {currency.name}
                       </button>
@@ -303,7 +303,7 @@ export default function Header() {
                       e.stopPropagation()
                       toggleDropdown('user')
                     }}
-                    className="flex items-center space-x-2 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 transition-all duration-300 rounded-full px-3 py-2 hover:bg-blue-50 dark:hover:bg-gray-700 backdrop-blur-sm font-medium"
+                    className="flex items-center space-x-2 text-[#102429] hover:text-[#0b6e7a] transition-all duration-300 rounded-full px-3 py-2 hover:bg-blue-50 backdrop-blur-sm font-medium"
                     aria-expanded={activeDropdown === 'user'}
                   >
                     <User className="w-4 h-4" />
@@ -311,11 +311,11 @@ export default function Header() {
                     <ChevronDown className="w-4 h-4" />
                   </button>
                   {activeDropdown === 'user' && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl py-2 z-10 border border-white/20 dark:border-gray-700/20">
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl py-2 z-10 border border-black/10">
                       {(user.role === 'super_admin' || user.role === 'admin' || user.role === 'staff') && (
                         <Link
                           href="/admin"
-                          className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-white transition-all duration-200 rounded-lg mx-1 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
+                          className="block px-4 py-2 text-sm text-[#3a5459] hover:text-white transition-all duration-200 rounded-lg mx-1 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
                           onClick={() => setActiveDropdown('')}
                         >
                           <Settings className="inline w-4 h-4 mr-2" />
@@ -324,7 +324,7 @@ export default function Header() {
                       )}
                       <button
                         onClick={handleLogout}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-white transition-all duration-200 rounded-lg mx-1 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
+                        className="block w-full text-left px-4 py-2 text-sm text-[#3a5459] hover:text-white transition-all duration-200 rounded-lg mx-1 hover:bg-gradient-to-r hover:from-[#4091FE] hover:to-[#187BFF]"
                       >
                         <LogOut className="inline w-4 h-4 mr-2" />
                         Sign Out
@@ -340,7 +340,7 @@ export default function Header() {
                       setAuthModalTab('register')
                       setIsAuthModalOpen(true)
                     }}
-                    className="bg-[var(--lagoon-deep)] hover:bg-[var(--lagoon)] text-white px-6 py-2.5 rounded-full font-semibold transition-all duration-300 shadow-lg hover:shadow-xl backdrop-blur-sm min-h-[44px] touch-manipulation"
+                    className="bg-[var(--lagoon-deep)] hover:bg-[var(--lagoon)] text-white px-4 min-[1400px]:px-6 py-2 min-[1400px]:py-2.5 rounded-full font-semibold text-sm min-[1400px]:text-base transition-all duration-300 shadow-lg hover:shadow-xl backdrop-blur-sm min-h-[44px] touch-manipulation"
                   >
                     Register
                   </button>
@@ -349,7 +349,7 @@ export default function Header() {
             </div>
 
             {/* Mobile menu button */}
-            <div className="min-[1400px]:hidden">
+            <div className="min-[1180px]:hidden">
               <button
                 type="button"
                 onClick={(e) => {
@@ -357,7 +357,7 @@ export default function Header() {
                   setActiveDropdown('')
                   setIsMenuOpen(!isMenuOpen)
                 }}
-                className="text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 active:text-[#1E3A8A] transition-all duration-300 rounded-full p-2.5 hover:bg-blue-50 dark:hover:bg-gray-700 backdrop-blur-sm font-medium min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation"
+                className="text-[#102429] hover:text-[#0b6e7a] active:text-[#0b6e7a] transition-all duration-300 rounded-full p-2.5 hover:bg-blue-50 backdrop-blur-sm font-medium min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation"
                 aria-label="Toggle menu"
                 aria-expanded={isMenuOpen}
               >
@@ -368,14 +368,14 @@ export default function Header() {
 
           {/* Mobile Navigation */}
           {isMenuOpen && (
-            <div className="min-[1400px]:hidden lp-nav-glass border-t border-gray-200 dark:border-gray-700 shadow-lg">
+            <div className="min-[1180px]:hidden lp-nav-glass border-t border-gray-200 shadow-lg">
               <div className="px-2 pt-2 pb-3 space-y-1">
                 {navigation.map((item) => (
                   item.name !== 'Tour Package' ? (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="block px-3 py-3 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 active:text-[#1E3A8A] transition-all duration-300 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 font-medium min-h-[44px] flex items-center touch-manipulation"
+                    className="block px-3 py-3 text-[#102429] hover:text-[#0b6e7a] active:text-[#0b6e7a] transition-all duration-300 rounded-lg hover:bg-blue-50 font-medium min-h-[44px] flex items-center touch-manipulation"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {item.name}
@@ -385,7 +385,7 @@ export default function Header() {
                       <button
                         type="button"
                         onClick={() => toggleDropdown('tours-mobile')}
-                        className="flex w-full items-center justify-between px-3 py-3 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 font-medium min-h-[44px] touch-manipulation"
+                        className="flex w-full items-center justify-between px-3 py-3 text-[#102429] hover:text-[#0b6e7a] rounded-lg hover:bg-blue-50 font-medium min-h-[44px] touch-manipulation"
                       >
                         <span>Tour Package</span>
                         <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'tours-mobile' ? 'rotate-180' : ''}`} />
@@ -399,7 +399,7 @@ export default function Header() {
                               value={tourSearch}
                               onChange={(e) => setTourSearch(e.target.value)}
                               placeholder="Search tour name..."
-                              className="w-full rounded-lg border border-gray-200 py-2.5 pl-9 pr-3 text-sm min-h-[44px]"
+                              className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-[#102429] min-h-[44px]"
                             />
                           </div>
                           <Link
@@ -414,7 +414,7 @@ export default function Header() {
                               <Link
                                 key={t.id}
                                 href={`/tours/${t.id}`}
-                                className="block px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700"
+                                className="block px-3 py-2.5 text-sm text-[#3a5459] rounded-lg hover:bg-blue-50"
                                 onClick={() => setIsMenuOpen(false)}
                               >
                                 {t.name} {t.duration ? `– ${t.duration}` : ''}
@@ -433,14 +433,14 @@ export default function Header() {
 
 
                 {/* Mobile Language & Currency */}
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                <div className="border-t border-gray-200 pt-4 mt-4">
                   <div className="px-3 py-2">
-                    <div className="flex items-center justify-between text-gray-800 dark:text-gray-200 text-sm font-medium">
+                    <div className="flex items-center justify-between text-[#102429] text-sm font-medium">
                       <span>Language:</span>
                       <select
                         value={selectedLanguage}
                         onChange={(e) => setGoogleTranslateLanguage(e.target.value)}
-                        className="bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 font-medium text-base min-h-[44px] touch-manipulation"
+                        className="bg-white text-[#102429] border border-gray-300 rounded-lg px-3 py-2.5 font-medium text-base min-h-[44px] touch-manipulation"
                       >
                         {languages.map((language) => (
                           <option key={language.code} value={language.code}>
@@ -452,12 +452,12 @@ export default function Header() {
                   </div>
                   
                   <div className="px-3 py-2">
-                    <div className="flex items-center justify-between text-gray-800 dark:text-gray-200 text-sm font-medium">
+                    <div className="flex items-center justify-between text-[#102429] text-sm font-medium">
                       <span>Currency:</span>
                       <select
                         value={selectedCurrency}
                         onChange={(e) => setSelectedCurrency(e.target.value)}
-                        className="bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 font-medium text-base min-h-[44px] touch-manipulation"
+                        className="bg-white text-[#102429] border border-gray-300 rounded-lg px-3 py-2.5 font-medium text-base min-h-[44px] touch-manipulation"
                       >
                         {currencies.map((currency) => (
                           <option key={currency.code} value={currency.code}>
@@ -470,13 +470,13 @@ export default function Header() {
                 </div>
 
                 {/* Mobile Auth Buttons */}
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 px-3 space-y-2">
+                <div className="border-t border-gray-200 pt-4 mt-4 px-3 space-y-2">
                   {user ? (
                     <>
                       {(user.role === 'super_admin' || user.role === 'admin' || user.role === 'staff') && (
                       <Link
                         href="/admin"
-                        className="w-full flex items-center justify-center space-x-2 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 transition-all duration-300 py-3 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 font-medium min-h-[44px] touch-manipulation"
+                        className="w-full flex items-center justify-center space-x-2 text-[#102429] hover:text-[#0b6e7a] transition-all duration-300 py-3 rounded-lg hover:bg-blue-50 font-medium min-h-[44px] touch-manipulation"
                         onClick={() => setIsMenuOpen(false)}
                       >
                         <Settings className="w-4 h-4" />
@@ -488,7 +488,7 @@ export default function Header() {
                           handleLogout()
                           setIsMenuOpen(false)
                         }}
-                        className="w-full flex items-center justify-center space-x-2 text-gray-800 dark:text-gray-200 hover:text-[#1E3A8A] dark:hover:text-blue-400 transition-all duration-300 py-3 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 font-medium min-h-[44px] touch-manipulation"
+                        className="w-full flex items-center justify-center space-x-2 text-[#102429] hover:text-[#0b6e7a] transition-all duration-300 py-3 rounded-lg hover:bg-blue-50 font-medium min-h-[44px] touch-manipulation"
                       >
                         <LogOut className="w-4 h-4" />
                         <span>Sign Out</span>

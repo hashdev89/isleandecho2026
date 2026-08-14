@@ -159,9 +159,9 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
       </div>
 
       <div className="w-full max-w-[1920px] mx-auto lp-gutter py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 min-[1180px]:grid-cols-3 gap-8">
           {/* Main Content */}
-          <div className="lg:col-span-2">
+          <div className="min-[1180px]:col-span-2">
             {/* Description */}
             <div className="lp-panel p-8 mb-8">
               <h2 className="lp-section-title text-3xl mb-6">About {destination.name}</h2>
@@ -201,7 +201,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
           </div>
 
           {/* Sidebar */}
-          <div className="lg:col-span-1">
+          <div className="min-[1180px]:col-span-1">
             {/* Gallery */}
             <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Gallery</h3>

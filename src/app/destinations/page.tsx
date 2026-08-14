@@ -103,8 +103,8 @@ export default function DestinationsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-1">
+        <div className="grid grid-cols-1 min-[1180px]:grid-cols-4 gap-8">
+          <div className="min-[1180px]:col-span-1">
             <div className="lp-panel p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
@@ -143,7 +143,7 @@ export default function DestinationsPage() {
             </div>
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="min-[1180px]:col-span-3">
             <div className="flex justify-between items-center mb-8">
               <h2 className="lp-section-title text-2xl sm:text-3xl">
                 {loading ? 'Loading destinations...' : 
@@ -186,7 +186,7 @@ export default function DestinationsPage() {
             )}
 
             {!loading && !error && filteredDestinations.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1400px]:grid-cols-3 gap-5">
               {filteredDestinations.map((destination) => {
                 const badge = String(destination.region || 'Explore').trim() || 'Explore'
 

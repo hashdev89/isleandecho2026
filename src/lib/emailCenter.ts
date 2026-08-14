@@ -5,7 +5,7 @@ import { supabaseAdmin } from './supabaseClient'
 import { loadAppJson, saveAppJson } from './supabaseJsonStore'
 import { sendEmail, formatEmailFrom } from './emailService'
 import { storeEmailAttachment } from './emailAttachments'
-import { canAccessEmailCenter } from './roles'
+import { isSuperAdmin } from './roles'
 
 export type EmailFolder = 'inbox' | 'sent' | 'trash' | 'starred'
 
@@ -15,7 +15,11 @@ export type EmailAccount = {
   email: string
   isDefault?: boolean
   isActive?: boolean
-  /** Dashboard user IDs (admin/staff) who can access this inbox. Admins always see all. */
+  /**
+   * Dashboard user IDs allowed to open this inbox.
+   * Super Admin always sees every account.
+   * Admin / staff / others only see accounts they are assigned to here.
+   */
   assignedUserIds?: string[]
   /** Personal backup inbox, e.g. hashdev89@gmail.com */
   backupEmail?: string
@@ -409,15 +413,17 @@ function normalizeEmail(email: string) {
   return parseEmailAddress(email)
 }
 
-/** Accounts a user may access. Admins see all active accounts; staff only assigned ones. */
+/** Accounts a user may open in Email Center. Super Admin sees all; everyone else needs assignment. */
 export function getAccessibleAccounts(
   accounts: EmailAccount[],
   userId: string,
   userRole: string
 ): EmailAccount[] {
   const active = accounts.filter((a) => a.isActive !== false && a.email?.trim())
-  if (canAccessEmailCenter(userRole) || userRole === 'admin') return active
-  return active.filter((a) => (a.assignedUserIds || []).includes(userId))
+  if (isSuperAdmin(userRole)) return active
+  const uid = String(userId || '').trim()
+  if (!uid) return []
+  return active.filter((a) => (a.assignedUserIds || []).map(String).includes(uid))
 }
 
 export function canAccessAccount(
@@ -426,10 +432,10 @@ export function canAccessAccount(
   userId: string,
   userRole: string
 ): boolean {
-  if (canAccessEmailCenter(userRole) || userRole === 'admin') return true
+  if (isSuperAdmin(userRole)) return true
   const account = accounts.find((a) => a.id === accountId)
-  if (!account) return false
-  return (account.assignedUserIds || []).includes(userId)
+  if (!account || account.isActive === false) return false
+  return (account.assignedUserIds || []).map(String).includes(String(userId || ''))
 }
 
 export function canAccessThread(
@@ -438,7 +444,7 @@ export function canAccessThread(
   userId: string,
   userRole: string
 ): boolean {
-  if (canAccessEmailCenter(userRole) || userRole === 'admin') return true
+  if (isSuperAdmin(userRole)) return true
   const accessible = getAccessibleAccounts(accounts, userId, userRole)
   return accessible.some((a) => normalizeEmail(a.email) === normalizeEmail(thread.accountEmail))
 }

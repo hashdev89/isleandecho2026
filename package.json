@@ -26,6 +26,14 @@
     "sharp": "^0.34.4",
     "uuid": "^13.0.0"
   },
+  "browserslist": [
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 111",
+    "safari >= 15",
+    "ios_saf >= 15",
+    "not dead"
+  ],
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",

@@ -116,7 +116,7 @@ export default function ContactPage() {
       {isSectionEnabled(page, 'contactInfo') !== false && (
       <section className="py-12 sm:py-16 bg-white/70">
         <div className="w-full max-w-[1920px] mx-auto lp-gutter">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 min-[820px]:grid-cols-2 min-[1180px]:grid-cols-4 gap-5">
             {contactInfo.map((item, index) => (
               <div key={index} className="lp-panel p-6 text-center">
                 <div className="w-14 h-14 bg-[var(--lagoon)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -135,7 +135,7 @@ export default function ContactPage() {
 
       <section className="lp-section-ink py-12 sm:py-16">
         <div className="w-full max-w-[1920px] mx-auto lp-gutter">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+          <div className="grid grid-cols-1 min-[1180px]:grid-cols-2 gap-8 min-[1180px]:gap-12">
             <div className="lp-panel p-6 sm:p-8">
               <p className="lp-kicker mb-2">Message</p>
               <h2 className="lp-section-title text-2xl sm:text-3xl mb-2">

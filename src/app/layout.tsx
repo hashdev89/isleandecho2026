@@ -24,6 +24,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   themeColor: "#0B3D4A",
+  colorScheme: "light",
 };
 
 export default async function RootLayout({
@@ -34,11 +35,13 @@ export default async function RootLayout({
   const seo = await getSiteSeo()
 
   return (
-    <html lang="en" className="font-inter" suppressHydrationWarning>
+    <html lang="en" className="font-inter light" style={{ colorScheme: "only light" }} suppressHydrationWarning>
       <head>
+        <meta name="color-scheme" content="only light" />
+        <meta name="supported-color-schemes" content="light" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet" />
         <link rel="icon" href={seo.faviconUrl || seo.logoUrl || '/logoisle&echo.png'} type="image/png" />
         <link rel="apple-touch-icon" href={seo.logoUrl || '/logoisle&echo.png'} />
       </head>

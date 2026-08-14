@@ -446,9 +446,9 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
       {/* Tour Details - full width content */}
       <section className="py-16 w-full">
         <div className="w-full lp-gutter">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 max-w-[1920px] mx-auto">
+          <div className="grid grid-cols-1 min-[1180px]:grid-cols-3 gap-8 min-[1180px]:gap-12 max-w-[1920px] mx-auto">
             {/* Main Content */}
-            <div className="lg:col-span-2 space-y-12">
+            <div className="min-[1180px]:col-span-2 space-y-12">
 
               {/* Key Experiences */}
               {tourPackage.keyExperiences && tourPackage.keyExperiences.length > 0 && (
@@ -759,7 +759,7 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
             </div>
 
             {/* Sidebar */}
-            <div className="lg:sticky lg:top-6 lg:h-fit lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto space-y-6">
+            <div className="min-[1180px]:sticky min-[1180px]:top-6 min-[1180px]:h-fit min-[1180px]:max-h-[calc(100vh-3rem)] min-[1180px]:overflow-y-auto space-y-6">
               {/* Quick Booking */}
               <div className="lp-panel p-6">
                 <h3 className="lp-section-title text-xl mb-4 text-[var(--ink)]">Quick Booking</h3>

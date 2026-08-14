@@ -219,7 +219,7 @@ export default function AdminSettingsPage() {
             secondaryColor: result.data.secondaryColor || defaultSettings.secondaryColor,
             logoUrl: result.data.logoUrl || defaultSettings.logoUrl,
             faviconUrl: result.data.faviconUrl || defaultSettings.faviconUrl,
-            theme: result.data.theme || defaultSettings.theme,
+            theme: 'light',
             seoTitle: result.data.seoTitle || defaultSettings.seoTitle,
             seoDescription: result.data.seoDescription || defaultSettings.seoDescription,
             seoKeywords: result.data.seoKeywords || defaultSettings.seoKeywords,
@@ -944,14 +944,13 @@ export default function AdminSettingsPage() {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Theme</label>
         <select
-          value={settings.theme}
-          onChange={(e) => updateSetting('theme', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          value="light"
+          disabled
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
         >
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-          <option value="auto">Auto</option>
+          <option value="light">Light only</option>
         </select>
+        <p className="mt-1 text-xs text-gray-500">The website always uses light mode.</p>
       </div>
     </div>
   )

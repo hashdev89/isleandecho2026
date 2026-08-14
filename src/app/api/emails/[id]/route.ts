@@ -8,7 +8,7 @@ import {
   restoreThread,
   updateThread,
 } from '@/lib/emailCenter'
-import { requireSuperAdminSession, staffUserFromRequest } from '@/lib/adminAuth'
+import { requireDashboardSection, staffUserFromRequest } from '@/lib/adminAuth'
 
 async function assertThreadAccess(request: NextRequest, threadId: string) {
   const staff = staffUserFromRequest(request)
@@ -25,7 +25,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireSuperAdminSession(request)
+  const denied = await requireDashboardSection(request, 'email')
   if (denied) return denied
 
   try {
@@ -48,7 +48,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireSuperAdminSession(request)
+  const denied = await requireDashboardSection(request, 'email')
   if (denied) return denied
 
   try {
@@ -81,7 +81,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireSuperAdminSession(request)
+  const denied = await requireDashboardSection(request, 'email')
   if (denied) return denied
 
   try {
