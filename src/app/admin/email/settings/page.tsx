@@ -98,6 +98,9 @@ export default function EmailSettingsPage() {
         email: '',
         isActive: true,
         assignedUserIds: [],
+        backupEmail: '',
+        forwardInbound: false,
+        forwardOutbound: false,
       },
     ])
   }
