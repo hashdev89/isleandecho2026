@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const denied = await requireSuperAdminSession(request)
+  const denied = await requireDashboardSection(request, 'email')
   if (denied) return denied
 
   try {
