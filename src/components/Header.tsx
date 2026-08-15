@@ -17,7 +17,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useAuth } from '../contexts/AuthContext'
 import { useMobileMenu } from '../contexts/MobileMenuContext'
-import AuthModal from './AuthModal'
 import { getGoogleTranslateLanguage, setGoogleTranslateLanguage } from './GoogleTranslate'
 import { useClickOutside } from '../hooks/useClickOutside'
 import { useCurrency } from '../contexts/CurrencyContext'
@@ -34,8 +33,6 @@ export default function Header() {
   useEffect(() => {
     setSelectedLanguage(getGoogleTranslateLanguage())
   }, [])
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
-  const [authModalTab, setAuthModalTab] = useState<'signin' | 'register'>('register')
   
   const { user, logout } = useAuth()
 
@@ -53,16 +50,6 @@ export default function Header() {
   const handleLogout = () => {
     logout()
     setActiveDropdown('')
-  }
-
-  const handleAuthAction = (isNew: boolean) => {
-    if (isNew) {
-      setAuthModalTab('register')
-      setIsAuthModalOpen(true)
-    } else {
-      setAuthModalTab('signin')
-      setIsAuthModalOpen(true)
-    }
   }
 
   const languages = [
@@ -334,16 +321,18 @@ export default function Header() {
                 </div>
               ) : (
                 <>
-                  {/* Register Button */}
-                  <button 
-                    onClick={() => {
-                      setAuthModalTab('register')
-                      setIsAuthModalOpen(true)
-                    }}
-                    className="bg-[var(--lagoon-deep)] hover:bg-[var(--lagoon)] text-white px-4 min-[1400px]:px-6 py-2 min-[1400px]:py-2.5 rounded-full font-semibold text-sm min-[1400px]:text-base transition-all duration-300 shadow-lg hover:shadow-xl backdrop-blur-sm min-h-[44px] touch-manipulation"
+                  <Link
+                    href="/login"
+                    className="hidden min-[1180px]:inline-flex items-center px-3 py-2 text-sm font-semibold text-[#102429] hover:text-[#0b6e7a] transition-colors min-h-[44px]"
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="bg-[var(--lagoon-deep)] hover:bg-[var(--lagoon)] text-white px-4 min-[1400px]:px-6 py-2 min-[1400px]:py-2.5 rounded-full font-semibold text-sm min-[1400px]:text-base transition-all duration-300 shadow-lg hover:shadow-xl backdrop-blur-sm min-h-[44px] touch-manipulation inline-flex items-center"
                   >
                     Register
-                  </button>
+                  </Link>
                 </>
               )}
             </div>
@@ -496,16 +485,20 @@ export default function Header() {
                     </>
                   ) : (
                     <>
-                      <button 
-                        onClick={() => {
-                          setAuthModalTab('register')
-                          setIsAuthModalOpen(true)
-                          setIsMenuOpen(false)
-                        }}
-                        className="w-full bg-[#1E3A8A] hover:bg-[#1E3A8A]/90 text-white px-4 py-3 rounded-full font-medium transition-all duration-300 shadow-lg min-h-[44px] touch-manipulation"
+                      <Link
+                        href="/login"
+                        onClick={() => setIsMenuOpen(false)}
+                        className="w-full flex items-center justify-center text-[#102429] hover:text-[#0b6e7a] transition-all duration-300 py-3 rounded-lg hover:bg-blue-50 font-medium min-h-[44px] touch-manipulation"
+                      >
+                        Sign in
+                      </Link>
+                      <Link
+                        href="/register"
+                        onClick={() => setIsMenuOpen(false)}
+                        className="w-full bg-[var(--lagoon-deep)] hover:bg-[var(--lagoon)] text-white px-4 py-3 rounded-full font-medium transition-all duration-300 shadow-lg min-h-[44px] touch-manipulation text-center"
                       >
                         Register
-                      </button>
+                      </Link>
                     </>
                   )}
                 </div>
@@ -514,13 +507,6 @@ export default function Header() {
           )}
         </div>
       </header>
-
-      {/* Auth Modal with Tabs */}
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)}
-        initialTab={authModalTab}
-      />
     </>
   )
 } 
