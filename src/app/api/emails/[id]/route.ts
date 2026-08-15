@@ -4,6 +4,7 @@ import {
   getEmailCenterSettings,
   getThreadWithMessages,
   markThreadRead,
+  markThreadUnread,
   permanentlyDeleteThread,
   restoreThread,
   updateThread,
@@ -34,7 +35,8 @@ export async function GET(
     if (access.error) return access.error
 
     await markThreadRead(id)
-    return NextResponse.json({ success: true, data: access.data })
+    const refreshed = await getThreadWithMessages(id)
+    return NextResponse.json({ success: true, data: refreshed || access.data })
   } catch (error) {
     console.error('Email thread GET error:', error)
     return NextResponse.json(
@@ -57,13 +59,33 @@ export async function PATCH(
     if (access.error) return access.error
 
     const body = await request.json()
-    const thread = body.restore
-      ? await restoreThread(id)
-      : await updateThread(id, {
-          starred: body.starred,
-          folder: body.folder,
-          status: body.status,
-        })
+    if (body.restore) {
+      const thread = await restoreThread(id)
+      if (!thread) {
+        return NextResponse.json({ success: false, error: 'Thread not found' }, { status: 404 })
+      }
+      return NextResponse.json({ success: true, data: thread })
+    }
+
+    if (body.unread === true) {
+      const thread = await markThreadUnread(id)
+      if (!thread) {
+        return NextResponse.json({ success: false, error: 'Thread not found' }, { status: 404 })
+      }
+      return NextResponse.json({ success: true, data: thread })
+    }
+
+    if (body.read === true) {
+      await markThreadRead(id)
+      const refreshed = await getThreadWithMessages(id)
+      return NextResponse.json({ success: true, data: refreshed?.thread || null })
+    }
+
+    const thread = await updateThread(id, {
+      starred: body.starred,
+      folder: body.folder,
+      status: body.status,
+    })
     if (!thread) {
       return NextResponse.json({ success: false, error: 'Thread not found' }, { status: 404 })
     }

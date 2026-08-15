@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
   emptyTrash,
+  emailsMatch,
   getAccessibleAccounts,
   getEmailCenterSettings,
   getEmailStats,
@@ -21,18 +22,17 @@ export async function GET(request: NextRequest) {
     const accessibleEmails = accessibleAccounts.map((a) => a.email)
 
     const { searchParams } = new URL(request.url)
-    const folder = (searchParams.get('folder') || 'inbox') as EmailFolder | 'all' | 'unread'
+    const folder = (searchParams.get('folder') || 'inbox') as EmailFolder | 'all' | 'unread' | 'read'
     const search = searchParams.get('search') || ''
     const accountEmail = searchParams.get('account') || undefined
 
-    if (accountEmail && !accessibleEmails.some((e) => e.toLowerCase() === accountEmail.toLowerCase())) {
+    if (accountEmail && !accessibleEmails.some((e) => emailsMatch(e, accountEmail))) {
       return NextResponse.json({ success: false, error: 'Access denied to this inbox' }, { status: 403 })
     }
 
-    const [threads, stats] = await Promise.all([
-      listThreads({ folder, search, accountEmail, accessibleEmails }),
-      getEmailStats(accessibleEmails),
-    ])
+    // Sync unread counts first (via listThreads), then stats from the same store
+    const threads = await listThreads({ folder, search, accountEmail, accessibleEmails })
+    const stats = await getEmailStats(accessibleEmails, accountEmail)
 
     return NextResponse.json({
       success: true,
