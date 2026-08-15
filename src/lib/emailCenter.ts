@@ -413,6 +413,54 @@ function normalizeEmail(email: string) {
   return parseEmailAddress(email)
 }
 
+function emailLocalPart(email: string) {
+  const n = normalizeEmail(email)
+  const at = n.indexOf('@')
+  return at > 0 ? n.slice(0, at) : n
+}
+
+function emailDomain(email: string) {
+  const n = normalizeEmail(email)
+  const at = n.indexOf('@')
+  return at > 0 ? n.slice(at + 1) : ''
+}
+
+/** Domains that should be treated as the same mailbox brand (e.g. sajith@…com vs sajith@…lk). */
+const RELATED_INBOX_DOMAINS = new Set(['isleandecho.com', 'isleandecho.lk'])
+
+/** True when two addresses are the same inbox (exact or same local-part on related domains). */
+export function emailsMatch(a: string, b: string): boolean {
+  const na = normalizeEmail(a)
+  const nb = normalizeEmail(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  const la = emailLocalPart(na)
+  const lb = emailLocalPart(nb)
+  if (!la || la !== lb) return false
+  const da = emailDomain(na)
+  const db = emailDomain(nb)
+  return RELATED_INBOX_DOMAINS.has(da) && RELATED_INBOX_DOMAINS.has(db)
+}
+
+function findAccountForRecipients(
+  accounts: EmailAccount[],
+  recipients: string[]
+): EmailAccount | undefined {
+  const active = accounts.filter((a) => a.isActive !== false && a.email?.trim())
+  const targets = recipients.map(normalizeEmail).filter(Boolean)
+  if (targets.length === 0) return undefined
+
+  for (const account of active) {
+    if (targets.some((to) => emailsMatch(to, account.email))) return account
+  }
+  for (const account of active) {
+    if (account.backupEmail && targets.some((to) => emailsMatch(to, account.backupEmail!))) {
+      return account
+    }
+  }
+  return undefined
+}
+
 /** Accounts a user may open in Email Center. Super Admin sees all; everyone else needs assignment. */
 export function getAccessibleAccounts(
   accounts: EmailAccount[],
@@ -446,13 +494,49 @@ export function canAccessThread(
 ): boolean {
   if (isSuperAdmin(userRole)) return true
   const accessible = getAccessibleAccounts(accounts, userId, userRole)
-  return accessible.some((a) => normalizeEmail(a.email) === normalizeEmail(thread.accountEmail))
+  return accessible.some((a) => emailsMatch(a.email, thread.accountEmail))
 }
 
 function filterByAccessibleEmails(threads: EmailThread[], emails: string[]) {
-  const allowed = new Set(emails.map(normalizeEmail))
-  if (allowed.size === 0) return []
-  return threads.filter((t) => allowed.has(normalizeEmail(t.accountEmail)))
+  const allowed = emails.map(normalizeEmail).filter(Boolean)
+  if (allowed.length === 0) return []
+  return threads.filter((t) => allowed.some((email) => emailsMatch(email, t.accountEmail)))
+}
+
+/** Re-tag threads whose stored accountEmail does not match inbound To recipients. */
+async function repairThreadAccountEmails(accounts: EmailAccount[]) {
+  const threads = await loadThreads()
+  const messages = await loadMessages()
+  let changed = false
+
+  const byThread = new Map<string, EmailMessage[]>()
+  for (const msg of messages) {
+    const list = byThread.get(msg.threadId) || []
+    list.push(msg)
+    byThread.set(msg.threadId, list)
+  }
+
+  const next = threads.map((thread) => {
+    const threadMsgs = byThread.get(thread.id) || []
+    const inbound = threadMsgs.filter((m) => m.direction === 'inbound')
+    const recipients = inbound.flatMap((m) => (m.to || []).map(normalizeEmail).filter(Boolean))
+    const matched = findAccountForRecipients(accounts, recipients)
+    if (!matched) return thread
+    if (emailsMatch(thread.accountEmail, matched.email)) {
+      // Normalize to configured mailbox spelling when only domain differs
+      if (normalizeEmail(thread.accountEmail) !== normalizeEmail(matched.email)) {
+        changed = true
+        return { ...thread, accountEmail: matched.email, updatedAt: new Date().toISOString() }
+      }
+      return thread
+    }
+    // Mis-tagged (e.g. fell back to default inbox) — move to the real mailbox
+    changed = true
+    return { ...thread, accountEmail: matched.email, updatedAt: new Date().toISOString() }
+  })
+
+  if (changed) await saveThreads(next)
+  return changed
 }
 
 function normalizeEmailList(value?: string | string[]) {
@@ -462,11 +546,18 @@ function normalizeEmailList(value?: string | string[]) {
 }
 
 export async function listThreads(filter: {
-  folder?: EmailFolder | 'all' | 'unread'
+  folder?: EmailFolder | 'all' | 'unread' | 'read'
   search?: string
   accountEmail?: string
   accessibleEmails?: string[]
 }) {
+  await syncUnreadCountsFromMessages()
+
+  if (filter.accountEmail) {
+    const settings = await getEmailCenterSettings()
+    await repairThreadAccountEmails(settings.accounts)
+  }
+
   let threads = await loadThreads()
   const folder = filter.folder || 'inbox'
 
@@ -478,6 +569,8 @@ export async function listThreads(filter: {
     threads = threads.filter((t) => t.starred && t.folder !== 'trash')
   } else if (folder === 'unread') {
     threads = threads.filter((t) => t.unreadCount > 0 && t.folder !== 'trash')
+  } else if (folder === 'read') {
+    threads = threads.filter((t) => t.unreadCount === 0 && t.folder !== 'trash')
   } else if (folder !== 'all') {
     threads = threads.filter((t) => t.folder === folder)
   } else {
@@ -485,7 +578,21 @@ export async function listThreads(filter: {
   }
 
   if (filter.accountEmail) {
-    threads = threads.filter((t) => normalizeEmail(t.accountEmail) === normalizeEmail(filter.accountEmail!))
+    const target = filter.accountEmail
+    const messages = await loadMessages()
+    const threadIdsFromRecipients = new Set<string>()
+    for (const msg of messages) {
+      const recipients =
+        msg.direction === 'inbound'
+          ? (msg.to || []).map(normalizeEmail)
+          : [normalizeEmail(msg.fromEmail)]
+      if (recipients.some((addr) => emailsMatch(addr, target))) {
+        threadIdsFromRecipients.add(msg.threadId)
+      }
+    }
+    threads = threads.filter(
+      (t) => emailsMatch(t.accountEmail, target) || threadIdsFromRecipients.has(t.id)
+    )
   }
 
   if (filter.search?.trim()) {
@@ -546,14 +653,63 @@ export async function markThreadRead(threadId: string) {
   const messages = await loadMessages()
   const now = new Date().toISOString()
   const idx = threads.findIndex((t) => t.id === threadId)
-  if (idx === -1) return false
+  if (idx === -1) return null
   threads[idx] = { ...threads[idx], unreadCount: 0, updatedAt: now }
   const updatedMessages = messages.map((m) =>
-    m.threadId === threadId && !m.readAt ? { ...m, readAt: now } : m
+    m.threadId === threadId ? { ...m, readAt: m.readAt || now } : m
   )
   await saveThreads(threads)
   await saveMessages(updatedMessages)
-  return true
+  return threads[idx]
+}
+
+export async function markThreadUnread(threadId: string) {
+  const threads = await loadThreads()
+  const messages = await loadMessages()
+  const idx = threads.findIndex((t) => t.id === threadId)
+  if (idx === -1) return null
+
+  const inbound = messages
+    .filter((m) => m.threadId === threadId && m.direction === 'inbound')
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+  let updatedMessages = messages
+  if (inbound.length > 0) {
+    // Mark the latest inbound message unread (Gmail-style); keep any others already unread
+    const latestId = inbound[0].id
+    updatedMessages = messages.map((m) => (m.id === latestId ? { ...m, readAt: null } : m))
+  }
+
+  const unreadCount = Math.max(1, unreadCountForThread(updatedMessages, threadId))
+  threads[idx] = {
+    ...threads[idx],
+    unreadCount,
+    updatedAt: new Date().toISOString(),
+  }
+  await saveThreads(threads)
+  if (inbound.length > 0) await saveMessages(updatedMessages)
+  return threads[idx]
+}
+
+/** Keep thread.unreadCount aligned with inbound messages missing readAt. */
+async function syncUnreadCountsFromMessages() {
+  const threads = await loadThreads()
+  const messages = await loadMessages()
+  let changed = false
+  const next = threads.map((thread) => {
+    const count = unreadCountForThread(messages, thread.id)
+    if (thread.unreadCount === count) return thread
+    changed = true
+    return { ...thread, unreadCount: count, updatedAt: new Date().toISOString() }
+  })
+  if (changed) await saveThreads(next)
+  return changed
+}
+
+function unreadCountForThread(messages: EmailMessage[], threadId: string) {
+  return messages.filter(
+    (m) => m.threadId === threadId && m.direction === 'inbound' && !m.readAt
+  ).length
 }
 
 export async function updateThread(
@@ -676,17 +832,17 @@ export async function recordInboundEmail(input: {
   const settings = await getEmailCenterSettings()
   const toAddresses = (input.to || []).map(parseEmailAddress).filter(Boolean)
   const matchedAccount =
-    settings.accounts.find(
-      (a) =>
-        a.isActive !== false &&
-        toAddresses.some((to) => parseEmailAddress(a.email) === to)
-    ) ||
-    settings.accounts.find((a) => a.isDefault) ||
-    settings.accounts[0]
+    findAccountForRecipients(settings.accounts, toAddresses) ||
+    (input.accountEmail
+      ? findAccountForRecipients(settings.accounts, [input.accountEmail])
+      : undefined)
+  // Prefer the matched mailbox; never silently dump unmatched mail into the default inbox.
   const accountEmail =
     matchedAccount?.email ||
     (input.accountEmail ? parseEmailAddress(input.accountEmail) : '') ||
     toAddresses[0] ||
+    settings.accounts.find((a) => a.isDefault)?.email ||
+    settings.accounts[0]?.email ||
     'info@isleandecho.com'
   const now = new Date().toISOString()
   const threads = await loadThreads()
@@ -703,6 +859,7 @@ export async function recordInboundEmail(input: {
     thread = threads.find(
       (t) =>
         t.folder !== 'trash' &&
+        emailsMatch(t.accountEmail, accountEmail) &&
         t.subject.replace(/^(re:\s*)+/i, '').trim().toLowerCase() === normalizedSubject.toLowerCase() &&
         t.participants.includes(input.fromEmail.toLowerCase())
     )
@@ -736,6 +893,7 @@ export async function recordInboundEmail(input: {
   } else {
     thread = {
       ...thread,
+      accountEmail: matchedAccount?.email || thread.accountEmail || accountEmail,
       subject: input.subject || thread.subject,
       unreadCount: thread.unreadCount + 1,
       lastMessageAt: now,
@@ -744,6 +902,13 @@ export async function recordInboundEmail(input: {
       lastFromEmail: input.fromEmail,
       updatedAt: now,
       folder: thread.folder === 'sent' ? 'inbox' : thread.folder,
+      participants: Array.from(
+        new Set([
+          ...thread.participants.map((p) => p.toLowerCase()),
+          input.fromEmail.toLowerCase(),
+          accountEmail.toLowerCase(),
+        ])
+      ),
     }
     const tIdx = threads.findIndex((t) => t.id === thread!.id)
     threads[tIdx] = thread
@@ -857,6 +1022,9 @@ export async function importResendAttachments(resendEmailId: string): Promise<Em
 
 /** Pull received emails from Resend into the inbox (webhook fallback / manual sync). */
 export async function syncInboundFromResend(limit = 50) {
+  const settings = await getEmailCenterSettings()
+  await repairThreadAccountEmails(settings.accounts)
+
   const list = await resendApiGet<{ data?: ResendReceivedListItem[] }>(
     `/emails/receiving?limit=${Math.min(Math.max(limit, 1), 100)}`
   )
@@ -887,6 +1055,7 @@ export async function syncInboundFromResend(limit = 50) {
     }
   }
 
+  await repairThreadAccountEmails(settings.accounts)
   return { imported, skipped, total: items.length }
 }
 
@@ -1023,14 +1192,23 @@ export async function sendStaffEmail(input: {
   return { thread, message }
 }
 
-export async function getEmailStats(accessibleEmails?: string[]) {
+export async function getEmailStats(
+  accessibleEmails?: string[],
+  accountEmail?: string
+) {
   let threads = await loadThreads()
   if (accessibleEmails) {
     threads = filterByAccessibleEmails(threads, accessibleEmails)
   }
+  if (accountEmail) {
+    threads = threads.filter((t) => emailsMatch(t.accountEmail, accountEmail))
+  }
+  const notTrash = threads.filter((t) => t.folder !== 'trash')
   return {
+    all: notTrash.length,
     inbox: threads.filter((t) => t.folder === 'inbox').length,
-    unread: threads.filter((t) => t.unreadCount > 0 && t.folder !== 'trash').length,
+    unread: notTrash.filter((t) => t.unreadCount > 0).length,
+    read: notTrash.filter((t) => t.unreadCount === 0).length,
     starred: threads.filter((t) => t.starred && t.folder !== 'trash').length,
     sent: threads.filter((t) => t.folder === 'sent').length,
     trash: threads.filter((t) => t.folder === 'trash').length,

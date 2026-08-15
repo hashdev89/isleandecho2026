@@ -1,24 +1,27 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   Mail,
+  MailOpen,
   Inbox,
   Send,
   Star,
   Trash2,
   PenSquare,
   Search,
-  RefreshCw,
   Settings,
   Reply,
   RotateCcw,
   Paperclip,
   X,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Download,
   FileText,
+  Layers,
 } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import type { EmailAccount, EmailAttachment, EmailMessage, EmailThread } from '@/lib/emailCenter'
@@ -31,9 +34,23 @@ import {
   isPdfAttachment,
 } from '@/lib/emailAttachments'
 
-type Folder = 'inbox' | 'unread' | 'starred' | 'sent' | 'trash' | 'all'
+type Folder = 'all' | 'inbox' | 'unread' | 'read' | 'starred' | 'sent' | 'trash'
 
-type Stats = { inbox: number; unread: number; starred: number; sent: number; trash: number }
+/** How many inbox accounts stay visible before Gmail-style More */
+const INBOX_PREVIEW_COUNT = 4
+/** Primary folders always shown; the rest sit behind More */
+const PRIMARY_FOLDERS: Folder[] = ['all', 'inbox', 'unread', 'starred', 'sent']
+const MORE_FOLDERS: Folder[] = ['read', 'trash']
+
+type Stats = {
+  all: number
+  inbox: number
+  unread: number
+  read: number
+  starred: number
+  sent: number
+  trash: number
+}
 
 function staffAuthHeaders(user: { id?: string; name?: string; role?: string } | null) {
   const h: HeadersInit = {}
@@ -77,9 +94,17 @@ export default function AdminEmailPage() {
   const { canAccess, loaded: accessLoaded } = useDashboardAccess()
   const hasEmailAccess = canAccess('email')
   const canManageAccounts = isSuperAdmin(user?.role)
-  const [folder, setFolder] = useState<Folder>('inbox')
+  const [folder, setFolder] = useState<Folder>('all')
   const [threads, setThreads] = useState<EmailThread[]>([])
-  const [stats, setStats] = useState<Stats>({ inbox: 0, unread: 0, starred: 0, sent: 0, trash: 0 })
+  const [stats, setStats] = useState<Stats>({
+    all: 0,
+    inbox: 0,
+    unread: 0,
+    read: 0,
+    starred: 0,
+    sent: 0,
+    trash: 0,
+  })
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [messages, setMessages] = useState<EmailMessage[]>([])
   const [search, setSearch] = useState('')
@@ -91,6 +116,9 @@ export default function AdminEmailPage() {
   const [mobileShowThread, setMobileShowThread] = useState(false)
   const [accountFilter, setAccountFilter] = useState('')
   const [accounts, setAccounts] = useState<EmailAccount[]>([])
+  const [selectedThreadCache, setSelectedThreadCache] = useState<EmailThread | null>(null)
+  const [inboxesExpanded, setInboxesExpanded] = useState(false)
+  const [foldersExpanded, setFoldersExpanded] = useState(false)
 
   const [compose, setCompose] = useState({
     fromAccountId: '',
@@ -105,13 +133,15 @@ export default function AdminEmailPage() {
   const [composeFiles, setComposeFiles] = useState<File[]>([])
   const [previewAttachment, setPreviewAttachment] = useState<EmailAttachment | null>(null)
 
-  const selectedThread = useMemo(
-    () => threads.find((t) => t.id === selectedId) || null,
-    [threads, selectedId]
-  )
+  const selectedThread = useMemo(() => {
+    const fromList = threads.find((t) => t.id === selectedId)
+    if (fromList) return fromList
+    if (selectedThreadCache && selectedThreadCache.id === selectedId) return selectedThreadCache
+    return null
+  }, [threads, selectedId, selectedThreadCache])
 
-  const loadThreads = useCallback(async () => {
-    setLoading(true)
+  const loadThreads = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true)
     try {
       const params = new URLSearchParams({ folder })
       if (search.trim()) params.set('search', search.trim())
@@ -123,14 +153,24 @@ export default function AdminEmailPage() {
       const json = await res.json()
       if (json.success) {
         setThreads(json.data.threads || [])
-        setStats(json.data.stats || { inbox: 0, unread: 0, starred: 0, sent: 0, trash: 0 })
+        setStats(
+          json.data.stats || {
+            all: 0,
+            inbox: 0,
+            unread: 0,
+            read: 0,
+            starred: 0,
+            sent: 0,
+            trash: 0,
+          }
+        )
         const loadedAccounts: EmailAccount[] = json.data.accounts || []
         setAccounts(loadedAccounts)
       }
     } catch (e) {
       console.error(e)
     } finally {
-      setLoading(false)
+      if (!opts?.silent) setLoading(false)
     }
   }, [folder, search, accountFilter, user])
 
@@ -143,21 +183,70 @@ export default function AdminEmailPage() {
       })
       const json = await res.json()
       if (json.success) {
+        const thread = json.data.thread as EmailThread | undefined
+        if (thread) setSelectedThreadCache({ ...thread, unreadCount: 0 })
         setMessages(json.data.messages || [])
         setSelectedId(id)
         setMobileShowThread(true)
-        setThreads((prev) =>
-          prev.map((t) => (t.id === id ? { ...t, unreadCount: 0 } : t))
-        )
+        await loadThreads({ silent: true })
       }
     } finally {
       setLoadingThread(false)
     }
-  }, [user])
+  }, [user, loadThreads])
 
   useEffect(() => {
     loadThreads()
   }, [loadThreads])
+
+  const syncInbox = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = opts?.silent === true
+      if (!silent) setSyncing(true)
+      try {
+        const res = await fetch('/api/emails/sync', {
+          method: 'POST',
+          credentials: 'include',
+          headers: staffHeaders(user),
+        })
+        const json = await res.json()
+        if (!json.success) throw new Error(json.error || 'Sync failed')
+        const { imported, skipped, total } = json.data || {}
+        await loadThreads()
+        if (silent) return
+        if (imported > 0) {
+          alert(`Synced ${imported} new email${imported === 1 ? '' : 's'} from Resend.`)
+        } else if (total === 0) {
+          alert(
+            'No received emails found in Resend yet. Check that inbound receiving is enabled for your domain.'
+          )
+        } else {
+          alert(`No new emails (${skipped || total} already in inbox).`)
+        }
+      } catch (e) {
+        if (!silent) {
+          alert(e instanceof Error ? e.message : 'Failed to sync inbox')
+        } else {
+          console.error('Auto sync failed:', e)
+        }
+      } finally {
+        if (!silent) setSyncing(false)
+      }
+    },
+    [user, loadThreads]
+  )
+
+  // Auto-sync on open, then every 60s while Email Center is open
+  const syncInboxRef = useRef(syncInbox)
+  syncInboxRef.current = syncInbox
+  useEffect(() => {
+    if (!user?.id) return
+    void syncInboxRef.current({ silent: true })
+    const timer = window.setInterval(() => {
+      void syncInboxRef.current({ silent: true })
+    }, 60_000)
+    return () => window.clearInterval(timer)
+  }, [user?.id])
 
   const patchThread = async (id: string, body: Record<string, unknown>) => {
     await fetch(`/api/emails/${id}`, {
@@ -167,6 +256,13 @@ export default function AdminEmailPage() {
       body: JSON.stringify(body),
     })
     await loadThreads()
+  }
+
+  const setThreadUnread = async (id: string, unread: boolean) => {
+    await patchThread(id, unread ? { unread: true } : { read: true })
+    setSelectedThreadCache((prev) =>
+      prev && prev.id === id ? { ...prev, unreadCount: unread ? Math.max(1, prev.unreadCount || 1) : 0 } : prev
+    )
   }
 
   const restoreFromTrash = async (id: string) => {
@@ -311,32 +407,6 @@ export default function AdminEmailPage() {
     }
   }
 
-  const syncInbox = async () => {
-    setSyncing(true)
-    try {
-      const res = await fetch('/api/emails/sync', {
-        method: 'POST',
-        credentials: 'include',
-        headers: staffHeaders(user),
-      })
-      const json = await res.json()
-      if (!json.success) throw new Error(json.error || 'Sync failed')
-      const { imported, skipped, total } = json.data || {}
-      await loadThreads()
-      if (imported > 0) {
-        alert(`Synced ${imported} new email${imported === 1 ? '' : 's'} from Resend.`)
-      } else if (total === 0) {
-        alert('No received emails found in Resend yet. Check that inbound receiving is enabled for your domain.')
-      } else {
-        alert(`No new emails (${skipped || total} already in inbox).`)
-      }
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to sync inbox')
-    } finally {
-      setSyncing(false)
-    }
-  }
-
   if (accessLoaded && !hasEmailAccess) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
@@ -347,12 +417,70 @@ export default function AdminEmailPage() {
   }
 
   const navItems: { id: Folder; label: string; icon: typeof Inbox; count?: number }[] = [
-    { id: 'inbox', label: 'Inbox', icon: Inbox, count: stats.unread },
+    { id: 'all', label: 'All', icon: Layers, count: stats.all },
+    { id: 'inbox', label: 'Inbox', icon: Inbox, count: stats.inbox },
     { id: 'unread', label: 'Unread', icon: Mail, count: stats.unread },
+    { id: 'read', label: 'Read', icon: MailOpen, count: stats.read },
     { id: 'starred', label: 'Starred', icon: Star, count: stats.starred },
     { id: 'sent', label: 'Sent', icon: Send, count: stats.sent },
     { id: 'trash', label: 'Trash', icon: Trash2, count: stats.trash },
   ]
+
+  const navById = useMemo(() => new Map(navItems.map((item) => [item.id, item])), [navItems])
+  const primaryFolderItems = PRIMARY_FOLDERS.map((id) => navById.get(id)).filter(
+    (item): item is NonNullable<typeof item> => Boolean(item)
+  )
+  const moreFolderItems = MORE_FOLDERS.map((id) => navById.get(id)).filter(
+    (item): item is NonNullable<typeof item> => Boolean(item)
+  )
+  const displayedMoreFolders = foldersExpanded
+    ? moreFolderItems
+    : moreFolderItems.filter((item) => item.id === folder)
+
+  const visibleAccounts = accounts.slice(0, INBOX_PREVIEW_COUNT)
+  const hiddenAccounts = accounts.slice(INBOX_PREVIEW_COUNT)
+  const pinnedHiddenInbox = !inboxesExpanded
+    ? hiddenAccounts.filter((acc) => acc.email === accountFilter)
+    : []
+  const displayedAccounts = inboxesExpanded
+    ? accounts
+    : [...visibleAccounts, ...pinnedHiddenInbox]
+  const inboxesNeedMore = hiddenAccounts.length > 0
+
+  const selectInbox = (email: string) => {
+    setAccountFilter(email)
+    setSelectedId(null)
+    setSelectedThreadCache(null)
+    setMessages([])
+    setMobileShowThread(false)
+  }
+
+  const selectFolder = (id: Folder) => {
+    setFolder(id)
+    setSelectedId(null)
+    setSelectedThreadCache(null)
+    setMessages([])
+    setMobileShowThread(false)
+  }
+
+  const renderFolderButton = (item: (typeof navItems)[number]) => (
+    <button
+      key={item.id}
+      type="button"
+      onClick={() => selectFolder(item.id)}
+      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
+        folder === item.id ? 'bg-teal-50 text-teal-800' : 'text-gray-700 hover:bg-gray-50'
+      }`}
+    >
+      <span className="flex items-center gap-2">
+        <item.icon className="h-4 w-4" />
+        {item.label}
+      </span>
+      {item.count ? (
+        <span className="rounded-full bg-teal-700 px-2 py-0.5 text-xs text-white">{item.count}</span>
+      ) : null}
+    </button>
+  )
 
   return (
     <div className="flex h-[calc(100vh-7rem)] min-h-[520px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -377,16 +505,9 @@ export default function AdminEmailPage() {
           onClick={() => syncInbox()}
           disabled={syncing}
           className="rounded-lg px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-60"
+          title="Pull new mail from Resend (also runs automatically every minute)"
         >
           {syncing ? 'Syncing…' : 'Sync inbox'}
-        </button>
-        <button
-          type="button"
-          onClick={() => loadThreads()}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
-          aria-label="Refresh"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
         <Link
           href="/admin/email/settings"
@@ -406,72 +527,84 @@ export default function AdminEmailPage() {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        {/* Sidebar */}
-        <aside className="hidden w-52 shrink-0 border-r border-gray-100 p-3 md:block">
+        {/* Sidebar — Gmail-style More / Less */}
+        <aside className="hidden w-52 shrink-0 overflow-y-auto border-r border-gray-100 p-3 md:block">
           {accounts.length > 0 && (
             <div className="mb-4">
               <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Inboxes</p>
               <nav className="space-y-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    setAccountFilter('')
-                    setSelectedId(null)
-                    setMessages([])
-                    setMobileShowThread(false)
-                  }}
+                  onClick={() => selectInbox('')}
                   className={`flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium ${
                     !accountFilter ? 'bg-teal-50 text-teal-800' : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
                   All inboxes
                 </button>
-                {accounts.map((acc) => (
+                {(displayedAccounts).map((acc) => (
                   <button
                     key={acc.id}
                     type="button"
-                    onClick={() => {
-                      setAccountFilter(acc.email)
-                      setSelectedId(null)
-                      setMessages([])
-                      setMobileShowThread(false)
-                    }}
+                    onClick={() => selectInbox(acc.email)}
                     className={`flex w-full flex-col items-start rounded-lg px-3 py-2 text-left text-sm ${
                       accountFilter === acc.email ? 'bg-teal-50 text-teal-800' : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    <span className="font-medium truncate w-full">{acc.name}</span>
-                    <span className="truncate text-xs text-gray-500 w-full">{acc.email}</span>
+                    <span className="w-full truncate font-medium">{acc.name}</span>
+                    <span className="w-full truncate text-xs text-gray-500">{acc.email}</span>
                   </button>
                 ))}
+                {inboxesNeedMore ? (
+                  <button
+                    type="button"
+                    onClick={() => setInboxesExpanded((v) => !v)}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                    aria-expanded={inboxesExpanded}
+                  >
+                    {inboxesExpanded ? (
+                      <>
+                        <ChevronUp className="h-4 w-4" />
+                        Less
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4" />
+                        More
+                        <span className="text-xs font-normal text-gray-400">
+                          ({hiddenAccounts.length})
+                        </span>
+                      </>
+                    )}
+                  </button>
+                ) : null}
               </nav>
             </div>
           )}
           <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Folders</p>
           <nav className="space-y-1">
-            {navItems.map((item) => (
+            {primaryFolderItems.map(renderFolderButton)}
+            {displayedMoreFolders.map(renderFolderButton)}
+            {moreFolderItems.length > 0 ? (
               <button
-                key={item.id}
                 type="button"
-                onClick={() => {
-                  setFolder(item.id)
-                  setSelectedId(null)
-                  setMessages([])
-                  setMobileShowThread(false)
-                }}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
-                  folder === item.id ? 'bg-teal-50 text-teal-800' : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                onClick={() => setFoldersExpanded((v) => !v)}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                aria-expanded={foldersExpanded}
               >
-                <span className="flex items-center gap-2">
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </span>
-                {item.count ? (
-                  <span className="rounded-full bg-teal-700 px-2 py-0.5 text-xs text-white">{item.count}</span>
-                ) : null}
+                {foldersExpanded ? (
+                  <>
+                    <ChevronUp className="h-4 w-4" />
+                    Less
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4" />
+                    More
+                  </>
+                )}
               </button>
-            ))}
+            ) : null}
           </nav>
         </aside>
 
@@ -529,27 +662,68 @@ export default function AdminEmailPage() {
                 ) : null}
                 <ul>
                   {threads.map((thread) => (
-                    <li key={thread.id}>
+                    <li key={thread.id} className="group relative border-b border-gray-50">
                       <button
                         type="button"
                         onClick={() => loadThread(thread.id)}
-                        className={`w-full border-b border-gray-50 px-4 py-3 text-left transition hover:bg-gray-50 ${
+                        className={`w-full px-4 py-3 pr-20 text-left transition hover:bg-gray-50 ${
                           selectedId === thread.id ? 'bg-teal-50/80' : ''
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <p
-                            className={`truncate text-sm ${
+                            className={`flex min-w-0 items-center gap-2 truncate text-sm ${
                               thread.unreadCount > 0 ? 'font-bold text-gray-900' : 'font-medium text-gray-800'
                             }`}
                           >
-                            {thread.lastFromName || thread.lastFromEmail}
+                            {thread.unreadCount > 0 ? (
+                              <span
+                                className="h-2 w-2 shrink-0 rounded-full bg-teal-600"
+                                aria-label="Unread"
+                              />
+                            ) : null}
+                            <span className="truncate">{thread.lastFromName || thread.lastFromEmail}</span>
                           </p>
                           <span className="shrink-0 text-xs text-gray-400">{formatTime(thread.lastMessageAt)}</span>
                         </div>
-                        <p className="truncate text-sm text-gray-700">{thread.subject}</p>
+                        <p
+                          className={`truncate text-sm ${
+                            thread.unreadCount > 0 ? 'font-semibold text-gray-800' : 'text-gray-700'
+                          }`}
+                        >
+                          {thread.subject}
+                        </p>
                         <p className="mt-0.5 truncate text-xs text-gray-500">{thread.lastPreview}</p>
                       </button>
+                      <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                        {thread.unreadCount > 0 ? (
+                          <button
+                            type="button"
+                            title="Mark as read"
+                            aria-label="Mark as read"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void setThreadUnread(thread.id, false)
+                            }}
+                            className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm hover:bg-teal-50 hover:text-teal-800"
+                          >
+                            <MailOpen className="h-3.5 w-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            title="Mark as unread"
+                            aria-label="Mark as unread"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void setThreadUnread(thread.id, true)
+                            }}
+                            className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm hover:bg-teal-50 hover:text-teal-800"
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -590,11 +764,33 @@ export default function AdminEmailPage() {
                     patchThread(selectedThread.id, { starred: !selectedThread.starred })
                   }
                   className="rounded-lg p-2 hover:bg-gray-100"
+                  title={selectedThread.starred ? 'Unstar' : 'Star'}
                 >
                   <Star
                     className={`h-4 w-4 ${selectedThread.starred ? 'fill-amber-400 text-amber-400' : 'text-gray-400'}`}
                   />
                 </button>
+                {selectedThread.unreadCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => void setThreadUnread(selectedThread.id, false)}
+                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+                    title="Mark as read"
+                  >
+                    <MailOpen className="h-4 w-4" />
+                    <span className="hidden sm:inline">Mark read</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void setThreadUnread(selectedThread.id, true)}
+                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+                    title="Mark as unread"
+                  >
+                    <Mail className="h-4 w-4" />
+                    <span className="hidden sm:inline">Mark unread</span>
+                  </button>
+                )}
                 {selectedThread.folder === 'trash' ? (
                   <>
                     <button

@@ -8,6 +8,17 @@ import type { EmailAccount } from '@/lib/emailCenter'
 import { isSuperAdmin, roleLabel } from '@/lib/roles'
 
 const EMAIL_DOMAIN = 'isleandecho.com'
+const RELATED_DOMAINS = new Set(['isleandecho.com', 'isleandecho.lk'])
+
+function emailsRoughlyMatch(a: string, b: string) {
+  const na = String(a || '').trim().toLowerCase()
+  const nb = String(b || '').trim().toLowerCase()
+  if (!na || !nb) return false
+  if (na === nb) return true
+  const [la, da] = na.split('@')
+  const [lb, db] = nb.split('@')
+  return Boolean(la && la === lb && RELATED_DOMAINS.has(da || '') && RELATED_DOMAINS.has(db || ''))
+}
 
 type StaffUser = {
   id: string
@@ -29,6 +40,12 @@ function emailLocalPart(email: string) {
   if (!email) return ''
   const at = email.indexOf('@')
   return at > 0 ? email.slice(0, at) : email
+}
+
+function emailDomainPart(email: string) {
+  if (!email) return EMAIL_DOMAIN
+  const at = email.indexOf('@')
+  return at > 0 ? email.slice(at + 1).toLowerCase() : EMAIL_DOMAIN
 }
 
 export default function EmailSettingsPage() {
@@ -125,8 +142,7 @@ export default function EmailSettingsPage() {
   const matchingUsersByAccount = useMemo(() => {
     const map = new Map<string, StaffUser[]>()
     for (const acc of accounts) {
-      const mailbox = String(acc.email || '').trim().toLowerCase()
-      const matches = staffUsers.filter((su) => String(su.email || '').trim().toLowerCase() === mailbox)
+      const matches = staffUsers.filter((su) => emailsRoughlyMatch(su.email, acc.email))
       map.set(acc.id, matches)
     }
     return map
@@ -212,14 +228,28 @@ export default function EmailSettingsPage() {
                     value={emailLocalPart(acc.email)}
                     onChange={(e) => {
                       const local = e.target.value.replace(/[@\s]/g, '').toLowerCase()
+                      const domain = emailDomainPart(acc.email)
                       const next = [...accounts]
-                      next[i] = { ...acc, email: local ? `${local}@${EMAIL_DOMAIN}` : '' }
+                      next[i] = { ...acc, email: local ? `${local}@${domain}` : '' }
                       setAccounts(next)
                     }}
                     placeholder="username"
                     className="flex-1 border-0 px-3 py-2 text-sm focus:ring-0"
                   />
-                  <span className="flex items-center bg-gray-50 px-3 text-sm text-gray-500">@{EMAIL_DOMAIN}</span>
+                  <select
+                    value={RELATED_DOMAINS.has(emailDomainPart(acc.email)) ? emailDomainPart(acc.email) : EMAIL_DOMAIN}
+                    onChange={(e) => {
+                      const local = emailLocalPart(acc.email)
+                      const next = [...accounts]
+                      next[i] = { ...acc, email: local ? `${local}@${e.target.value}` : '' }
+                      setAccounts(next)
+                    }}
+                    className="border-0 border-l bg-gray-50 px-2 text-sm text-gray-600 focus:ring-0"
+                    aria-label="Email domain"
+                  >
+                    <option value="isleandecho.com">@isleandecho.com</option>
+                    <option value="isleandecho.lk">@isleandecho.lk</option>
+                  </select>
                 </div>
               </div>
               <label className="flex items-center gap-2 text-sm">
@@ -262,9 +292,7 @@ export default function EmailSettingsPage() {
                   <div className="grid gap-2 sm:grid-cols-2">
                     {staffUsers.map((su) => {
                       const checked = (acc.assignedUserIds || []).map(String).includes(su.id)
-                      const sameEmail =
-                        String(su.email || '').trim().toLowerCase() ===
-                        String(acc.email || '').trim().toLowerCase()
+                      const sameEmail = emailsRoughlyMatch(su.email, acc.email)
                       return (
                         <label
                           key={su.id}
