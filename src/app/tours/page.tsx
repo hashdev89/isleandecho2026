@@ -7,7 +7,7 @@ export default function ToursPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-[var(--sand)]">
-          <Header />
+      <Header />
           <div className="flex items-center justify-center min-h-[60vh] text-[var(--ink-soft)]">
             Loading tours…
           </div>

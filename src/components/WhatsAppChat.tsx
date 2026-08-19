@@ -61,6 +61,7 @@ export default function WhatsAppChat() {
   const chatRootRef = useRef<HTMLDivElement>(null)
   const suppressOutsideCloseUntil = useRef(0)
   const greetingSentRef = useRef(false)
+  // Outside-click closes only if clicking outside the panel (backdrop handles its own click)
   const closeChatIfDesktop = useCallback(() => {
     if (Date.now() < suppressOutsideCloseUntil.current) return
     if (typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches) {
@@ -1124,137 +1125,119 @@ export default function WhatsAppChat() {
     </div>
   )
 
+  const chatHeader = (compact = false) => (
+    <div className={`bg-[#25D366] text-white ${compact ? 'p-3' : 'p-4'} flex items-center justify-between`}>
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className={`bg-white rounded-full flex items-center justify-center p-1.5 shrink-0 ${compact ? 'w-9 h-9' : 'w-11 h-11'}`}>
+          <Image
+            src="/logoisle&echo.png"
+            alt="ISLE & ECHO Logo"
+            width={compact ? 22 : 28}
+            height={compact ? 22 : 28}
+            className="object-contain"
+          />
+        </div>
+        <div className="min-w-0">
+          <h3 className={`font-semibold ${compact ? 'text-sm' : 'text-base'}`}>ISLE &amp; ECHO</h3>
+          <p className={`opacity-90 truncate ${compact ? 'text-xs' : 'text-sm'}`}>
+            {intake.mode === 'live'
+              ? 'Live agent chat'
+              : intake.mode === 'bot'
+                ? 'Chatbot assistant'
+                : conversation
+                  ? 'How can we help?'
+                  : "We're here to help!"}
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={() => setIsOpen(false)}
+        className="ml-2 p-1.5 hover:bg-white/20 rounded-full transition-colors shrink-0"
+        aria-label="Close chat"
+      >
+        <X className={compact ? 'w-5 h-5' : 'w-5 h-5'} />
+      </button>
+    </div>
+  )
+
   return (
     <>
+      {/* ── Backdrop blur when chat is open (desktop only — mobile has full-screen overlay) ── */}
+      {isOpen && (
+        <div
+          className="hidden sm:block fixed inset-0 z-[48] bg-black/40 backdrop-blur-sm"
+          onClick={() => setIsOpen(false)}
+          aria-hidden
+        />
+      )}
+
+      {/* ── FAB toggle button — always visible ── */}
       <div
-        ref={chatRootRef}
-        className={`fixed right-4 z-50 md:right-6 ${
+        className={`fixed right-4 md:right-6 z-[51] ${
           isOpen
-            ? 'hidden sm:block sm:bottom-6'
+            ? 'bottom-4 sm:bottom-6'
             : 'bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] md:bottom-6'
         }`}
       >
         <button
           type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="bg-[#25D366] hover:bg-[#20BA5A] text-white rounded-full p-4 shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center relative"
-          aria-label="Open chat"
+          onClick={() => setIsOpen((v) => !v)}
+          className="bg-[#25D366] hover:bg-[#20BA5A] text-white rounded-full shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center relative"
+          aria-label={isOpen ? 'Close chat' : 'Open chat'}
           aria-expanded={isOpen}
-          style={{ width: '56px', height: '56px', boxShadow: '0 4px 20px rgba(37, 211, 102, 0.4)' }}
+          style={{ width: '46px', height: '46px', boxShadow: '0 4px 20px rgba(37,211,102,0.45)' }}
         >
-          {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
+          {isOpen ? <X className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
           {!isOpen && (
             <span
-              className="absolute inset-0 rounded-full bg-[#25D366] animate-ping opacity-75"
-              style={{ animation: 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite' }}
+              className="absolute inset-0 rounded-full bg-[#25D366] animate-ping opacity-60 pointer-events-none"
+              style={{ animation: 'ping 2.2s cubic-bezier(0,0,0.2,1) infinite' }}
             />
           )}
         </button>
-
-        {isOpen && (
-          <div
-            className="absolute bottom-20 right-0 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-0"
-            style={{ height: '600px', maxHeight: '80vh' }}
-          >
-            <div className="bg-[#25D366] p-4 text-white">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center p-2">
-                  <Image
-                    src="/logoisle&echo.png"
-                    alt="ISLE & ECHO Logo"
-                    width={32}
-                    height={32}
-                    className="object-contain"
-                  />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg">ISLE & ECHO</h3>
-                  <p className="text-sm opacity-90">
-                    {intake.mode === 'live'
-                      ? 'Live agent chat'
-                      : intake.mode === 'bot'
-                        ? 'Chatbot assistant'
-                        : conversation
-                          ? 'How can we help?'
-                          : "We're here to help!"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div ref={desktopScrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-gray-50">
-              {loading ? (
-                <div className="text-center text-gray-500 py-8">
-                  <p>Setting up your chat...</p>
-                </div>
-              ) : error ? (
-                <div className="text-center py-8">
-                  <p className="text-red-600 text-sm mb-4">{error}</p>
-                  <button
-                    onClick={loadOrCreateConversation}
-                    className="px-4 py-2 bg-[#25D366] text-white rounded-lg hover:bg-[#20BA5A] text-sm"
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : (
-                renderMessagesBody()
-              )}
-            </div>
-            {renderComposer(false)}
-          </div>
-        )}
       </div>
 
+      {/* ── Desktop chat panel — fixed overlay, never clips ── */}
       {isOpen && (
-        <div className="sm:hidden fixed inset-0 z-[100] bg-white flex flex-col min-h-0">
-          <div className="bg-[#25D366] p-4 text-white flex items-center justify-between">
-            <div className="flex items-center space-x-3 flex-1">
-              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center p-2">
-                <Image
-                  src="/logoisle&echo.png"
-                  alt="ISLE & ECHO Logo"
-                  width={24}
-                  height={24}
-                  className="object-contain"
-                />
-              </div>
-              <div>
-                <h3 className="font-semibold text-base">ISLE & ECHO</h3>
-                <p className="text-xs opacity-90">
-                  {intake.mode === 'live'
-                    ? 'Live agent chat'
-                    : intake.mode === 'bot'
-                      ? 'Chatbot assistant'
-                      : conversation
-                        ? 'How can we help?'
-                        : "We're here to help!"}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="p-2 hover:bg-white/20 rounded-full transition-colors"
-              aria-label="Close chat"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          <div ref={mobileScrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-gray-50">
+        <div
+          ref={chatRootRef}
+          className="hidden sm:flex fixed z-[50] flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
+          style={{
+            width: '23rem',
+            bottom: '5.5rem',
+            right: '1.5rem',
+            maxHeight: 'calc(100dvh - 7rem)',
+            height: '600px',
+          }}
+        >
+          {chatHeader(false)}
+          <div ref={desktopScrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-gray-50">
             {loading ? (
-              <div className="text-center text-gray-500 py-8">
-                <p>Setting up your chat...</p>
-              </div>
+              <div className="text-center text-gray-500 py-8"><p>Setting up your chat…</p></div>
             ) : error ? (
               <div className="text-center py-8">
                 <p className="text-red-600 text-sm mb-4">{error}</p>
-                <button
-                  onClick={loadOrCreateConversation}
-                  className="px-4 py-2 bg-[#25D366] text-white rounded-lg hover:bg-[#20BA5A] text-sm"
-                >
-                  Retry
-                </button>
+                <button onClick={loadOrCreateConversation} className="px-4 py-2 bg-[#25D366] text-white rounded-lg hover:bg-[#20BA5A] text-sm">Retry</button>
+              </div>
+            ) : (
+              renderMessagesBody()
+            )}
+          </div>
+          {renderComposer(false)}
+        </div>
+      )}
+
+      {/* ── Mobile full-screen overlay ── */}
+      {isOpen && (
+        <div className="sm:hidden fixed inset-0 z-[100] bg-white flex flex-col min-h-0">
+          {chatHeader(true)}
+          <div ref={mobileScrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-gray-50">
+            {loading ? (
+              <div className="text-center text-gray-500 py-8"><p>Setting up your chat…</p></div>
+            ) : error ? (
+              <div className="text-center py-8">
+                <p className="text-red-600 text-sm mb-4">{error}</p>
+                <button onClick={loadOrCreateConversation} className="px-4 py-2 bg-[#25D366] text-white rounded-lg hover:bg-[#20BA5A] text-sm">Retry</button>
               </div>
             ) : (
               renderMessagesBody()

@@ -26,12 +26,23 @@ export default function Header() {
   const { isMenuOpen, setIsMenuOpen } = useMobileMenu()
   const [activeDropdown, setActiveDropdown] = useState('')
   const [selectedLanguage, setSelectedLanguage] = useState('EN')
+  const [chatOpen, setChatOpen] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
   const { currencies, selectedCurrency, setSelectedCurrency } = useCurrency()
 
   // Sync language with Google Translate cookie on load
   useEffect(() => {
     setSelectedLanguage(getGoogleTranslateLanguage())
+  }, [])
+
+  // Hide header when chat is open
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ isOpen: boolean }>).detail
+      setChatOpen(detail.isOpen)
+    }
+    window.addEventListener('chatStateChange', handler)
+    return () => window.removeEventListener('chatStateChange', handler)
   }, [])
   
   const { user, logout } = useAuth()
@@ -120,7 +131,9 @@ export default function Header() {
     <>
       <header
         ref={headerRef}
-        className="sticky top-0 z-[100] transition-all duration-500 lp-nav-glass shadow-[0_8px_30px_rgba(11,61,74,0.08)] border-b border-white/40"
+        className={`sticky top-0 z-[100] transition-all duration-300 lp-nav-glass shadow-[0_8px_30px_rgba(11,61,74,0.08)] border-b border-white/40 ${
+          chatOpen ? 'opacity-0 pointer-events-none -translate-y-1' : 'opacity-100 translate-y-0'
+        }`}
       >
         <div className="w-full max-w-[1920px] mx-auto lp-gutter">
           <div className="flex justify-between items-center h-[4.5rem]">
