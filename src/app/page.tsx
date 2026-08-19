@@ -208,6 +208,8 @@ export default function HomePage() {
   const [siteContent, setSiteContent] = useState<SiteContentDoc | null>(null)
   const [blogPosts, setBlogPosts] = useState<Array<{ id: number; title: string; description?: string; excerpt?: string; image?: string; date?: string; readTime?: string; category?: string }>>([])
   const [blogCarouselIndex, setBlogCarouselIndex] = useState(0)
+  const [blogHovered, setBlogHovered] = useState(false)
+  const blogPerSlide = 3
   const [heroReady, setHeroReady] = useState(false)
   const [failedHeroImageIndices, setFailedHeroImageIndices] = useState<Set<number>>(new Set())
 
@@ -288,6 +290,17 @@ export default function HomePage() {
   useEffect(() => {
     setCurrentSlide((s) => Math.min(s, Math.max(0, heroImages.length - 1)))
   }, [heroImages.length])
+
+  // Blog carousel auto-advance every 5 s; pause while hovered
+  useEffect(() => {
+    if (blogPosts.length <= blogPerSlide) return
+    if (blogHovered) return
+    const totalSlides = Math.ceil(blogPosts.length / blogPerSlide)
+    const timer = setInterval(() => {
+      setBlogCarouselIndex((i) => (i + 1) % totalSlides)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [blogPosts.length, blogHovered, blogPerSlide])
 
   // Screen loader: hide as soon as site content is in (faster) or after 1s max
   useEffect(() => {
@@ -2554,60 +2567,102 @@ export default function HomePage() {
           </div>
 
           {blogPosts.length > 0 ? (
-            <>
-              <div className="relative pl-10 pr-10 sm:pl-14 sm:pr-14 md:pl-16 md:pr-16">
-                <button
-                  type="button"
-                  aria-label="Previous blog posts"
-                  onClick={() => setBlogCarouselIndex(i => Math.max(0, i - 1))}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-[1] w-9 h-9 sm:w-12 sm:h-12 rounded-full lp-glass shadow-lg flex items-center justify-center text-[var(--ink)] hover:bg-white border border-white/50 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 touch-manipulation"
+            (() => {
+              const totalSlides = Math.ceil(blogPosts.length / blogPerSlide)
+              const slides = Array.from({ length: totalSlides }, (_, si) =>
+                blogPosts.slice(si * blogPerSlide, si * blogPerSlide + blogPerSlide)
+              )
+              return (
+                <div
+                  className="relative"
+                  onMouseEnter={() => setBlogHovered(true)}
+                  onMouseLeave={() => setBlogHovered(false)}
                 >
-                  <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Next blog posts"
-                  onClick={() => setBlogCarouselIndex(i => Math.min(Math.max(0, Math.ceil(blogPosts.length / 3) - 1), i + 1))}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-[1] w-9 h-9 sm:w-12 sm:h-12 rounded-full lp-glass shadow-lg flex items-center justify-center text-[var(--ink)] hover:bg-white border border-white/50 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 touch-manipulation"
-                >
-                  <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
-                </button>
-                <div className="overflow-hidden px-1">
-                  <div
-                    className="flex transition-transform duration-300 ease-out"
-                    style={{ transform: `translateX(-${blogCarouselIndex * 100}%)` }}
+                  {/* Prev arrow */}
+                  <button
+                    type="button"
+                    aria-label="Previous blog posts"
+                    onClick={() => setBlogCarouselIndex((i) => (i - 1 + totalSlides) % totalSlides)}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-full lp-glass shadow-lg flex items-center justify-center text-[var(--ink)] hover:bg-white border border-white/50 touch-manipulation"
                   >
-                    {blogPosts.map((post) => (
-                      <div
-                        key={post.id}
-                        className="flex-shrink-0 w-full sm:w-1/2 min-[1180px]:w-1/3 px-2"
-                      >
-                        <Link href={`/blog/${post.id}`} className="lp-photo-card group block h-[360px] sm:h-[400px]">
-                            <SafeImage
-                              src={post.image || '/placeholder-image.svg'}
-                              alt={post.title}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                            />
-                          <div className="absolute inset-x-0 bottom-0 z-20 p-5 sm:p-6">
-                            {post.category && (
-                              <span className="inline-block text-[var(--sun)] text-xs font-bold tracking-[0.14em] uppercase mb-2">
-                                {post.category}
-                              </span>
-                            )}
-                            <h3 className="font-display text-xl sm:text-2xl text-white leading-tight mb-2 line-clamp-2">{post.title}</h3>
-                            <p className="text-white/75 text-sm line-clamp-2">
-                              {post.description || post.excerpt || ''}
-                            </p>
-                          </div>
-                        </Link>
-                      </div>
-                    ))}
+                    <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </button>
+
+                  {/* Viewport */}
+                  <div className="overflow-hidden px-12 sm:px-14">
+                    <div
+                      className="flex transition-transform duration-500 ease-in-out"
+                      style={{ transform: `translateX(-${blogCarouselIndex * 100}%)` }}
+                    >
+                      {slides.map((group, si) => (
+                        <div key={si} className="flex-shrink-0 w-full flex gap-4">
+                          {group.map((post) => (
+                            <div key={post.id} className="flex-1 min-w-0">
+                              <Link href={`/blog/${post.id}`} className="lp-photo-card group block h-[360px] sm:h-[400px]">
+                                <SafeImage
+                                  src={post.image || '/placeholder-image.svg'}
+                                  alt={post.title}
+                                  fill
+                                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                />
+                                <div className="absolute inset-x-0 bottom-0 z-20 p-5 sm:p-6">
+                                  {post.category && (
+                                    <span className="inline-block text-[var(--sun)] text-xs font-bold tracking-[0.14em] uppercase mb-2">
+                                      {post.category}
+                                    </span>
+                                  )}
+                                  <h3 className="font-display text-xl sm:text-2xl text-white leading-tight mb-2 line-clamp-2">
+                                    {post.title}
+                                  </h3>
+                                  <p className="text-white/75 text-sm line-clamp-2">
+                                    {post.description || post.excerpt || ''}
+                                  </p>
+                                </div>
+                              </Link>
+                            </div>
+                          ))}
+                          {/* Fill empty slots on the last slide so layout stays consistent */}
+                          {group.length < blogPerSlide &&
+                            Array.from({ length: blogPerSlide - group.length }).map((_, ei) => (
+                              <div key={`empty-${ei}`} className="flex-1 min-w-0" aria-hidden />
+                            ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Next arrow */}
+                  <button
+                    type="button"
+                    aria-label="Next blog posts"
+                    onClick={() => setBlogCarouselIndex((i) => (i + 1) % totalSlides)}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-full lp-glass shadow-lg flex items-center justify-center text-[var(--ink)] hover:bg-white border border-white/50 touch-manipulation"
+                  >
+                    <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </button>
+
+                  {/* Dot indicators */}
+                  {totalSlides > 1 && (
+                    <div className="flex justify-center gap-2 mt-6">
+                      {Array.from({ length: totalSlides }).map((_, di) => (
+                        <button
+                          key={di}
+                          type="button"
+                          aria-label={`Go to slide ${di + 1}`}
+                          onClick={() => setBlogCarouselIndex(di)}
+                          className={`rounded-full transition-all duration-300 ${
+                            di === blogCarouselIndex
+                              ? 'w-6 h-2.5 bg-[var(--lagoon-deep)]'
+                              : 'w-2.5 h-2.5 bg-[var(--ink-soft)]/30 hover:bg-[var(--ink-soft)]/60'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            </>
+              )
+            })()
           ) : (
             <div className="text-center py-12">
               <p className="text-[var(--ink-soft)] mb-4">Explore stories and travel tips on our blog.</p>
