@@ -3,6 +3,7 @@ import type {
   AdditionalCharge,
   RentalQuote,
   RentalQuoteBreakdownLine,
+  RentalQuoteMode,
   RentalSettings,
   Vehicle,
 } from '@/lib/vehicleTypes'
@@ -10,6 +11,7 @@ import type {
 export interface RentalQuoteInput {
   vehicle: Vehicle
   settings: RentalSettings
+  mode?: RentalQuoteMode
   pickupLat: number
   pickupLng: number
   pickupCityName: string
@@ -33,10 +35,23 @@ function roundCurrency(n: number): number {
   return Math.round(n * 100) / 100
 }
 
+function chargeAmount(charge: AdditionalCharge, days: number, estimatedKm: number): number {
+  switch (charge.type) {
+    case 'per_day':
+      return roundCurrency(charge.amount * days)
+    case 'per_km':
+      return roundCurrency(charge.amount * estimatedKm)
+    case 'flat':
+    default:
+      return roundCurrency(charge.amount)
+  }
+}
+
 export function calculateRentalQuote(input: RentalQuoteInput): RentalQuote {
   const {
     vehicle,
     settings,
+    mode = 'multi_day',
     pickupLat,
     pickupLng,
     pickupCityName,
@@ -48,11 +63,48 @@ export function calculateRentalQuote(input: RentalQuoteInput): RentalQuote {
     selectedChargeIds = [],
   } = input
 
-  const days = rentalDays(pickupDate, returnDate)
   const multiplier = settings.roadDistanceMultiplier || 1.25
   const oneWayKm = haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng)
   const routeKm = roundCurrency(oneWayKm * multiplier)
+  const unitRatePerKm = settings.dropoffUnitRatePerKm ?? settings.defaultExtraKmRate ?? 0
 
+  if (mode === 'dropoff') {
+    const dropoffDistanceCharge = roundCurrency(routeKm * unitRatePerKm)
+    const priceAvailable = unitRatePerKm > 0 && routeKm > 0
+    const breakdown: RentalQuoteBreakdownLine[] = priceAvailable
+      ? [
+          {
+            label: `Distance (${routeKm} km × ${unitRatePerKm} ${settings.currency}/km)`,
+            amount: dropoffDistanceCharge,
+          },
+        ]
+      : []
+
+    return {
+      mode: 'dropoff',
+      days: 1,
+      routeKm,
+      estimatedDrivingKm: routeKm,
+      includedKm: 0,
+      extraKm: 0,
+      baseRent: 0,
+      extraKmCharge: 0,
+      oneWayFee: 0,
+      dropoffDistanceCharge: priceAvailable ? dropoffDistanceCharge : 0,
+      unitRatePerKm,
+      additionalCharges: [],
+      additionalChargesTotal: 0,
+      totalPrice: priceAvailable ? dropoffDistanceCharge : 0,
+      priceAvailable,
+      breakdown,
+      currency: settings.currency || 'USD',
+      pickupCityName,
+      dropoffCityName,
+      withDriver: true,
+    }
+  }
+
+  const days = rentalDays(pickupDate, returnDate)
   const isOneWay = pickupCityName.trim().toLowerCase() !== dropoffCityName.trim().toLowerCase()
   const estimatedDrivingKm = isOneWay ? roundCurrency(routeKm * 2) : roundCurrency(routeKm)
 
@@ -81,7 +133,7 @@ export function calculateRentalQuote(input: RentalQuoteInput): RentalQuote {
   )
 
   const breakdown: RentalQuoteBreakdownLine[] = [
-    { label: `Base rent (${days} day${days === 1 ? '' : 's'})`, amount: baseRent },
+    { label: `Base rent with driver (${days} day${days === 1 ? '' : 's'})`, amount: baseRent },
   ]
 
   if (extraKmCharge > 0) {
@@ -100,6 +152,7 @@ export function calculateRentalQuote(input: RentalQuoteInput): RentalQuote {
   const totalPrice = roundCurrency(baseRent + extraKmCharge + oneWayFee + additionalChargesTotal)
 
   return {
+    mode: 'multi_day',
     days,
     routeKm,
     estimatedDrivingKm,
@@ -108,28 +161,31 @@ export function calculateRentalQuote(input: RentalQuoteInput): RentalQuote {
     baseRent,
     extraKmCharge,
     oneWayFee,
+    dropoffDistanceCharge: 0,
+    unitRatePerKm: extraKmRate,
     additionalCharges: additionalLines,
     additionalChargesTotal,
     totalPrice,
+    priceAvailable: true,
     breakdown,
-    currency: settings.currency,
+    currency: settings.currency || 'USD',
     pickupCityName,
     dropoffCityName,
+    withDriver: true,
   }
 }
 
-function chargeAmount(charge: AdditionalCharge, days: number, estimatedKm: number): number {
-  switch (charge.type) {
-    case 'per_day':
-      return roundCurrency(charge.amount * days)
-    case 'per_km':
-      return roundCurrency(charge.amount * estimatedKm)
-    case 'flat':
-    default:
-      return roundCurrency(charge.amount)
+export function formatRentalCurrency(amount: number, currency = 'USD'): string {
+  const code = (currency || 'USD').toUpperCase()
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: code,
+      maximumFractionDigits: code === 'USD' || code === 'EUR' ? 2 : 0,
+    }).format(amount)
+  } catch {
+    return `${code} ${amount.toLocaleString('en-US', {
+      maximumFractionDigits: code === 'USD' ? 2 : 0,
+    })}`
   }
-}
-
-export function formatRentalCurrency(amount: number, currency = 'LKR'): string {
-  return `${currency} ${amount.toLocaleString('en-LK', { maximumFractionDigits: 0 })}`
 }

@@ -16,6 +16,10 @@ interface ImageSelectorProps {
   onClose: () => void
   onSelect: (imageUrl: string) => void
   currentImageUrl?: string
+  /** Prefill upload category when the modal opens */
+  defaultCategory?: string
+  /** Start on upload tab when useful (e.g. vehicle editor) */
+  defaultTab?: 'select' | 'upload'
 }
 
 interface UploadedFile {
@@ -26,7 +30,14 @@ interface UploadedFile {
   error?: string
 }
 
-export default function ImageSelector({ isOpen, onClose, onSelect, currentImageUrl }: ImageSelectorProps) {
+export default function ImageSelector({
+  isOpen,
+  onClose,
+  onSelect,
+  currentImageUrl,
+  defaultCategory = 'Tours',
+  defaultTab = 'select',
+}: ImageSelectorProps) {
   const [images, setImages] = useState<ImageItem[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -34,7 +45,7 @@ export default function ImageSelector({ isOpen, onClose, onSelect, currentImageU
   const [activeTab, setActiveTab] = useState<'select' | 'upload'>('select')
   const [uploadFiles, setUploadFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
-  const [category, setCategory] = useState('Tours')
+  const [category, setCategory] = useState(defaultCategory)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -54,11 +65,12 @@ export default function ImageSelector({ isOpen, onClose, onSelect, currentImageU
   useEffect(() => {
     if (isOpen) {
       fetchImages()
-      setActiveTab('select')
+      setActiveTab(defaultTab)
+      setCategory(defaultCategory)
       setUploadFiles([])
       setSearchTerm('')
     }
-  }, [isOpen])
+  }, [isOpen, defaultCategory, defaultTab])
 
   const fetchImages = async () => {
     try {

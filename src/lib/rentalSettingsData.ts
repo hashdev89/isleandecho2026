@@ -6,38 +6,25 @@ import { loadAppJson, saveAppJson } from '@/lib/supabaseJsonStore'
 const SETTINGS_FILE = path.join(process.cwd(), 'data', 'rental-settings.json')
 
 export const DEFAULT_RENTAL_SETTINGS: RentalSettings = {
-  currency: 'LKR',
+  currency: 'USD',
   defaultIncludedKmPerDay: 100,
-  defaultExtraKmRate: 50,
-  defaultOneWayFee: 3000,
+  defaultExtraKmRate: 0.35,
+  defaultOneWayFee: 25,
+  dropoffUnitRatePerKm: 0.45,
   roadDistanceMultiplier: 1.25,
   additionalCharges: [
     {
-      id: 'full-insurance',
-      label: 'Full insurance cover',
-      amount: 1500,
-      type: 'per_day',
-      enabled: true,
-    },
-    {
-      id: 'driver',
-      label: 'Professional driver',
-      amount: 5000,
-      type: 'per_day',
-      enabled: true,
-    },
-    {
-      id: 'airport-pickup',
-      label: 'Airport pickup fee',
-      amount: 2000,
-      type: 'flat',
-      enabled: true,
-    },
-    {
       id: 'child-seat',
       label: 'Child seat',
-      amount: 800,
+      amount: 5,
       type: 'per_day',
+      enabled: true,
+    },
+    {
+      id: 'extra-stop',
+      label: 'Extra stop',
+      amount: 10,
+      type: 'flat',
       enabled: true,
     },
   ],
@@ -50,38 +37,76 @@ const ensureDataDir = () => {
   }
 }
 
+function readLocalSettings(): RentalSettings | null {
+  try {
+    if (!fs.existsSync(SETTINGS_FILE)) return null
+    return {
+      ...DEFAULT_RENTAL_SETTINGS,
+      ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')),
+    } as RentalSettings
+  } catch {
+    return null
+  }
+}
+
+function stamp(settings: RentalSettings | null | undefined): number {
+  if (!settings?.updatedAt) return 0
+  const t = Date.parse(settings.updatedAt)
+  return Number.isFinite(t) ? t : 0
+}
+
+function normalize(settings: RentalSettings): RentalSettings {
+  return {
+    ...DEFAULT_RENTAL_SETTINGS,
+    ...settings,
+    dropoffUnitRatePerKm:
+      settings.dropoffUnitRatePerKm ?? DEFAULT_RENTAL_SETTINGS.dropoffUnitRatePerKm,
+    currency: (settings.currency || 'USD').toUpperCase(),
+  }
+}
+
 export async function loadRentalSettings(): Promise<RentalSettings> {
   try {
+    const local = readLocalSettings()
     const remote = await loadAppJson<RentalSettings>('rental-settings.json')
-    if (remote && typeof remote === 'object') {
-      const merged = { ...DEFAULT_RENTAL_SETTINGS, ...remote }
-      try {
-        ensureDataDir()
-        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2))
-      } catch {
-        /* local cache is optional */
-      }
-      return merged
+    const remoteNorm =
+      remote && typeof remote === 'object' ? normalize(remote as RentalSettings) : null
+
+    let chosen: RentalSettings
+    if (local && remoteNorm) {
+      chosen = stamp(local) >= stamp(remoteNorm) ? normalize(local) : remoteNorm
+    } else if (local) {
+      chosen = normalize(local)
+    } else if (remoteNorm) {
+      chosen = remoteNorm
+    } else {
+      chosen = { ...DEFAULT_RENTAL_SETTINGS }
     }
 
     ensureDataDir()
-    if (fs.existsSync(SETTINGS_FILE)) {
-      const local = { ...DEFAULT_RENTAL_SETTINGS, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) }
-      await saveAppJson('rental-settings.json', local)
-      return local
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(chosen, null, 2))
+
+    if (!remoteNorm || stamp(chosen) > stamp(remoteNorm)) {
+      void saveAppJson('rental-settings.json', chosen)
     }
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_RENTAL_SETTINGS, null, 2))
-    await saveAppJson('rental-settings.json', DEFAULT_RENTAL_SETTINGS)
-    return DEFAULT_RENTAL_SETTINGS
+
+    return chosen
   } catch (error) {
     console.error('Error loading rental settings:', error)
-    return DEFAULT_RENTAL_SETTINGS
+    return readLocalSettings() || { ...DEFAULT_RENTAL_SETTINGS }
   }
 }
 
 export async function saveRentalSettings(settings: RentalSettings) {
   ensureDataDir()
-  const payload = { ...settings, updatedAt: new Date().toISOString() }
+  const payload = normalize({
+    ...settings,
+    updatedAt: new Date().toISOString(),
+  })
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(payload, null, 2))
-  await saveAppJson('rental-settings.json', payload)
+  const remoteOk = await saveAppJson('rental-settings.json', payload)
+  if (!remoteOk) {
+    console.warn('Rental settings saved locally; Supabase sync unavailable or failed')
+  }
+  return payload
 }

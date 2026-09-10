@@ -1274,7 +1274,8 @@ export default function TourEditor() {
                     <MapboxMap 
                       key={`${tour.destinations?.join(',') || 'empty'}-${tourDestinations.length}`}
                       destinations={tourDestinations} 
-                      tourName={tour.name} 
+                      tourName={tour.name}
+                      completeLoopAtBia
                     />
                   </div>
                 ) : (

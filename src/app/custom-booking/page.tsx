@@ -21,6 +21,11 @@ import SiteDatePicker from '../../components/SiteDatePicker'
 import SafeImage from '../../components/SafeImage'
 import dynamic from 'next/dynamic'
 import { tourFitsGuestCountFromTour, formatGroupSizeRange, getTourGroupSize } from '@/lib/tourGroupSize'
+import {
+  formatDistanceKm,
+  getBiaLoopRouteSegments,
+  getBiaLoopTotalKm,
+} from '@/lib/geoDistance'
 
 const MapboxMap = dynamic(() => import('../../components/MapboxMap'), {
   ssr: false,
@@ -310,6 +315,21 @@ export default function CustomBookingPage() {
 
     return resolved
   }, [tripData, availableDestinations])
+
+  const mapDestinations = useMemo(
+    () =>
+      selectedDestinations
+        .filter((d) => typeof d.lat === 'number' && typeof d.lng === 'number')
+        .map((dest) => ({
+          name: dest.name,
+          lat: dest.lat as number,
+          lng: dest.lng as number,
+          region: dest.region || 'Sri Lanka',
+        })),
+    [selectedDestinations]
+  )
+  const routeSegments = useMemo(() => getBiaLoopRouteSegments(mapDestinations), [mapDestinations])
+  const totalRouteKm = useMemo(() => getBiaLoopTotalKm(mapDestinations), [mapDestinations])
 
   const guestCountForTours = bookingData.guests || tripData?.guests || 1
   const toursForGuestCount = useMemo(
@@ -647,14 +667,44 @@ export default function CustomBookingPage() {
 
                       <div className="rounded-lg overflow-hidden border border-black/10">
                         <MapboxMap
-                          destinations={selectedDestinations.map((dest) => ({
-                            ...dest,
-                            lat: dest.lat,
-                            lng: dest.lng,
-                          }))}
+                          destinations={mapDestinations}
                           tourName="Custom Trip"
+                          completeLoopAtBia
                         />
                       </div>
+
+                      {routeSegments.length > 0 && (
+                        <div className="mt-6 rounded-xl border border-[var(--lagoon)]/20 bg-[var(--foam)] p-4 sm:p-5">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                            <h4 className="font-semibold text-[var(--ink)]">Trip route distances</h4>
+                            <p className="text-sm font-bold text-[var(--lagoon-deep)]">
+                              Total coverage: {formatDistanceKm(totalRouteKm)}
+                            </p>
+                          </div>
+                          <ul className="space-y-2">
+                            {routeSegments.map((segment, index) => (
+                              <li
+                                key={`${segment.from.name}-${segment.to.name}-${index}`}
+                                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-sm text-[var(--ink-soft)] border-b border-black/5 last:border-0 pb-2 last:pb-0"
+                              >
+                                <span className="flex items-center gap-2 min-w-0">
+                                  <Navigation className="w-4 h-4 text-[var(--lagoon)] shrink-0" />
+                                  <span className="truncate">
+                                    {segment.from.name} → {segment.to.name}
+                                  </span>
+                                </span>
+                                <span className="font-semibold text-[var(--lagoon-deep)] sm:ml-4 shrink-0">
+                                  {formatDistanceKm(segment.distanceKm)}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="mt-3 text-xs text-[var(--ink-soft)]">
+                            Distances are straight-line estimates for a full loop starting and finishing at BIA
+                            (Bandaranaike International Airport), including the return leg to the airport.
+                          </p>
+                        </div>
+                      )}
 
                       <div className="mt-6">
                         <h4 className="font-semibold text-[var(--ink)] mb-3">Map Features</h4>

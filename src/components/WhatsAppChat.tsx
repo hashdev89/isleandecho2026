@@ -141,6 +141,10 @@ export default function WhatsAppChat() {
     const loadSettings = async () => {
       try {
         const response = await fetch('/api/settings')
+        const contentType = response.headers.get('content-type') || ''
+        if (!response.ok || !contentType.includes('application/json')) {
+          return
+        }
         const result = await response.json()
         if (result.success && result.data?.whatsappPhone) {
           setWhatsappPhone(result.data.whatsappPhone)

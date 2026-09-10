@@ -77,7 +77,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = 'register' }: 
         setSignInError('Invalid email or password')
       }
     } catch (err) {
-      setSignInError('An error occurred. Please try again.')
+      setSignInError(err instanceof Error ? err.message : 'An error occurred. Please try again.')
       console.error('Login error:', err)
     } finally {
       setIsSignInLoading(false)

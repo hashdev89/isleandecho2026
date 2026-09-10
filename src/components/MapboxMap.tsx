@@ -1,7 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { formatDistanceKm, getRouteSegments, getTotalRouteKm } from '@/lib/geoDistance'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  formatDistanceKm,
+  getRouteSegments,
+  getTotalRouteKm,
+  isBiaAirportPoint,
+  withBiaAirportLoop,
+} from '@/lib/geoDistance'
 
 interface Destination {
   name: string
@@ -13,15 +19,22 @@ interface Destination {
 interface MapboxMapProps {
   destinations: Destination[]
   tourName: string
+  /** When true, route starts and ends at BIA (Bandaranaike International Airport). */
+  completeLoopAtBia?: boolean
 }
 
-export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
+export default function MapboxMap({ destinations, tourName, completeLoopAtBia = false }: MapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const [lng] = useState(80.5) // Sri Lanka center longitude
-  const [lat] = useState(7.5)  // Sri Lanka center latitude
+  const [lat] = useState(7.5) // Sri Lanka center latitude
   const [zoom] = useState(7)
   const [error, setError] = useState<string | null>(null)
+
+  const routePoints = useMemo(
+    () => (completeLoopAtBia ? withBiaAirportLoop(destinations) : destinations),
+    [completeLoopAtBia, destinations]
+  )
 
   useEffect(() => {
     if (map.current || typeof window === 'undefined') return // initialize map only once and ensure we're on client side
@@ -41,7 +54,7 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
         link.href = 'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css'
         document.head.appendChild(link)
       }
-      
+
       mapboxgl.default.accessToken = token
 
       if (mapContainer.current) {
@@ -53,7 +66,7 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
             zoom: zoom,
             pitch: 45, // 3D tilt
             bearing: 0,
-            antialias: true
+            antialias: true,
           })
         } catch (err) {
           console.error('Mapbox init error:', err)
@@ -68,7 +81,7 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
 
         // Add navigation controls
         map.current.addControl(new mapboxgl.default.NavigationControl(), 'top-right')
-        
+
         // Add fullscreen control
         map.current.addControl(new mapboxgl.default.FullscreenControl(), 'top-right')
 
@@ -82,7 +95,7 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                 try {
                   map.current.addSource('mapbox-terrain', {
                     type: 'vector',
-                    url: 'mapbox://mapbox.mapbox-terrain-v2'
+                    url: 'mapbox://mapbox.mapbox-terrain-v2',
                   })
 
                   // Add terrain layer (only if it doesn't exist)
@@ -94,8 +107,8 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                       type: 'line',
                       paint: {
                         'line-color': '#ff69b4',
-                        'line-width': 1
-                      }
+                        'line-width': 1,
+                      },
                     })
                   }
                 } catch (error) {
@@ -122,7 +135,7 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                         15,
                         0,
                         15.05,
-                        ['get', 'height']
+                        ['get', 'height'],
                       ],
                       'fill-extrusion-base': [
                         'interpolate',
@@ -131,10 +144,10 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                         15,
                         0,
                         15.05,
-                        ['get', 'min_height']
+                        ['get', 'min_height'],
                       ],
-                      'fill-extrusion-opacity': 0.6
-                    }
+                      'fill-extrusion-opacity': 0.6,
+                    },
                   })
                 }
               } catch (error) {
@@ -143,14 +156,20 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
 
               // Add markers for each destination
               const markers: mapboxgl.Marker[] = []
-              destinations.forEach((destination, index) => {
+              const startsAtBia = completeLoopAtBia && routePoints.length > 0 && isBiaAirportPoint(routePoints[0])
+
+              routePoints.forEach((destination, index) => {
                 try {
+                  const isAirport = isBiaAirportPoint(destination)
+                  const isReturnAirport =
+                    isAirport && index === routePoints.length - 1 && routePoints.length > 1
+
                   // Create custom marker element
                   const markerEl = document.createElement('div')
                   markerEl.className = 'marker'
-                  markerEl.style.width = '30px'
-                  markerEl.style.height = '30px'
-                  markerEl.style.backgroundColor = '#3B82F6'
+                  markerEl.style.width = isAirport ? '36px' : '30px'
+                  markerEl.style.height = isAirport ? '36px' : '30px'
+                  markerEl.style.backgroundColor = isAirport ? '#0B3D4A' : '#3B82F6'
                   markerEl.style.borderRadius = '50%'
                   markerEl.style.border = '3px solid white'
                   markerEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)'
@@ -160,8 +179,12 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                   markerEl.style.justifyContent = 'center'
                   markerEl.style.fontWeight = 'bold'
                   markerEl.style.color = 'white'
-                  markerEl.style.fontSize = '12px'
-                  markerEl.textContent = (index + 1).toString()
+                  markerEl.style.fontSize = isAirport ? '9px' : '12px'
+                  markerEl.textContent = isAirport
+                    ? 'BIA'
+                    : startsAtBia
+                      ? String(index)
+                      : String(index + 1)
 
                   // Add marker to map with error handling
                   if (map.current && mapContainer.current) {
@@ -171,11 +194,17 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                     markers.push(destinationMarker)
 
                     // Create popup
-                    const popup = new mapboxgl.default.Popup({ offset: 25 })
-                      .setHTML(`
-                        <div style="padding: 10px; max-width: 200px;">
+                    const popup = new mapboxgl.default.Popup({ offset: 25 }).setHTML(`
+                        <div style="padding: 10px; max-width: 220px;">
                           <h3 style="margin: 0 0 5px 0; color: #333; font-weight: bold;">${destination.name}</h3>
-                          <p style="margin: 0; color: #666; font-size: 12px;">${destination.region}</p>
+                          <p style="margin: 0; color: #666; font-size: 12px;">${destination.region || ''}</p>
+                          ${
+                            isAirport
+                              ? `<p style="margin: 6px 0 0; color: #0B3D4A; font-size: 11px; font-weight: 600;">${
+                                  isReturnAirport ? 'Return to airport' : 'Trip start (airport)'
+                                }</p>`
+                              : ''
+                          }
                         </div>
                       `)
 
@@ -184,7 +213,7 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                         popup.setLngLat([destination.lng, destination.lat]).addTo(map.current)
                       }
                     })
-                    
+
                     destinationMarker.setPopup(popup)
                   }
                 } catch (error) {
@@ -193,7 +222,7 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
               })
 
               // Distance labels between consecutive stops
-              const routeSegments = getRouteSegments(destinations)
+              const routeSegments = getRouteSegments(routePoints)
               routeSegments.forEach((segment) => {
                 try {
                   if (!map.current) return
@@ -226,10 +255,10 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
               })
 
               // Fit map to all destinations when available
-              if (destinations.length > 0 && map.current) {
+              if (routePoints.length > 0 && map.current) {
                 try {
                   const bounds = new mapboxgl.default.LngLatBounds()
-                  destinations.forEach((dest) => bounds.extend([dest.lng, dest.lat]))
+                  routePoints.forEach((dest) => bounds.extend([dest.lng, dest.lat]))
                   map.current.fitBounds(bounds, { padding: 56, maxZoom: 10, duration: 0 })
                 } catch (error) {
                   console.warn('Error fitting map bounds:', error)
@@ -237,10 +266,10 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
               }
 
               // Add route line if multiple destinations
-              if (destinations.length > 1 && map.current) {
+              if (routePoints.length > 1 && map.current) {
                 try {
-                  const coordinates = destinations.map(dest => [dest.lng, dest.lat])
-                  
+                  const coordinates = routePoints.map((dest) => [dest.lng, dest.lat])
+
                   // Add route source (only if it doesn't exist)
                   if (!map.current.getSource('route')) {
                     map.current.addSource('route', {
@@ -250,9 +279,9 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                         properties: {},
                         geometry: {
                           type: 'LineString',
-                          coordinates: coordinates
-                        }
-                      }
+                          coordinates: coordinates,
+                        },
+                      },
                     })
                   }
 
@@ -264,13 +293,13 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                       source: 'route',
                       layout: {
                         'line-join': 'round',
-                        'line-cap': 'round'
+                        'line-cap': 'round',
                       },
                       paint: {
                         'line-color': '#3B82F6',
                         'line-width': 4,
-                        'line-opacity': 0.8
-                      }
+                        'line-opacity': 0.8,
+                      },
                     })
                   }
 
@@ -282,14 +311,14 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                       source: 'route',
                       layout: {
                         'line-join': 'round',
-                        'line-cap': 'round'
+                        'line-cap': 'round',
                       },
                       paint: {
                         'line-color': '#60A5FA',
                         'line-width': 2,
                         'line-dasharray': [0, 4],
-                        'line-opacity': 0.6
-                      }
+                        'line-opacity': 0.6,
+                      },
                     })
                   }
 
@@ -301,7 +330,7 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                         const phase = (start % 100) / 100
                         map.current.setPaintProperty('route-animated', 'line-dasharray', [
                           phase * 4,
-                          (1 - phase) * 4
+                          (1 - phase) * 4,
                         ])
                         start += 1
                         requestAnimationFrame(animateRoute)
@@ -310,7 +339,7 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                       }
                     }
                   }
-                  
+
                   // Start animation after a short delay to ensure layer is ready
                   setTimeout(() => {
                     animateRoute()
@@ -323,7 +352,7 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
               // Add tour title + total distance overlay
               try {
                 if (mapContainer.current && !mapContainer.current.querySelector('.map-title')) {
-                  const totalKm = getTotalRouteKm(destinations)
+                  const totalKm = getTotalRouteKm(routePoints)
                   const titleEl = document.createElement('div')
                   titleEl.className = 'map-title'
                   titleEl.innerHTML = `
@@ -342,7 +371,13 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
                       max-width: min(280px, calc(100% - 40px));
                     ">
                       <div>${tourName}</div>
-                      ${destinations.length > 1 ? `<div style="margin-top:6px;font-size:12px;font-weight:600;color:#d4f06a;">Total route: ${formatDistanceKm(totalKm)}</div>` : ''}
+                      ${
+                        routePoints.length > 1
+                          ? `<div style="margin-top:6px;font-size:12px;font-weight:600;color:#d4f06a;">Total route: ${formatDistanceKm(totalKm)}${
+                              completeLoopAtBia ? ' (BIA loop)' : ''
+                            }</div>`
+                          : ''
+                      }
                     </div>
                   `
                   mapContainer.current.appendChild(titleEl)
@@ -362,15 +397,15 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
         try {
           // Remove layers
           const layersToRemove = ['terrain', '3d-buildings', 'route-line', 'route-animated']
-          layersToRemove.forEach(layerId => {
+          layersToRemove.forEach((layerId) => {
             if (map.current && map.current.getLayer(layerId)) {
               map.current.removeLayer(layerId)
             }
           })
-          
+
           // Remove sources
           const sourcesToRemove = ['mapbox-terrain', 'route']
-          sourcesToRemove.forEach(sourceId => {
+          sourcesToRemove.forEach((sourceId) => {
             if (map.current && map.current.getSource(sourceId)) {
               map.current.removeSource(sourceId)
             }
@@ -378,12 +413,12 @@ export default function MapboxMap({ destinations, tourName }: MapboxMapProps) {
         } catch (error) {
           console.warn('Error cleaning up map sources/layers:', error)
         }
-        
+
         map.current.remove()
         map.current = null
       }
     }
-  }, [lng, lat, zoom, destinations, tourName])
+  }, [lng, lat, zoom, routePoints, tourName, completeLoopAtBia])
 
   return (
     <div className="relative w-full h-96 rounded-2xl overflow-hidden shadow-lg">

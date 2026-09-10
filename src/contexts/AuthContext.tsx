@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email, password }),
       })
 
-      const data = await response.json()
+      const data = await response.json().catch(() => ({}))
 
       if (data.success && data.user) {
         setUser(data.user)
@@ -56,9 +56,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return true
       }
 
+      if (typeof data.error === 'string' && data.error) {
+        throw new Error(data.error)
+      }
+
       return false
     } catch (error) {
       console.error('Login error:', error)
+      if (error instanceof Error && error.message && error.message !== 'Failed to fetch') {
+        throw error
+      }
       return false
     }
   }

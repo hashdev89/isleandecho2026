@@ -19,13 +19,25 @@ export async function PUT(request: NextRequest) {
     const updated: RentalSettings = {
       ...current,
       ...body,
+      currency: String(body.currency || current.currency || 'USD').toUpperCase(),
+      dropoffUnitRatePerKm: Number(
+        body.dropoffUnitRatePerKm ?? current.dropoffUnitRatePerKm ?? 0.45
+      ),
+      defaultIncludedKmPerDay: Number(
+        body.defaultIncludedKmPerDay ?? current.defaultIncludedKmPerDay
+      ),
+      defaultExtraKmRate: Number(body.defaultExtraKmRate ?? current.defaultExtraKmRate),
+      defaultOneWayFee: Number(body.defaultOneWayFee ?? current.defaultOneWayFee),
+      roadDistanceMultiplier: Number(
+        body.roadDistanceMultiplier ?? current.roadDistanceMultiplier
+      ),
       additionalCharges: Array.isArray(body.additionalCharges)
         ? body.additionalCharges
         : current.additionalCharges,
       updatedAt: new Date().toISOString(),
     }
-    await saveRentalSettings(updated)
-    return NextResponse.json({ success: true, data: updated, message: 'Rental settings saved' })
+    const saved = await saveRentalSettings(updated)
+    return NextResponse.json({ success: true, data: saved, message: 'Rental settings saved' })
   } catch (error) {
     console.error('PUT /api/rental-settings error:', error)
     return NextResponse.json({ success: false, error: 'Failed to save settings' }, { status: 500 })

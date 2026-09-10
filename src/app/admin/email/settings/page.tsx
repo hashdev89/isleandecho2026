@@ -149,28 +149,34 @@ export default function EmailSettingsPage() {
   }, [accounts, staffUsers])
 
   if (loading) {
-    return <div className="p-8 text-gray-500">Loading email settings…</div>
+    return <div className="flex h-dvh items-center justify-center bg-white p-8 text-gray-500">Loading email settings…</div>
   }
 
   if (!allowed) {
     return (
-      <div className="mx-auto max-w-lg p-8 text-center">
+      <div className="flex h-dvh flex-col items-center justify-center bg-white p-8 text-center">
         <Shield className="mx-auto mb-3 h-10 w-10 text-amber-500" />
         <p className="text-gray-600">Only Super Admin can decide which users can open each email account.</p>
-        <Link href="/admin/email" className="mt-4 inline-block text-teal-700 underline">
-          Back to Email Center
-        </Link>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          <Link href="/admin/email" className="text-teal-700 underline">
+            Back to Email Center
+          </Link>
+          <Link href="/admin" className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+            Close to Admin Panel
+          </Link>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="h-dvh overflow-y-auto bg-gray-50">
+      <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
       <div className="flex items-center gap-3">
-        <Link href="/admin/email" className="rounded-lg p-2 hover:bg-gray-100">
+        <Link href="/admin/email" className="rounded-lg p-2 hover:bg-gray-100" title="Back to Email Center">
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold text-gray-900">Email account access</h1>
           <p className="text-sm text-gray-600">
             Choose exactly which authenticated users can open each inbox. Personal mailboxes should be assigned to
@@ -178,6 +184,13 @@ export default function EmailSettingsPage() {
             Super Admin.
           </p>
         </div>
+        <Link
+          href="/admin"
+          className="shrink-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          title="Close Email Center and return to Admin Panel"
+        >
+          Close
+        </Link>
       </div>
 
       <div className="rounded-2xl border border-teal-100 bg-teal-50 p-4 text-sm text-teal-900">
@@ -369,6 +382,7 @@ export default function EmailSettingsPage() {
         <Save className="h-4 w-4" />
         {saving ? 'Saving…' : 'Save account access'}
       </button>
+      </div>
     </div>
   )
 }

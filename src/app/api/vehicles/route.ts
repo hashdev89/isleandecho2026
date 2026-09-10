@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { loadVehicles, saveVehicles, invalidateVehiclesCache } from '@/lib/vehiclesData'
+import { loadVehicles, saveVehicles } from '@/lib/vehiclesData'
 import type { Vehicle } from '@/lib/vehicleTypes'
 
 export async function GET(request: NextRequest) {
@@ -47,7 +47,12 @@ export async function POST(request: NextRequest) {
       includedKmPerDay: Number(body.includedKmPerDay ?? 100),
       extraKmRate: Number(body.extraKmRate ?? 50),
       oneWayDropoffFee: body.oneWayDropoffFee != null ? Number(body.oneWayDropoffFee) : undefined,
-      seats: Number(body.seats ?? 5),
+      seats: Number(body.seats ?? body.passengers ?? 5),
+      passengers: Number(body.passengers ?? body.seats ?? 5),
+      luggage: body.luggage != null ? Number(body.luggage) : undefined,
+      doors: body.doors != null ? Number(body.doors) : undefined,
+      airConditioning: body.airConditioning ?? true,
+      automatic: body.automatic ?? /auto/i.test(String(body.transmission || 'Automatic')),
       transmission: body.transmission || 'Automatic',
       fuelType: body.fuelType || 'Petrol',
       features: Array.isArray(body.features) ? body.features : [],
@@ -64,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     vehicles.push(newVehicle)
     await saveVehicles(vehicles)
-    invalidateVehiclesCache()
+    // Keep in-memory cache — do not invalidate or a stale remote fetch can wipe the save
 
     return NextResponse.json({ success: true, data: newVehicle, message: 'Vehicle created' }, { status: 201 })
   } catch (error) {
@@ -94,7 +99,6 @@ export async function PUT(request: NextRequest) {
     }
     vehicles[index] = updated
     await saveVehicles(vehicles)
-    invalidateVehiclesCache()
 
     return NextResponse.json({ success: true, data: updated, message: 'Vehicle updated' })
   } catch (error) {
@@ -117,7 +121,6 @@ export async function DELETE(request: NextRequest) {
     }
 
     await saveVehicles(next)
-    invalidateVehiclesCache()
     return NextResponse.json({ success: true, message: 'Vehicle deleted' })
   } catch (error) {
     console.error('DELETE /api/vehicles error:', error)

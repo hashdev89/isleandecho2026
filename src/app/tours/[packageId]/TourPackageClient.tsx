@@ -26,7 +26,11 @@ import {
 import Header from '../../../components/Header'
 import SafeImage from '../../../components/SafeImage'
 import dynamic from 'next/dynamic'
-import { formatDistanceKm, getRouteSegments, getTotalRouteKm } from '@/lib/geoDistance'
+import {
+  formatDistanceKm,
+  getBiaLoopRouteSegments,
+  getBiaLoopTotalKm,
+} from '@/lib/geoDistance'
 import { tourFitsGuestCount } from '@/lib/tourGroupSize'
 import { useCurrency } from '@/contexts/CurrencyContext'
 import { getTourRating, getTourReviews } from '@/lib/currency'
@@ -258,8 +262,9 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
     .map((dest: string) => availableDestinations.find(d => d.name === dest))
     .filter((d): d is { name: string; lat: number; lng: number; region: string } => d != null && typeof d.lat === 'number' && typeof d.lng === 'number') || []
 
-  const routeSegments = useMemo(() => getRouteSegments(tourDestinations), [tourDestinations])
-  const totalRouteKm = useMemo(() => getTotalRouteKm(tourDestinations), [tourDestinations])
+  // Full loop: BIA → tour stops → BIA (includes return-to-airport mileage)
+  const routeSegments = useMemo(() => getBiaLoopRouteSegments(tourDestinations), [tourDestinations])
+  const totalRouteKm = useMemo(() => getBiaLoopTotalKm(tourDestinations), [tourDestinations])
 
   // Debug logging
   useEffect(() => {
@@ -476,7 +481,8 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
                   {/* Destination cards – right under the title */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                     {tourDestinations.map((dest, index) => {
-                      const leg = index > 0 ? routeSegments[index - 1] : null
+                      // routeSegments[0] is BIA → first stop when loop is enabled
+                      const leg = routeSegments[index] || null
                       return (
                       <div key={index} className="rounded-xl p-4 border border-[var(--lagoon)]/20 bg-[var(--lagoon)]/5">
                         <div className="flex items-center justify-between gap-2 mb-2">
@@ -504,6 +510,7 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
                       key={`tour-map-${tourPackage.id}-${tourDestinations.map(d => d.name).join(',')}`}
                       destinations={tourDestinations}
                       tourName={tourPackage.name}
+                      completeLoopAtBia
                     />
                   </div>
 
@@ -534,7 +541,8 @@ export default function TourPackageClient({ params }: { params: Promise<{ packag
                         ))}
                       </ul>
                       <p className="mt-3 text-xs text-[var(--ink-soft)]">
-                        Distances are straight-line estimates between stops and help show how much ground this tour covers.
+                        Distances are straight-line estimates for a full loop starting and finishing at BIA
+                        (Bandaranaike International Airport), including the return leg to the airport.
                       </p>
                     </div>
                   )}

@@ -54,6 +54,7 @@ export default function RentalSettingsAdminPage() {
       })
       const json = await res.json()
       if (!json.success) throw new Error(json.message || 'Save failed')
+      if (json.data) setSettings(json.data)
       alert('Rental settings saved')
     } catch (error: unknown) {
       alert(error instanceof Error ? error.message : 'Save failed')
@@ -82,7 +83,16 @@ export default function RentalSettingsAdminPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Currency</label>
-            <input value={settings.currency} onChange={(e) => setSettings({ ...settings, currency: e.target.value })} className="w-full px-3 py-2 border rounded-lg" />
+            <select
+              value={settings.currency}
+              onChange={(e) => setSettings({ ...settings, currency: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg"
+            >
+              <option value="USD">USD</option>
+              <option value="LKR">LKR</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Road distance multiplier</label>
@@ -95,11 +105,22 @@ export default function RentalSettingsAdminPage() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Default extra km rate</label>
-            <input type="number" value={settings.defaultExtraKmRate} onChange={(e) => setSettings({ ...settings, defaultExtraKmRate: Number(e.target.value) })} className="w-full px-3 py-2 border rounded-lg" />
+            <input type="number" step="0.01" value={settings.defaultExtraKmRate} onChange={(e) => setSettings({ ...settings, defaultExtraKmRate: Number(e.target.value) })} className="w-full px-3 py-2 border rounded-lg" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Drop-off unit rate per km</label>
+            <input
+              type="number"
+              step="0.01"
+              value={settings.dropoffUnitRatePerKm ?? 0.45}
+              onChange={(e) => setSettings({ ...settings, dropoffUnitRatePerKm: Number(e.target.value) })}
+              className="w-full px-3 py-2 border rounded-lg"
+            />
+            <p className="text-xs text-gray-500 mt-1">Drop-off total = distance (km) × this rate</p>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Default one-way fee</label>
-            <input type="number" value={settings.defaultOneWayFee} onChange={(e) => setSettings({ ...settings, defaultOneWayFee: Number(e.target.value) })} className="w-full px-3 py-2 border rounded-lg" />
+            <input type="number" step="0.01" value={settings.defaultOneWayFee} onChange={(e) => setSettings({ ...settings, defaultOneWayFee: Number(e.target.value) })} className="w-full px-3 py-2 border rounded-lg" />
           </div>
         </div>
 

@@ -22,6 +22,7 @@ import {
   Download,
   FileText,
   Layers,
+  PanelLeftClose,
 } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import type { EmailAccount, EmailAttachment, EmailMessage, EmailThread } from '@/lib/emailCenter'
@@ -409,9 +410,17 @@ export default function AdminEmailPage() {
 
   if (accessLoaded && !hasEmailAccess) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-        <h1 className="text-xl font-bold text-gray-900">Email Center</h1>
-        <p className="mt-2 text-gray-600">You do not have access to Email Center. Ask Super Admin to enable it for your role.</p>
+      <div className="flex h-dvh items-center justify-center bg-white p-8 text-center">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Email Center</h1>
+          <p className="mt-2 text-gray-600">You do not have access to Email Center. Ask Super Admin to enable it for your role.</p>
+          <Link
+            href="/admin"
+            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Back to Admin Panel
+          </Link>
+        </div>
       </div>
     )
   }
@@ -483,7 +492,7 @@ export default function AdminEmailPage() {
   )
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] min-h-[520px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+    <div className="flex h-dvh w-full flex-col overflow-hidden bg-white">
       {/* Top bar */}
       <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-4 py-3">
         <div className="flex items-center gap-2">
@@ -524,6 +533,14 @@ export default function AdminEmailPage() {
           <PenSquare className="h-4 w-4" />
           Compose
         </button>
+        <Link
+          href="/admin"
+          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          title="Close Email Center and return to Admin Panel"
+        >
+          <PanelLeftClose className="h-4 w-4" />
+          <span className="hidden sm:inline">Close</span>
+        </Link>
       </div>
 
       <div className="flex min-h-0 flex-1">

@@ -46,7 +46,7 @@ export default function SignInModal({ isOpen, onClose, onSwitchToRegister }: Sig
         setError('Invalid email or password')
       }
     } catch (err) {
-      setError('An error occurred. Please try again.')
+      setError(err instanceof Error ? err.message : 'An error occurred. Please try again.')
       console.error('Login error:', err)
     } finally {
       setIsLoading(false)

@@ -156,7 +156,11 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: 'Invalid email or password' },
+        {
+          success: false,
+          error:
+            'Invalid email or password. Locally, only users in data/users.json work until you add Supabase keys to .env.local (same as production). Super Admin accounts are not synced from the public API.',
+        },
         { status: 401 }
       )
     }
@@ -173,6 +177,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Invalid email or password' },
         { status: 401 }
+      )
+    }
+
+    // No local password hash (synced profile without secrets): allow login for local/dev only
+    if (!storedHash) {
+      console.warn(
+        `Local login for ${normalizedEmail} without password_hash — configure Supabase in .env.local for real password checks`
       )
     }
 
