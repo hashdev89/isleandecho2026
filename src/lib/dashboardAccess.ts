@@ -45,7 +45,7 @@ export const DASHBOARD_SECTIONS: DashboardSectionDef[] = [
   { id: 'users', name: 'Users', href: '/admin/users', description: 'Staff, admin, and customer accounts' },
   { id: 'analytics', name: 'Analytics', href: '/admin/analytics', description: 'Traffic and booking analytics' },
   { id: 'seo', name: 'SEO', href: '/admin/seo', description: 'Search keywords and meta tools' },
-  { id: 'site-content', name: 'Site Content', href: '/admin/site-content', description: 'Homepage and CMS sections' },
+  { id: 'site-content', name: 'Pages CMS', href: '/admin/site-content', description: 'Create pages, edit sections, change layouts' },
   { id: 'settings', name: 'Settings', href: '/admin/settings', description: 'Site, payment, and SEO settings' },
   { id: 'access-control', name: 'Access control', href: '/admin/access', description: 'Who can see each dashboard section (Super Admin only)' },
 ]

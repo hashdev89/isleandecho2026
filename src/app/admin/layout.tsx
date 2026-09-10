@@ -113,10 +113,11 @@ export default function AdminLayout({
     return pathname?.startsWith(href)
   }
 
-  // Email Center is a full-window workspace — hide admin sidebar/top bar
-  const isEmailCenter = pathname?.startsWith('/admin/email')
+  // Full-window workspaces — hide admin sidebar/top bar
+  const isFullWindowWorkspace =
+    pathname?.startsWith('/admin/email') || pathname?.startsWith('/admin/site-content')
 
-  if (isEmailCenter) {
+  if (isFullWindowWorkspace) {
     return (
       <AdminRoute>
         <div className="h-dvh overflow-hidden bg-gray-50">{children}</div>

@@ -12,6 +12,13 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",
+    "@tiptap/extension-link": "^3.31.3",
+    "@tiptap/extension-placeholder": "^3.31.3",
+    "@tiptap/extension-text-align": "^3.31.3",
+    "@tiptap/extension-underline": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/react": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
     "@types/nodemailer": "^7.0.4",
     "@types/uuid": "^10.0.0",
     "lucide-react": "^0.525.0",

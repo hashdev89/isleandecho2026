@@ -551,7 +551,7 @@ export default function HomePage() {
     let isMounted = true
     // Parallel CMS fetches; allow browser cache for faster repeat visits
     Promise.all([
-      fetch('/api/site-content', { cache: 'force-cache' }).then(res => (res.ok ? res.json() : null)),
+      fetch('/api/site-content', { cache: 'no-store' }).then(res => (res.ok ? res.json() : null)),
       fetch('/api/blog', { cache: 'force-cache' }).then(res => (res.ok ? res.json() : [])),
     ])
       .then(([siteJson, posts]) => {

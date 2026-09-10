@@ -44,13 +44,13 @@ export default function Footer() {
     { label: 'About Us', url: '/about' }, { label: 'Careers', url: '#' }, { label: 'Blog', url: '/blog' }, { label: 'Press', url: '#' }, { label: 'Gift Cards', url: '#' }
   ]
   const supportLinks = f?.supportLinks && f.supportLinks.length > 0 ? f.supportLinks : [
-    { label: 'Contact', url: '/contact' }, { label: 'Legal Notice', url: '#' }, { label: 'Privacy Policy', url: '#' }, { label: 'Terms and Conditions', url: '#' }, { label: 'Sitemap', url: '/sitemap.xml' }
+    { label: 'Contact', url: '/contact' }, { label: 'Legal Notice', url: '#' }, { label: 'Privacy Policy', url: '/privacy-policy' }, { label: 'Terms and Conditions', url: '#' }, { label: 'Sitemap', url: '/sitemap.xml' }
   ]
   const otherServicesLinks = f?.otherServicesLinks && f.otherServicesLinks.length > 0 ? f.otherServicesLinks : [
     { label: 'Car Hire', url: '#' }, { label: 'Activity Finder', url: '#' }, { label: 'Tour List', url: '/tours' }, { label: 'Flight Finder', url: '#' }, { label: 'Cruise Ticket', url: '#' }, { label: 'Holiday Rental', url: '#' }, { label: 'Travel Agents', url: '#' }
   ]
   const bottomLinks = f?.bottomLinks && f.bottomLinks.length > 0 ? f.bottomLinks : [
-    { label: 'Privacy', url: '#' }, { label: 'Terms', url: '#' }, { label: 'Site Map', url: '/sitemap.xml' }
+    { label: 'Privacy', url: '/privacy-policy' }, { label: 'Terms', url: '#' }, { label: 'Site Map', url: '/sitemap.xml' }
   ]
 
   return (

@@ -4,26 +4,14 @@ import Header from '../../../components/Header'
 import CmsPageSections from '../../../components/CmsPageSections'
 import { useCmsPage } from '@/hooks/useSiteContent'
 import { use } from 'react'
-import { normalizeSlug } from '@/lib/siteContent'
-
-const RESERVED = new Set([
-  '/',
-  '/about',
-  '/contact',
-  '/tours',
-  '/rent-car',
-  '/destinations',
-  '/blog',
-  '/custom-booking',
-  '/admin',
-])
+import { BUILTIN_PAGE_SLUGS, normalizeSlug } from '@/lib/siteContent'
 
 export default function CustomCmsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
   const path = normalizeSlug(slug)
   const { page, loading } = useCmsPage(path)
 
-  if (RESERVED.has(path)) {
+  if (BUILTIN_PAGE_SLUGS.has(path)) {
     return (
       <div className="min-h-screen bg-[var(--foam)]">
         <Header />

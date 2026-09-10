@@ -146,6 +146,17 @@ body {
   z-index: 1;
 }
 
+/* Privacy policy: breathing room after hero title and before site footer */
+.privacy-page .lp-page-hero {
+  padding-bottom: 4.5rem;
+}
+
+@media (min-width: 640px) {
+  .privacy-page .lp-page-hero {
+    padding-bottom: 5.25rem;
+  }
+}
+
 .lp-panel {
   background: #fff;
   border: 1px solid rgba(16, 36, 41, 0.08);
@@ -855,5 +866,116 @@ input[type="date"]::-moz-calendar-picker-indicator {
   }
   100% {
     background-position: 0% 50%;
+  }
+}
+
+/* CMS rich text editor + published content */
+@layer components {
+  .cms-rich-editor,
+  .cms-prose {
+    line-height: 1.7;
+    color: var(--ink-soft, #3a5459);
+  }
+
+  .cms-rich-editor p,
+  .cms-prose p {
+    margin: 0 0 0.85rem;
+  }
+
+  .cms-rich-editor p.cms-spacer,
+  .cms-prose p.cms-spacer,
+  .cms-prose p:empty {
+    margin: 0 0 0.85rem;
+    min-height: 1.15em;
+    line-height: 1.7;
+  }
+
+  .cms-rich-editor h2,
+  .cms-prose h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin: 1.75rem 0 0.75rem;
+    color: #0b3d4a;
+    line-height: 1.3;
+  }
+
+  .cms-rich-editor h2:first-child,
+  .cms-prose h2:first-child,
+  .cms-rich-editor > *:first-child,
+  .cms-prose > *:first-child {
+    margin-top: 0;
+  }
+
+  .cms-rich-editor h3,
+  .cms-prose h3 {
+    font-size: 1.1rem;
+    font-weight: 650;
+    margin: 1.35rem 0 0.55rem;
+    color: #0b3d4a;
+    line-height: 1.35;
+  }
+
+  .cms-rich-editor ul,
+  .cms-prose ul {
+    list-style: disc;
+    padding-left: 1.35rem;
+    margin: 0 0 1rem;
+  }
+
+  .cms-rich-editor ol,
+  .cms-prose ol {
+    list-style: decimal;
+    padding-left: 1.35rem;
+    margin: 0 0 1rem;
+  }
+
+  .cms-rich-editor li,
+  .cms-prose li {
+    margin: 0.4rem 0;
+    padding-left: 0.15rem;
+  }
+
+  .cms-rich-editor li > p,
+  .cms-prose li > p {
+    margin: 0;
+  }
+
+  .cms-rich-editor li + li,
+  .cms-prose li + li {
+    margin-top: 0.55rem;
+  }
+
+  .cms-rich-editor blockquote,
+  .cms-prose blockquote {
+    border-left: 3px solid #0b3d4a;
+    padding-left: 0.75rem;
+    color: #5b6b70;
+    margin: 0 0 1rem;
+  }
+
+  .cms-rich-editor a,
+  .cms-prose a {
+    color: #0f766e;
+    text-decoration: underline;
+  }
+
+  .cms-rich-editor .is-editor-empty:first-child::before {
+    color: #94a3b8;
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+
+  .cms-rich-editor p.is-empty,
+  .cms-rich-editor p:has(br.ProseMirror-trailingBreak:only-child) {
+    min-height: 1.15em;
+  }
+
+  /* Nested legacy privacy wrapper should not add extra outer padding */
+  .cms-prose .privacy-cms-doc {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }

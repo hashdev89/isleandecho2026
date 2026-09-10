@@ -12,16 +12,28 @@ import {
   LayoutTemplate,
   FilePlus,
   Menu,
+  ExternalLink,
+  Settings2,
+  PanelsTopLeft,
+  PanelLeftClose,
 } from 'lucide-react'
+import Link from 'next/link'
 import ImageSelector from '../../../components/ImageSelector'
+import CmsRichTextEditor from '../../../components/CmsRichTextEditor'
 import {
   ALL_SECTION_TYPES,
   SECTION_META,
+  SECTION_LAYOUT_OPTIONS,
   createBlankPage,
   createSection,
+  getPagePublicUrl,
+  isBuiltinPageSlug,
   normalizeSiteContent,
+  normalizeSlug,
+  resolveSectionLayout,
   type CmsPage,
   type PageSection,
+  type SectionLayout,
   type SectionType,
   type SiteContentDoc,
   type SiteLink,
@@ -116,6 +128,55 @@ function LinksEditor({
             </button>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+function SectionLayoutPicker({
+  value,
+  onChange,
+}: {
+  value: SectionLayout
+  onChange: (layout: SectionLayout) => void
+}) {
+  return (
+    <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <PanelsTopLeft className="h-4 w-4 text-teal-700" />
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Section layout</p>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {SECTION_LAYOUT_OPTIONS.map((opt) => {
+          const active = value === opt.id
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => onChange(opt.id)}
+              className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                active
+                  ? 'border-teal-500 bg-white shadow-sm ring-2 ring-teal-500/20'
+                  : 'border-slate-200 bg-white hover:border-slate-300'
+              }`}
+            >
+              <div className="mb-2 flex h-8 items-end justify-center gap-0.5 px-1">
+                <span
+                  className={`block h-full rounded-sm ${active ? 'bg-teal-600' : 'bg-slate-300'} ${
+                    opt.id === 'full' ? 'w-full' : opt.id === 'wide' ? 'w-4/5' : 'w-1/2'
+                  }`}
+                  style={{
+                    width: opt.id === 'full' ? '100%' : opt.id === 'wide' ? '78%' : '48%',
+                  }}
+                />
+              </div>
+              <p className={`text-sm font-semibold ${active ? 'text-teal-800' : 'text-slate-800'}`}>
+                {opt.label}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-snug text-slate-500">{opt.description}</p>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -470,8 +531,20 @@ function SectionEditor({
         <div className="space-y-4">
           <Field label="Kicker" value={String(d.kicker || '')} onChange={(v) => set('kicker', v)} />
           <Field label="Title" value={String(d.title || '')} onChange={(v) => set('title', v)} />
-          <Field label="Body" value={String(d.body || '')} onChange={(v) => set('body', v)} multiline rows={5} />
-          <Field label="Body (2nd paragraph)" value={String(d.body2 || '')} onChange={(v) => set('body2', v)} multiline rows={4} />
+          <CmsRichTextEditor
+            label="Body content"
+            value={String(d.body || '')}
+            onChange={(v) => set('body', v)}
+            placeholder="Write the main section content…"
+            minHeightClass="min-h-[200px]"
+          />
+          <CmsRichTextEditor
+            label="Extra content (optional)"
+            value={String(d.body2 || '')}
+            onChange={(v) => set('body2', v)}
+            placeholder="Optional second content block…"
+            minHeightClass="min-h-[140px]"
+          />
           <div className="flex gap-2">
             <input
               value={String(d.image || '')}
@@ -697,7 +770,20 @@ function SectionEditor({
         </div>
       )
     case 'html':
-      return <Field label="HTML" value={String(d.html || '')} onChange={(v) => set('html', v)} multiline rows={8} />
+      return (
+        <div className="space-y-3">
+          <p className="text-xs text-slate-500">
+            Use the visual editor for formatted content. Switch to HTML source only if you need raw markup.
+          </p>
+          <CmsRichTextEditor
+            label="Rich content"
+            value={String(d.html || '')}
+            onChange={(v) => set('html', v)}
+            placeholder="Write page content with headings, lists, links…"
+            minHeightClass="min-h-[320px]"
+          />
+        </div>
+      )
     default:
       return <p className="text-sm text-slate-500">No editor for this section type yet.</p>
   }
@@ -711,6 +797,7 @@ export default function AdminSiteContentPage() {
   const [selectedPageId, setSelectedPageId] = useState<string>('')
   const [selectedSectionId, setSelectedSectionId] = useState<string>('')
   const [view, setView] = useState<'pages' | 'footer'>('pages')
+  const [editorTab, setEditorTab] = useState<'content' | 'settings'>('content')
   const [addSectionType, setAddSectionType] = useState<SectionType>('richText')
   const [newPageTitle, setNewPageTitle] = useState('')
   const [newPageSlug, setNewPageSlug] = useState('')
@@ -806,52 +893,82 @@ export default function AdminSiteContentPage() {
   }
 
   const addPage = () => {
-    if (!doc || !newPageTitle.trim() || !newPageSlug.trim()) {
-      alert('Enter a page title and slug (e.g. /offers)')
+    if (!doc || !newPageTitle.trim()) {
+      alert('Enter a page title')
       return
     }
-    const page = createBlankPage(newPageTitle.trim(), newPageSlug.trim())
-    if (doc.pages.some((p) => p.slug === page.slug)) {
+    const slugInput = newPageSlug.trim() || `/${newPageTitle.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`
+    const page = createBlankPage(newPageTitle.trim(), slugInput)
+    if (doc.pages.some((p) => normalizeSlug(p.slug) === page.slug)) {
       alert('A page with that slug already exists')
       return
     }
     updatePages([...doc.pages, page])
     setSelectedPageId(page.id)
     setSelectedSectionId(page.sections[0]?.id || '')
+    setEditorTab('content')
     setNewPageTitle('')
     setNewPageSlug('')
     setView('pages')
   }
 
   const footer = (doc?.footer || {}) as Record<string, unknown>
+  const publicUrl = selectedPage ? getPagePublicUrl(selectedPage) : ''
 
   if (loadingData || !doc) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-slate-500">Loading site content…</div>
+      <div className="flex h-dvh items-center justify-center bg-gray-50 text-slate-500">Loading pages CMS…</div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Site Content</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Manage every page layout: add pages, add sections, reorder, and edit copy. Changes sync to the live site after
-            save.
-          </p>
+    <div className="flex h-dvh flex-col overflow-hidden bg-gray-50">
+      <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-700">CMS</p>
+            <h1 className="mt-1 text-2xl font-bold text-slate-900">Pages &amp; layout editor</h1>
+            <p className="mt-1 max-w-2xl text-sm text-slate-600">
+              Create website pages, add or reorder sections, edit content, and publish. Built-in routes (Home, About,
+              Tours…) keep their URLs; new pages go live at{' '}
+              <code className="rounded bg-slate-100 px-1">/p/your-slug</code>.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedPage && publicUrl ? (
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Preview page
+              </a>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-full bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
+            >
+              <Save className="h-4 w-4" />
+              {saving ? 'Saving…' : saved ? 'Saved' : 'Save all'}
+            </button>
+            <Link
+              href="/admin"
+              title="Close Pages CMS and return to Admin Panel"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+              <span className="hidden sm:inline">Close</span>
+            </Link>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="inline-flex items-center gap-2 rounded-full bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
-        >
-          <Save className="h-4 w-4" />
-          {saving ? 'Saving…' : saved ? 'Saved' : 'Save all'}
-        </button>
-      </div>
+      </header>
 
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+      <div className="mx-auto max-w-[1600px] space-y-6">
       <div className="flex gap-2">
         <button
           type="button"
@@ -860,8 +977,8 @@ export default function AdminSiteContentPage() {
             view === 'pages' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'
           }`}
         >
-          <LayoutTemplate className="h-4 w-4" />
-          Pages & layouts
+          <PanelsTopLeft className="h-4 w-4" />
+          Page editor
         </button>
         <button
           type="button"
@@ -960,17 +1077,36 @@ export default function AdminSiteContentPage() {
               ))}
             </div>
             <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Add page</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Create new page</p>
               <input
                 value={newPageTitle}
-                onChange={(e) => setNewPageTitle(e.target.value)}
-                placeholder="Title"
+                onChange={(e) => {
+                  const title = e.target.value
+                  setNewPageTitle(title)
+                  const auto = `/${title
+                    .trim()
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-|-$/g, '')}`
+                  // Keep slug in sync while creating unless user typed a custom slug first
+                  setNewPageSlug((prev) => {
+                    if (!prev) return auto === '/' ? '' : auto
+                    const prevAutoFromOldTitle = `/${newPageTitle
+                      .trim()
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]+/g, '-')
+                      .replace(/^-|-$/g, '')}`
+                    if (prev === prevAutoFromOldTitle || prev === '/') return auto === '/' ? '' : auto
+                    return prev
+                  })
+                }}
+                placeholder="Page title"
                 className="w-full rounded-lg border px-2 py-1.5 text-sm"
               />
               <input
                 value={newPageSlug}
                 onChange={(e) => setNewPageSlug(e.target.value)}
-                placeholder="/offers"
+                placeholder="/offers (optional)"
                 className="w-full rounded-lg border px-2 py-1.5 text-sm"
               />
               <button
@@ -982,8 +1118,8 @@ export default function AdminSiteContentPage() {
                 Create page
               </button>
               <p className="text-[11px] leading-relaxed text-slate-500">
-                Custom pages publish at <code className="rounded bg-slate-100 px-1">/p/your-slug</code>. Built-in routes
-                (/about, /tours, …) use the matching slug.
+                New pages publish at <code className="rounded bg-slate-100 px-1">/p/…</code>. Edit Home/About/Contact
+                from the list to change their sections and copy.
               </p>
             </div>
           </div>
@@ -993,7 +1129,11 @@ export default function AdminSiteContentPage() {
             {selectedPage ? (
               <>
                 <div className="mb-3 space-y-2">
-                  <h2 className="text-sm font-bold text-slate-900">Layout</h2>
+                  <h2 className="text-sm font-bold text-slate-900">Sections / layout</h2>
+                  <p className="text-[11px] text-slate-500">
+                    Drag order with arrows. Toggle visibility or delete sections. Live URL:{' '}
+                    <code className="rounded bg-slate-100 px-1">{publicUrl}</code>
+                  </p>
                   <Field
                     label="Page title"
                     value={selectedPage.title}
@@ -1002,7 +1142,12 @@ export default function AdminSiteContentPage() {
                   <Field
                     label="Slug"
                     value={selectedPage.slug}
-                    onChange={(v) => updatePage(selectedPage.id, { slug: v, isCustom: !['/', '/about', '/contact', '/tours', '/rent-car', '/destinations', '/blog', '/custom-booking'].includes(v) })}
+                    onChange={(v) =>
+                      updatePage(selectedPage.id, {
+                        slug: v,
+                        isCustom: !isBuiltinPageSlug(v),
+                      })
+                    }
                   />
                   <button
                     type="button"
@@ -1010,7 +1155,7 @@ export default function AdminSiteContentPage() {
                     className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600"
                   >
                     {selectedPage.enabled ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                    {selectedPage.enabled ? 'Page enabled' : 'Page disabled'}
+                    {selectedPage.enabled ? 'Page published' : 'Page unpublished'}
                   </button>
                 </div>
                 <div className="space-y-1">
@@ -1027,6 +1172,9 @@ export default function AdminSiteContentPage() {
                         onClick={() => setSelectedSectionId(section.id)}
                       >
                         {SECTION_META[section.type]?.label || section.type}
+                        <span className="ml-1 font-normal text-slate-400">
+                          · {resolveSectionLayout(section)}
+                        </span>
                         {!section.enabled && <span className="ml-1 text-slate-400">(off)</span>}
                       </button>
                       <button type="button" className="p-1 text-slate-500" onClick={() => moveSection(selectedPage.id, section.id, -1)} disabled={index === 0}>
@@ -1107,27 +1255,98 @@ export default function AdminSiteContentPage() {
             )}
           </div>
 
-          {/* Section content */}
+          {/* Section content / page settings */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            {selectedSection && selectedPage ? (
+            {selectedPage ? (
               <>
-                <div className="mb-4">
-                  <h2 className="text-lg font-bold text-slate-900">
-                    {SECTION_META[selectedSection.type]?.label || selectedSection.type}
-                  </h2>
-                  <p className="text-sm text-slate-500">{SECTION_META[selectedSection.type]?.description}</p>
+                <div className="mb-4 flex gap-2 border-b border-slate-100 pb-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditorTab('content')}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                      editorTab === 'content' ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    <LayoutTemplate className="h-3.5 w-3.5" />
+                    Section content
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditorTab('settings')}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                      editorTab === 'settings' ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    <Settings2 className="h-3.5 w-3.5" />
+                    Page settings
+                  </button>
                 </div>
-                <SectionEditor
-                  section={selectedSection}
-                  onChange={(data) => updateSection(selectedPage.id, selectedSection.id, { data })}
-                />
+
+                {editorTab === 'settings' ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-slate-500">
+                      SEO and publish settings for <strong>{selectedPage.title}</strong>.
+                    </p>
+                    <Field
+                      label="SEO title"
+                      value={String(selectedPage.seoTitle || '')}
+                      onChange={(v) => updatePage(selectedPage.id, { seoTitle: v })}
+                    />
+                    <Field
+                      label="SEO description"
+                      value={String(selectedPage.seoDescription || '')}
+                      onChange={(v) => updatePage(selectedPage.id, { seoDescription: v })}
+                      multiline
+                      rows={4}
+                    />
+                    <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
+                      <p>
+                        <span className="font-semibold text-slate-800">Public URL:</span>{' '}
+                        <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="text-teal-700 hover:underline">
+                          {publicUrl}
+                        </a>
+                      </p>
+                      <p className="mt-2">
+                        <span className="font-semibold text-slate-800">Type:</span>{' '}
+                        {selectedPage.isCustom ? 'Custom CMS page' : 'Built-in website page'}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        Home page section order is partly fixed in the homepage design; About and custom pages follow
+                        this layout order exactly.
+                      </p>
+                    </div>
+                  </div>
+                ) : selectedSection ? (
+                  <>
+                    <div className="mb-4">
+                      <h2 className="text-lg font-bold text-slate-900">
+                        {SECTION_META[selectedSection.type]?.label || selectedSection.type}
+                      </h2>
+                      <p className="text-sm text-slate-500">{SECTION_META[selectedSection.type]?.description}</p>
+                    </div>
+                    <SectionLayoutPicker
+                      value={resolveSectionLayout(selectedSection)}
+                      onChange={(layout) =>
+                        updateSection(selectedPage.id, selectedSection.id, { layout })
+                      }
+                    />
+                    <SectionEditor
+                      section={selectedSection}
+                      onChange={(data) => updateSection(selectedPage.id, selectedSection.id, { data })}
+                    />
+                  </>
+                ) : (
+                  <p className="text-sm text-slate-500">Select a section in the layout panel to edit its content.</p>
+                )}
               </>
             ) : (
-              <p className="text-sm text-slate-500">Select a section to edit its content.</p>
+              <p className="text-sm text-slate-500">Select a page to start editing.</p>
             )}
           </div>
         </div>
       )}
+      </div>
+      </div>
     </div>
   )
 }

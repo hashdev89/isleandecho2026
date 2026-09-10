@@ -102,7 +102,7 @@ export async function GET() {
       { success: true, data },
       {
         headers: {
-          'Cache-Control': 'public, max-age=30, s-maxage=120, stale-while-revalidate=300',
+          'Cache-Control': 'no-store, must-revalidate',
         },
       }
     )
@@ -147,8 +147,9 @@ export async function PUT(request: NextRequest) {
         )
       }
     } else {
-      const saved = (await saveToSupabase(merged)).ok || saveSiteContentToFile(merged)
-      if (!saved) {
+      const remoteOk = (await saveToSupabase(merged)).ok
+      const localOk = saveSiteContentToFile(merged)
+      if (!remoteOk && !localOk) {
         return NextResponse.json(
           { success: false, error: 'Failed to save site content.' },
           { status: 500 }

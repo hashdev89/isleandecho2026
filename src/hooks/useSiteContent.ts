@@ -16,7 +16,7 @@ export function useSiteContent() {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch('/api/site-content', { cache: 'force-cache' })
+        const res = await fetch('/api/site-content', { cache: 'no-store' })
         const json = await res.json()
         if (!cancelled && json.success && json.data) {
           setDoc(normalizeSiteContent(json.data))

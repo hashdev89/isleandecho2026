@@ -21,11 +21,57 @@ export type SectionType =
   | 'contactForm'
   | 'html'
 
+/** Content container width for a CMS section */
+export type SectionLayout = 'full' | 'wide' | 'medium'
+
+export const SECTION_LAYOUT_OPTIONS: Array<{
+  id: SectionLayout
+  label: string
+  description: string
+}> = [
+  { id: 'full', label: 'Full width', description: 'Edge-to-edge site width' },
+  { id: 'wide', label: 'Wide', description: 'Large content band' },
+  { id: 'medium', label: 'Medium', description: 'Comfortable reading width' },
+]
+
 export type PageSection = {
   id: string
   type: SectionType
   enabled: boolean
+  /** Content width: full | wide | medium */
+  layout?: SectionLayout
   data: Record<string, unknown>
+}
+
+export function isSectionLayout(value: unknown): value is SectionLayout {
+  return value === 'full' || value === 'wide' || value === 'medium'
+}
+
+export function defaultLayoutForSection(type: SectionType): SectionLayout {
+  switch (type) {
+    case 'html':
+    case 'richText':
+      return 'medium'
+    default:
+      return 'full'
+  }
+}
+
+export function resolveSectionLayout(section: Pick<PageSection, 'layout' | 'type'>): SectionLayout {
+  if (isSectionLayout(section.layout)) return section.layout
+  return 'full'
+}
+
+export function sectionContainerClass(layout?: SectionLayout | string) {
+  switch (layout) {
+    case 'medium':
+      return 'mx-auto w-full max-w-3xl lp-gutter'
+    case 'wide':
+      return 'mx-auto w-full max-w-5xl lp-gutter'
+    case 'full':
+    default:
+      return 'mx-auto w-full max-w-[1920px] lp-gutter'
+  }
 }
 
 export type CmsPage = {
@@ -35,8 +81,24 @@ export type CmsPage = {
   enabled: boolean
   /** When true, also available at /p/[slug] for custom pages */
   isCustom?: boolean
+  /** Optional SEO overrides for this page */
+  seoTitle?: string
+  seoDescription?: string
   sections: PageSection[]
 }
+
+/** Built-in app routes that already have dedicated Next.js pages */
+export const BUILTIN_PAGE_SLUGS = new Set([
+  '/',
+  '/about',
+  '/contact',
+  '/tours',
+  '/rent-car',
+  '/destinations',
+  '/blog',
+  '/custom-booking',
+  '/privacy-policy',
+])
 
 export type SiteContentDoc = {
   version: 2
@@ -77,7 +139,7 @@ export const SECTION_META: Record<
   values: { label: 'Values', description: 'Values / principles grid' },
   contactInfo: { label: 'Contact info', description: 'Address, phone, email, hours' },
   contactForm: { label: 'Contact form intro', description: 'Form section title & helper text' },
-  html: { label: 'Custom HTML', description: 'Raw HTML block (advanced)' },
+  html: { label: 'Rich content', description: 'Advanced visual content editor (with optional HTML source)' },
 }
 
 export const ALL_SECTION_TYPES = Object.keys(SECTION_META) as SectionType[]
@@ -91,6 +153,7 @@ export function createSection(type: SectionType, data?: Record<string, unknown>)
     id: uid(type),
     type,
     enabled: true,
+    layout: defaultLayoutForSection(type),
     data: { ...defaultDataForSection(type), ...data },
   }
 }
@@ -328,7 +391,7 @@ export const defaultFooter: Record<string, unknown> = {
   supportLinks: [
     { label: 'Contact', url: '/contact' },
     { label: 'Legal Notice', url: '#' },
-    { label: 'Privacy Policy', url: '#' },
+    { label: 'Privacy Policy', url: '/privacy-policy' },
     { label: 'Terms and Conditions', url: '#' },
     { label: 'Sitemap', url: '/sitemap.xml' },
   ] as SiteLink[],
@@ -341,7 +404,7 @@ export const defaultFooter: Record<string, unknown> = {
   mobileHeading: 'Mobile',
   copyrightText: '© 2024 by ISLE & ECHO. All rights reserved.',
   bottomLinks: [
-    { label: 'Privacy', url: '#' },
+    { label: 'Privacy', url: '/privacy-policy' },
     { label: 'Terms', url: '#' },
     { label: 'Site Map', url: '/sitemap.xml' },
   ] as SiteLink[],
@@ -514,6 +577,81 @@ export function buildDefaultPages(legacy: Record<string, unknown> = {}): CmsPage
         }),
       ],
     },
+    {
+      id: 'page_privacy_policy',
+      slug: '/privacy-policy',
+      title: 'Privacy Policy',
+      enabled: true,
+      isCustom: false,
+      seoTitle: 'Privacy Policy | Isle & Echo',
+      seoDescription:
+        'How Isle & Echo collects, uses, stores, shares and protects your personal information.',
+      sections: buildPrivacyPolicySections(),
+    },
+  ]
+}
+
+function buildPrivacyPolicySections(): PageSection[] {
+  return [
+    createSection('pageHero', {
+      kicker: 'Legal',
+      title: 'Privacy Policy',
+      subtitle: 'How we collect, use, store, share and protect your personal information.',
+    }),
+    createSection('richText', {
+      kicker: 'Last Updated: August 2026',
+      title: 'Our commitment',
+      body: 'Isle & Echo respects your privacy and is committed to protecting the personal information of our customers, website visitors and people who contact us.',
+      body2:
+        'This Privacy Policy explains how we collect, use, store, share and protect your personal information when you visit our website, make an enquiry, book a tour or transport service, communicate with us or make a payment. By using our website or services, you acknowledge that your information may be handled as described in this Privacy Policy.',
+      image: '',
+    }),
+    createSection('html', {
+      html: `<h2>1. Who We Are</h2>
+<p>Isle &amp; Echo provides travel and tourism-related services, including customised tours, multi-day travel packages, chauffeur-driven transportation, airport transfers, taxi services and other travel experiences in Sri Lanka.</p>
+<p>For questions regarding this Privacy Policy or your personal information, please contact us using the details at the end of this policy.</p>
+<h2>2. Information We May Collect</h2>
+<p>Depending on how you interact with us, we may collect personal information (name, email, phone, nationality), booking and travel details (dates, passengers, pickup/drop-off, flight and hotel information, preferences), communication records, and website technical information (IP address, browser, device, pages visited).</p>
+
+<h2>3. How We Use Your Information</h2>
+<p>We may use your information to respond to enquiries, prepare itineraries and quotations, process bookings, provide tours and transportation, arrange airport transfers, communicate about your trip, confirm payments, provide support, improve our services, maintain records, prevent fraud, and meet legal obligations. Where permitted, we may send promotional information; you may opt out where applicable.</p>
+
+<h2>4. Payment Information</h2>
+<p>Online payments may be processed through authorised third-party payment providers. Isle &amp; Echo does not intentionally store complete payment card details unless specifically required and permitted through an authorised arrangement.</p>
+
+<h2>5. How We Share Your Information</h2>
+<p>We may share relevant information with trusted third parties such as hotels, drivers, guides, activity providers, restaurants, payment providers, and technology providers where necessary to deliver your requested services, or where required by law.</p>
+
+<h2>6. International Transfers of Information</h2>
+<p>As we serve customers from different countries and operate in Sri Lanka, personal information may be processed or shared across borders where necessary. We take reasonable steps to handle information appropriately.</p>
+
+<h2>7. Cookies and Similar Technologies</h2>
+<p>Our website may use cookies and similar technologies to improve functionality, analyse traffic and enhance experience. You may control cookies in your browser settings; disabling some cookies may affect website features.</p>
+
+<h2>8. Data Retention</h2>
+<p>We retain personal information as long as reasonably necessary for bookings, support, accounting, legal obligations, disputes and business records, then delete or securely dispose of it subject to legal requirements.</p>
+
+<h2>9. Data Security</h2>
+<p>We take reasonable technical and organisational measures to protect personal information. No internet transmission or electronic storage can be guaranteed completely secure.</p>
+
+<h2>10. Your Rights</h2>
+<p>Depending on applicable laws, you may request access, correction, deletion in certain circumstances, object to certain uses, withdraw consent where relevant, or ask how your information is used. Contact us to make a request.</p>
+
+<h2>11. Third-Party Websites</h2>
+<p>Our website may link to third-party sites. Isle &amp; Echo is not responsible for their privacy practices, security or content.</p>
+
+<h2>12. Children's Privacy</h2>
+<p>Our services are not specifically directed at children acting independently. Bookings involving minors should normally be made by or with a parent, legal guardian or authorised adult.</p>
+
+<h2>13. Changes to This Privacy Policy</h2>
+<p>We may update this Privacy Policy from time to time. Updated versions will be published on this page with a revised &quot;Last Updated&quot; date.</p>
+
+<h2>14. Contact Us</h2>
+<p><strong>Isle &amp; Echo</strong><br/>
+Website: <a href="https://isleandecho.com">https://isleandecho.com</a><br/>
+Email: <a href="mailto:info@isleandecho.com">info@isleandecho.com</a><br/>
+Mobile: <a href="tel:+94741415812">+94 741 415 812</a> / <a href="tel:+447756026869">+44 7756 026 869</a></p>`,
+    }),
   ]
 }
 
@@ -580,13 +718,19 @@ export function normalizeSiteContent(raw: Record<string, unknown> | null | undef
       title: p.title || 'Untitled',
       enabled: p.enabled !== false,
       isCustom: Boolean(p.isCustom),
+      seoTitle: typeof p.seoTitle === 'string' ? p.seoTitle : '',
+      seoDescription: typeof p.seoDescription === 'string' ? p.seoDescription : '',
       sections: Array.isArray(p.sections)
-        ? p.sections.map((s) => ({
-            id: s.id || uid(s.type || 'sec'),
-            type: (s.type || 'richText') as SectionType,
-            enabled: s.enabled !== false,
-            data: { ...defaultDataForSection((s.type || 'richText') as SectionType), ...(s.data || {}) },
-          }))
+        ? p.sections.map((s) => {
+            const type = (s.type || 'richText') as SectionType
+            return {
+              id: s.id || uid(type),
+              type,
+              enabled: s.enabled !== false,
+              layout: isSectionLayout(s.layout) ? s.layout : undefined,
+              data: { ...defaultDataForSection(type), ...(s.data || {}) },
+            }
+          })
         : [],
     }))
 
@@ -626,6 +770,20 @@ export function normalizeSlug(slug: string): string {
   return withSlash.replace(/\/+$/, '') || '/'
 }
 
+export function isBuiltinPageSlug(slug: string): boolean {
+  return BUILTIN_PAGE_SLUGS.has(normalizeSlug(slug))
+}
+
+/** Public URL visitors use for a CMS page */
+export function getPagePublicUrl(page: Pick<CmsPage, 'slug' | 'isCustom'>): string {
+  const slug = normalizeSlug(page.slug)
+  if (page.isCustom || !isBuiltinPageSlug(slug)) {
+    const path = slug === '/' ? '' : slug.replace(/^\//, '')
+    return path ? `/p/${path}` : '/p'
+  }
+  return slug
+}
+
 export function getPageBySlug(doc: SiteContentDoc, slug: string): CmsPage | undefined {
   const target = normalizeSlug(slug)
   return doc.pages.find((p) => normalizeSlug(p.slug) === target && p.enabled !== false)
@@ -648,17 +806,20 @@ export function getEnabledSections(page: CmsPage | undefined): PageSection[] {
 }
 
 export function createBlankPage(title: string, slug: string): CmsPage {
+  const normalized = normalizeSlug(slug)
   return {
     id: uid('page'),
-    slug: normalizeSlug(slug),
+    slug: normalized,
     title: title || 'New page',
     enabled: true,
-    isCustom: true,
+    isCustom: !isBuiltinPageSlug(normalized),
+    seoTitle: title || 'New page',
+    seoDescription: '',
     sections: [
       createSection('pageHero', {
         kicker: 'New page',
         title: title || 'New page',
-        subtitle: 'Edit this content in Site Content CMS.',
+        subtitle: 'Edit this content in the Pages CMS.',
       }),
       createSection('richText', {
         kicker: '',
@@ -666,6 +827,14 @@ export function createBlankPage(title: string, slug: string): CmsPage {
         body: 'Add your story here. Reorder or add more sections from the layout panel.',
         body2: '',
         image: '',
+      }),
+      createSection('cta', {
+        title: 'Ready to plan your trip?',
+        subtitle: 'Tell us what you need and we’ll craft the right itinerary.',
+        primaryButtonText: 'Contact us',
+        primaryButtonUrl: '/contact',
+        secondaryButtonText: 'View tours',
+        secondaryButtonUrl: '/tours',
       }),
     ],
   }
