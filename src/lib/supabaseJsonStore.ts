@@ -11,16 +11,24 @@ function hasSupabase() {
 }
 
 async function ensureBucket() {
-  const { data: buckets } = await supabaseAdmin.storage.listBuckets()
-  if (buckets?.some((b) => b.name === BUCKET)) return true
+  try {
+    const { data: buckets } = await supabaseAdmin.storage.listBuckets()
+    if (buckets?.some((b) => b.name === BUCKET)) return true
+  } catch (e) {
+    console.warn('listBuckets failed, will try upload anyway:', e)
+  }
+
   const { error } = await supabaseAdmin.storage.createBucket(BUCKET, {
     public: false,
     allowedMimeTypes: ['application/json'],
     fileSizeLimit: '5MB',
   })
   if (error) {
-    console.error('app json bucket create:', error.message)
-    return false
+    // Bucket may already exist, or creation may be restricted — still try upload
+    const msg = (error.message || '').toLowerCase()
+    if (msg.includes('already') || msg.includes('exists')) return true
+    console.warn('app json bucket create:', error.message)
+    return true
   }
   return true
 }
@@ -41,10 +49,13 @@ export async function saveAppJson(key: string, value: unknown): Promise<boolean>
   if (!hasSupabase()) return false
   try {
     if (!(await ensureBucket())) return false
-    const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' })
+    const payload = JSON.stringify(value, null, 2)
+    // Prefer Buffer on Node/serverless — Blob uploads can fail on some hosts
+    const body =
+      typeof Buffer !== 'undefined' ? Buffer.from(payload, 'utf8') : new Blob([payload], { type: 'application/json' })
     const { error } = await supabaseAdmin.storage
       .from(BUCKET)
-      .upload(key, blob, { contentType: 'application/json', upsert: true })
+      .upload(key, body, { contentType: 'application/json', upsert: true })
     if (error) {
       console.error(`saveAppJson ${key}:`, error.message)
       return false

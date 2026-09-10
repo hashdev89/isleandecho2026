@@ -35,7 +35,7 @@ export default function VehiclesAdminPage() {
     const res = await fetch(`/api/vehicles?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
     const json = await res.json()
     if (json.success) setVehicles((prev) => prev.filter((v) => v.id !== id))
-    else alert(json.message || 'Delete failed')
+    else alert(json.message || json.error || 'Delete failed')
   }
 
   return (

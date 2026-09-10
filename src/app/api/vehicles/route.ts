@@ -74,7 +74,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: newVehicle, message: 'Vehicle created' }, { status: 201 })
   } catch (error) {
     console.error('POST /api/vehicles error:', error)
-    return NextResponse.json({ success: false, error: 'Failed to create vehicle' }, { status: 500 })
+    const detail = error instanceof Error ? error.message : 'Failed to create vehicle'
+    return NextResponse.json({ success: false, error: detail, message: detail }, { status: 500 })
   }
 }
 
@@ -95,6 +96,28 @@ export async function PUT(request: NextRequest) {
       ...vehicles[index],
       ...body,
       id: body.id,
+      basePricePerDay:
+        body.basePricePerDay != null ? Number(body.basePricePerDay) : vehicles[index].basePricePerDay,
+      includedKmPerDay:
+        body.includedKmPerDay != null
+          ? Number(body.includedKmPerDay)
+          : vehicles[index].includedKmPerDay,
+      extraKmRate: body.extraKmRate != null ? Number(body.extraKmRate) : vehicles[index].extraKmRate,
+      oneWayDropoffFee:
+        body.oneWayDropoffFee != null
+          ? Number(body.oneWayDropoffFee)
+          : vehicles[index].oneWayDropoffFee,
+      seats: body.seats != null ? Number(body.seats) : vehicles[index].seats,
+      passengers:
+        body.passengers != null
+          ? Number(body.passengers)
+          : body.seats != null
+            ? Number(body.seats)
+            : vehicles[index].passengers,
+      luggage: body.luggage != null ? Number(body.luggage) : vehicles[index].luggage,
+      doors: body.doors != null ? Number(body.doors) : vehicles[index].doors,
+      features: Array.isArray(body.features) ? body.features : vehicles[index].features,
+      images: Array.isArray(body.images) ? body.images : vehicles[index].images,
       updatedAt: new Date().toISOString(),
     }
     vehicles[index] = updated
@@ -103,7 +126,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true, data: updated, message: 'Vehicle updated' })
   } catch (error) {
     console.error('PUT /api/vehicles error:', error)
-    return NextResponse.json({ success: false, error: 'Failed to update vehicle' }, { status: 500 })
+    const detail = error instanceof Error ? error.message : 'Failed to update vehicle'
+    return NextResponse.json({ success: false, error: detail, message: detail }, { status: 500 })
   }
 }
 
@@ -124,6 +148,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true, message: 'Vehicle deleted' })
   } catch (error) {
     console.error('DELETE /api/vehicles error:', error)
-    return NextResponse.json({ success: false, error: 'Failed to delete vehicle' }, { status: 500 })
+    const detail = error instanceof Error ? error.message : 'Failed to delete vehicle'
+    return NextResponse.json({ success: false, error: detail, message: detail }, { status: 500 })
   }
 }

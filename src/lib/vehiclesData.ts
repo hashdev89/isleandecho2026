@@ -117,7 +117,11 @@ const CACHE_DURATION = 5 * 60 * 1000
 const ensureDataDir = () => {
   const dataDir = path.join(process.cwd(), 'data')
   if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true })
+    try {
+      fs.mkdirSync(dataDir, { recursive: true })
+    } catch {
+      // Vercel / serverless: filesystem is often read-only
+    }
   }
 }
 
@@ -131,9 +135,16 @@ function readLocalVehicles(): Vehicle[] | null {
   }
 }
 
-function writeLocalVehicles(vehicles: Vehicle[]) {
-  ensureDataDir()
-  fs.writeFileSync(FALLBACK_FILE, JSON.stringify(vehicles, null, 2))
+/** Best-effort local write — returns false on read-only hosts (e.g. Vercel). */
+function writeLocalVehicles(vehicles: Vehicle[]): boolean {
+  try {
+    ensureDataDir()
+    fs.writeFileSync(FALLBACK_FILE, JSON.stringify(vehicles, null, 2))
+    return true
+  } catch (error) {
+    console.warn('writeLocalVehicles skipped (read-only filesystem):', error)
+    return false
+  }
 }
 
 function vehicleStamp(v: Vehicle): number {
@@ -213,14 +224,24 @@ export async function saveVehicles(vehicles: Vehicle[]) {
     ...v,
     updatedAt: v.updatedAt || new Date().toISOString(),
   }))
-  writeLocalVehicles(stamped)
+
+  // Update memory first so this request sees the new list immediately
   vehiclesCache = stamped
   cacheTimestamp = Date.now()
 
+  const localOk = writeLocalVehicles(stamped)
   const remoteOk = await saveAppJson('vehicles.json', stamped)
-  if (!remoteOk) {
-    console.warn('Vehicles saved locally; Supabase sync unavailable or failed')
+
+  if (!localOk && !remoteOk) {
+    throw new Error(
+      'Could not persist vehicles. On live hosting the server filesystem is read-only — configure Supabase (NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) and ensure the site-content storage bucket allows uploads.'
+    )
   }
+
+  if (!remoteOk) {
+    console.warn('Vehicles saved locally only; Supabase sync unavailable or failed')
+  }
+
   return stamped
 }
 
