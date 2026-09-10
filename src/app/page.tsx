@@ -1003,17 +1003,32 @@ export default function HomePage() {
   }, [featuredTours.length]);
 
   // Function to navigate to specific featured tour slide
-  const goToFeaturedSlide = (slideIndex: number) => {
-    const container = document.getElementById('tour-slider');
-    if (!container) return
+  const getFeaturedCardStep = (container: HTMLElement) => {
     const first = container.children[0] as HTMLElement | undefined
     const second = container.children[1] as HTMLElement | undefined
-    const cardStep = first
-      ? (second ? second.offsetLeft - first.offsetLeft : first.offsetWidth)
-      : 300
-    container.scrollTo({ left: slideIndex * cardStep, behavior: 'smooth' })
-    setFeaturedTourSlide(slideIndex)
-  };
+    if (!first) return 300
+    if (second) return second.offsetLeft - first.offsetLeft
+    return first.offsetWidth || 300
+  }
+
+  const goToFeaturedSlide = (slideIndex: number) => {
+    const container = document.getElementById('tour-slider')
+    if (!container || featuredTours.length === 0) return
+    const cardStep = getFeaturedCardStep(container)
+    const maxIndex = Math.max(0, featuredTours.length - 1)
+    const nextIndex = Math.max(0, Math.min(slideIndex, maxIndex))
+    container.scrollTo({ left: nextIndex * cardStep, behavior: 'smooth' })
+    setFeaturedTourSlide(nextIndex)
+  }
+
+  const scrollFeaturedBy = (direction: -1 | 1) => {
+    const container = document.getElementById('tour-slider')
+    if (!container || featuredTours.length === 0) return
+    const cardStep = getFeaturedCardStep(container)
+    if (cardStep <= 0) return
+    const currentIndex = Math.round(container.scrollLeft / cardStep)
+    goToFeaturedSlide(currentIndex + direction)
+  }
 
   return (
     <div className="min-h-screen bg-[var(--foam)] dark:bg-[var(--foam)] lp-section-ink">
@@ -2185,9 +2200,11 @@ export default function HomePage() {
                 <p className="mt-2 text-[var(--ink-soft)]">{String(featuredCms.subtitle)}</p>
               ) : null}
             </div>
-            <Link href="/tours" className="inline-flex items-center gap-2 font-semibold text-[var(--lagoon)] hover:text-[var(--lagoon-deep)] transition-colors">
-              View all trips <ArrowRight className="w-4 h-4" />
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/tours" className="inline-flex items-center gap-2 font-semibold text-[var(--lagoon)] hover:text-[var(--lagoon-deep)] transition-colors">
+                View all trips <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
           <div className="relative">
             {/* Slider Container */}
@@ -2257,36 +2274,51 @@ export default function HomePage() {
             )}
             </div>
 
-            {/* Pagination dots — all breakpoints */}
+            {/* Bottom arrows + progress — scrolls one card at a time */}
             {featuredTours && featuredTours.length > 1 && (
-              <div
-                className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5 mt-5 sm:mt-6"
-                role="tablist"
-                aria-label="Featured tour packages"
-              >
-                {featuredTours.map((tour, index) => (
+              <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5">
+                <div className="flex items-center gap-2">
                   <button
-                    key={tour.id || `dot-${index}`}
                     type="button"
-                    role="tab"
-                    aria-selected={featuredTourSlide === index}
-                    aria-label={`Go to tour ${index + 1}: ${tour.name}`}
-                    onClick={() => goToFeaturedSlide(index)}
-                    className={`rounded-full transition-all duration-300 touch-manipulation min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${
-                      featuredTourSlide === index
-                        ? 'px-1'
-                        : 'px-1 opacity-80 hover:opacity-100'
-                    }`}
+                    aria-label="Previous featured tours"
+                    onClick={() => scrollFeaturedBy(-1)}
+                    disabled={featuredTourSlide <= 0}
+                    className="w-11 h-11 rounded-full border border-black/10 bg-white shadow-sm flex items-center justify-center text-[var(--lagoon-deep)] hover:bg-[var(--foam)] disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
                   >
-                    <span
-                      className={`block rounded-full transition-all duration-300 ${
-                        featuredTourSlide === index
-                          ? 'w-6 sm:w-7 h-2.5 sm:h-3 bg-[var(--lagoon-deep)]'
-                          : 'w-2.5 sm:w-3 h-2.5 sm:h-3 bg-[var(--lagoon-deep)]/30'
-                      }`}
-                    />
+                    <ChevronLeft className="w-5 h-5" strokeWidth={2.25} />
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    aria-label="Next featured tours"
+                    onClick={() => scrollFeaturedBy(1)}
+                    disabled={featuredTourSlide >= featuredTours.length - 1}
+                    className="w-11 h-11 rounded-full border border-black/10 bg-white shadow-sm flex items-center justify-center text-[var(--lagoon-deep)] hover:bg-[var(--foam)] disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="w-5 h-5" strokeWidth={2.25} />
+                  </button>
+                </div>
+
+                <div
+                  className="flex-1 h-1.5 rounded-full bg-[var(--lagoon-deep)]/10 overflow-hidden"
+                  role="progressbar"
+                  aria-valuemin={1}
+                  aria-valuemax={featuredTours.length}
+                  aria-valuenow={featuredTourSlide + 1}
+                  aria-label="Featured tour position"
+                >
+                  <div
+                    className="h-full rounded-full bg-[var(--lagoon-deep)] transition-all duration-300 ease-out"
+                    style={{
+                      width: `${((featuredTourSlide + 1) / featuredTours.length) * 100}%`,
+                    }}
+                  />
+                </div>
+
+                <p className="shrink-0 text-sm font-semibold tabular-nums text-[var(--lagoon-deep)] tracking-wide">
+                  <span className="text-base">{String(featuredTourSlide + 1).padStart(2, '0')}</span>
+                  <span className="mx-1.5 text-[var(--ink-soft)] font-normal">/</span>
+                  <span className="text-[var(--ink-soft)]">{String(featuredTours.length).padStart(2, '0')}</span>
+                </p>
               </div>
             )}
           </div>
