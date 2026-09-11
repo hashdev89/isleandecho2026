@@ -98,6 +98,7 @@ export const BUILTIN_PAGE_SLUGS = new Set([
   '/blog',
   '/custom-booking',
   '/privacy-policy',
+  '/terms-conditions',
 ])
 
 export type SiteContentDoc = {
@@ -392,7 +393,7 @@ export const defaultFooter: Record<string, unknown> = {
     { label: 'Contact', url: '/contact' },
     { label: 'Legal Notice', url: '#' },
     { label: 'Privacy Policy', url: '/privacy-policy' },
-    { label: 'Terms and Conditions', url: '#' },
+    { label: 'Terms and Conditions', url: '/terms-conditions' },
     { label: 'Sitemap', url: '/sitemap.xml' },
   ] as SiteLink[],
   otherServicesHeading: 'Other Services',
@@ -405,7 +406,7 @@ export const defaultFooter: Record<string, unknown> = {
   copyrightText: '© 2024 by ISLE & ECHO. All rights reserved.',
   bottomLinks: [
     { label: 'Privacy', url: '/privacy-policy' },
-    { label: 'Terms', url: '#' },
+    { label: 'Terms', url: '/terms-conditions' },
     { label: 'Site Map', url: '/sitemap.xml' },
   ] as SiteLink[],
 }
